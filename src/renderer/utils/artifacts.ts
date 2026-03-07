@@ -2,16 +2,7 @@ import type { Artifact } from '@/components/ArtifactPanel';
 import type { Message, WriteInput } from '@/types/chat';
 
 const HTML_EXTENSIONS = new Set(['html', 'htm', 'svg']);
-const IMAGE_EXTENSIONS = new Set([
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'webp',
-  'bmp',
-  'avif',
-  'ico'
-]);
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'ico']);
 
 function getExtension(filePath: string): string {
   return filePath.split('.').pop()?.toLowerCase() || '';

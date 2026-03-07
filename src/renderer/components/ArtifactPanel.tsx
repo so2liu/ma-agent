@@ -56,7 +56,12 @@ export default function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps)
           return;
         }
         if (response.isText) {
-          setDiskResult({ path: targetPath, content: response.content, dataUrl: null, error: null });
+          setDiskResult({
+            path: targetPath,
+            content: response.content,
+            dataUrl: null,
+            error: null
+          });
         } else {
           setDiskResult({
             path: targetPath,
