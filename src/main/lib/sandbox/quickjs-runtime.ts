@@ -109,10 +109,35 @@ export async function createSandboxApp(
 ): Promise<SandboxApp> {
   const module = await getModule();
 
+  // Validate backend code compiles at creation time
+  const testVm = module.newContext();
+  try {
+    const testResult = testVm.evalCode(`${backendCode}\ntypeof handleRequest === 'function'`);
+    if (testResult.error) {
+      const err = testVm.dump(testResult.error);
+      testResult.error.dispose();
+      throw new Error(`Backend code compilation failed: ${String(err)}`);
+    }
+    const isValid = testVm.dump(testResult.value);
+    testResult.value.dispose();
+    if (isValid !== true) {
+      throw new Error('Backend code must export a handleRequest function');
+    }
+  } finally {
+    testVm.dispose();
+  }
+
   const db = createDBApi(dataPath);
   const logger = createLoggerApi(appId);
 
-  const handleRequest = async (req: SandboxRequest): Promise<SandboxResponse> => {
+  // Serialize requests to prevent concurrent snapshot-then-overwrite data loss
+  let requestQueue: Promise<SandboxResponse> = Promise.resolve({
+    status: 200,
+    headers: {},
+    body: ''
+  });
+
+  const executeRequest = async (req: SandboxRequest): Promise<SandboxResponse> => {
     const dbSnapshot = db.getAll();
     const code = buildSandboxCode(backendCode, dbSnapshot, req);
 
@@ -165,6 +190,14 @@ export async function createSandboxApp(
     } finally {
       vm.dispose();
     }
+  };
+
+  const handleRequest = (req: SandboxRequest): Promise<SandboxResponse> => {
+    requestQueue = requestQueue.then(
+      () => executeRequest(req),
+      () => executeRequest(req)
+    );
+    return requestQueue;
   };
 
   return {

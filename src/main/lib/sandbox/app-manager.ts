@@ -74,11 +74,6 @@ class AppManager {
   }
 
   private async _doPublish(workspaceDir: string, appId: string): Promise<PublishResult> {
-    // Stop if already running
-    if (this.runningApps.has(appId)) {
-      await this.stop(appId);
-    }
-
     const appDir = join(workspaceDir, 'apps', appId);
     const indexPath = join(appDir, 'index.html');
     const serverPath = join(appDir, 'server.js');
@@ -99,11 +94,16 @@ class AppManager {
       writeFileSync(dataPath, '[]');
     }
 
-    // Create sandbox
+    // Create sandbox first (validates backend code before stopping old app)
     const sandbox = await createSandboxApp(backendJs, appId, dataPath);
 
-    // Start HTTP server
+    // Start new HTTP server before stopping old one
     const server = await startAppServer(frontendHtml, sandbox);
+
+    // Only stop old app after new one is successfully running
+    if (this.runningApps.has(appId)) {
+      await this.stop(appId);
+    }
 
     this.runningApps.set(appId, {
       sandbox,

@@ -36,43 +36,27 @@ function readBody(req: import('node:http').IncomingMessage): Promise<string | nu
   });
 }
 
-async function findAvailablePort(startPort: number, endPort: number): Promise<number> {
-  const net = await import('node:net');
-
-  for (let port = startPort; port <= endPort; port++) {
-    const available = await new Promise<boolean>((resolve) => {
-      const server = net.createServer();
-      server.once('error', () => resolve(false));
-      server.once('listening', () => {
-        server.close(() => resolve(true));
-      });
-      server.listen(port);
-    });
-    if (available) return port;
-  }
-  throw new Error(`No available port in range ${startPort}-${endPort}`);
-}
-
-function getLanIP(): string {
+function getLanIPs(): string[] {
   const nets = networkInterfaces();
+  const ips: string[] = [];
   for (const name of Object.keys(nets)) {
     for (const net of nets[name] ?? []) {
       if (net.family === 'IPv4' && !net.internal) {
-        return net.address;
+        ips.push(net.address);
       }
     }
   }
-  return 'localhost';
+  return ips;
 }
 
 export async function startAppServer(
   frontendHtml: string,
   sandboxApp: SandboxApp
 ): Promise<AppServer> {
-  const port = await findAvailablePort(3456, 3500);
-
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url ?? '/', `http://localhost:${String(port)}`);
+    const addr = server.address();
+    const boundPort = typeof addr === 'object' && addr ? addr.port : 0;
+    const url = new URL(req.url ?? '/', `http://localhost:${String(boundPort)}`);
 
     // CORS headers - restrict to same-origin (LAN app served from same host)
     const origin = req.headers.origin;
@@ -89,9 +73,13 @@ export async function startAppServer(
       return;
     }
 
-    // Serve frontend
+    // Serve frontend with CSP to restrict client-side capabilities
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Security-Policy':
+          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'"
+      });
       res.end(frontendHtml);
       return;
     }
@@ -135,15 +123,19 @@ export async function startAppServer(
     res.end('Not Found');
   });
 
-  await new Promise<void>((resolve) => {
-    server.listen(port, () => resolve());
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, () => resolve());
   });
 
-  const lanIp = getLanIP();
+  const addr = server.address();
+  const port = typeof addr === 'object' && addr ? addr.port : 0;
+  const lanIps = getLanIPs();
+  const primaryIp = lanIps[0] ?? 'localhost';
 
   return {
     port,
-    lanUrl: `http://${lanIp}:${String(port)}`,
+    lanUrl: `http://${primaryIp}:${String(port)}`,
     localUrl: `http://localhost:${String(port)}`,
     stop: () =>
       new Promise((resolve) => {
