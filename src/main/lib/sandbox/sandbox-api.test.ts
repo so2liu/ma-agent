@@ -1,9 +1,11 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
-import { createDBApi } from './sandbox-api';
+import { Database } from 'bun:sqlite';
+
+import { createDBApi, migrateJsonToSqlite } from './sandbox-api';
 
 describe('createDBApi', () => {
   let tempDir: string;
@@ -11,8 +13,7 @@ describe('createDBApi', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'sandbox-test-'));
-    dataPath = join(tempDir, 'data.json');
-    writeFileSync(dataPath, '[]');
+    dataPath = join(tempDir, 'data.sqlite');
   });
 
   afterEach(() => {
@@ -24,6 +25,7 @@ describe('createDBApi', () => {
   test('getAll returns empty array initially', () => {
     const db = createDBApi(dataPath);
     expect(db.getAll()).toEqual([]);
+    db.close();
   });
 
   test('insert adds record with id and createdAt', () => {
@@ -34,6 +36,7 @@ describe('createDBApi', () => {
     expect(record.employeeId).toBe('001');
     expect(record.id).toBeDefined();
     expect(record.createdAt).toBeDefined();
+    db.close();
   });
 
   test('getAll returns inserted records', () => {
@@ -43,6 +46,7 @@ describe('createDBApi', () => {
 
     const all = db.getAll();
     expect(all).toHaveLength(2);
+    db.close();
   });
 
   test('getById finds record', () => {
@@ -52,11 +56,13 @@ describe('createDBApi', () => {
     const found = db.getById(inserted.id as string);
     expect(found).not.toBeNull();
     expect(found?.name).toBe('Alice');
+    db.close();
   });
 
   test('getById returns null for missing id', () => {
     const db = createDBApi(dataPath);
     expect(db.getById('nonexistent')).toBeNull();
+    db.close();
   });
 
   test('update modifies record', () => {
@@ -68,11 +74,13 @@ describe('createDBApi', () => {
 
     const updated = db.getById(inserted.id as string);
     expect(updated?.name).toBe('Alice Updated');
+    db.close();
   });
 
   test('update returns false for missing id', () => {
     const db = createDBApi(dataPath);
     expect(db.update('nonexistent', { name: 'x' })).toBe(false);
+    db.close();
   });
 
   test('remove deletes record', () => {
@@ -82,11 +90,13 @@ describe('createDBApi', () => {
     const result = db.remove(inserted.id as string);
     expect(result).toBe(true);
     expect(db.getAll()).toHaveLength(0);
+    db.close();
   });
 
   test('remove returns false for missing id', () => {
     const db = createDBApi(dataPath);
     expect(db.remove('nonexistent')).toBe(false);
+    db.close();
   });
 
   test('query filters by field value', () => {
@@ -97,15 +107,73 @@ describe('createDBApi', () => {
 
     const engineers = db.query({ dept: 'eng' });
     expect(engineers).toHaveLength(2);
+    db.close();
   });
 
-  test('data persists to disk', () => {
+  test('data persists to sqlite file', () => {
     const db = createDBApi(dataPath);
     db.insert({ name: 'Alice' });
+    db.close();
 
-    // Read directly from file
-    const raw = JSON.parse(readFileSync(dataPath, 'utf-8'));
-    expect(raw).toHaveLength(1);
-    expect(raw[0].name).toBe('Alice');
+    const rawDb = new Database(dataPath, { readonly: true });
+    const rows = rawDb.prepare('SELECT * FROM records').all();
+    expect(rows).toHaveLength(1);
+    rawDb.close();
+  });
+});
+
+describe('migrateJsonToSqlite', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'migrate-test-'));
+  });
+
+  afterEach(() => {
+    if (existsSync(tempDir)) {
+      rmSync(tempDir, { recursive: true });
+    }
+  });
+
+  test('migrates data.json to data.sqlite', () => {
+    const jsonPath = join(tempDir, 'data.json');
+    const sqlitePath = join(tempDir, 'data.sqlite');
+
+    writeFileSync(
+      jsonPath,
+      JSON.stringify([
+        { id: 'abc', name: 'Alice', createdAt: '2024-01-01T00:00:00Z' },
+        { id: 'def', name: 'Bob', createdAt: '2024-01-02T00:00:00Z' }
+      ])
+    );
+
+    migrateJsonToSqlite(jsonPath, sqlitePath);
+
+    expect(existsSync(sqlitePath)).toBe(true);
+    expect(existsSync(jsonPath)).toBe(false);
+
+    const db = createDBApi(sqlitePath);
+    const all = db.getAll();
+    expect(all).toHaveLength(2);
+    expect(all.find((r) => r.id === 'abc')?.name).toBe('Alice');
+    db.close();
+  });
+
+  test('skips migration if sqlite already exists', () => {
+    const jsonPath = join(tempDir, 'data.json');
+    const sqlitePath = join(tempDir, 'data.sqlite');
+
+    writeFileSync(jsonPath, JSON.stringify([{ id: 'abc', name: 'Alice', createdAt: '2024-01-01' }]));
+
+    const db = createDBApi(sqlitePath);
+    db.close();
+
+    migrateJsonToSqlite(jsonPath, sqlitePath);
+
+    expect(existsSync(jsonPath)).toBe(true);
+
+    const db2 = createDBApi(sqlitePath);
+    expect(db2.getAll()).toHaveLength(0);
+    db2.close();
   });
 });

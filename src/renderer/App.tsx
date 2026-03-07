@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import DbViewer from '@/components/DbViewer';
 import UpdateCheckFeedback from '@/components/UpdateCheckFeedback';
 import UpdateReadyBanner from '@/components/UpdateReadyBanner';
 import Chat from '@/pages/Chat';
@@ -7,11 +8,17 @@ import Schedules from '@/pages/Schedules';
 import Settings from '@/pages/Settings';
 import Skills from '@/pages/Skills';
 
-type View = 'home' | 'settings' | 'skills' | 'schedules';
+type View = 'home' | 'settings' | 'skills' | 'schedules' | 'db-viewer';
+
+interface DbViewerState {
+  appId: string;
+  appName: string;
+}
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('home');
   const currentViewRef = useRef<View>('home');
+  const [dbViewerState, setDbViewerState] = useState<DbViewerState | null>(null);
 
   useEffect(() => {
     // Update ref whenever currentView changes
@@ -34,6 +41,11 @@ export default function App() {
     };
   }, []);
 
+  const openDbViewer = (appId: string, appName: string) => {
+    setDbViewerState({ appId, appName });
+    setCurrentView('db-viewer');
+  };
+
   return (
     <>
       <UpdateCheckFeedback />
@@ -47,11 +59,21 @@ export default function App() {
       <div className={currentView === 'schedules' ? 'block' : 'hidden'}>
         <Schedules onBack={() => setCurrentView('home')} />
       </div>
+      {currentView === 'db-viewer' && dbViewerState && (
+        <div className="h-screen">
+          <DbViewer
+            appId={dbViewerState.appId}
+            appName={dbViewerState.appName}
+            onClose={() => setCurrentView('home')}
+          />
+        </div>
+      )}
       <div className={currentView === 'home' ? 'block' : 'hidden'}>
         <Chat
           onSettingsClick={() => setCurrentView('settings')}
           onSkillsClick={() => setCurrentView('skills')}
           onSchedulesClick={() => setCurrentView('schedules')}
+          onOpenDbViewer={openDbViewer}
         />
       </div>
     </>

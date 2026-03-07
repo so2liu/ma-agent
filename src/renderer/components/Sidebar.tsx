@@ -35,6 +35,7 @@ interface SidebarProps {
   onSettingsClick?: () => void;
   onSkillsClick?: () => void;
   onSchedulesClick?: () => void;
+  onOpenDbViewer?: (appId: string, appName: string) => void;
 }
 
 export default function Sidebar({
@@ -47,6 +48,7 @@ export default function Sidebar({
   onSettingsClick,
   onSkillsClick,
   onSchedulesClick,
+  onOpenDbViewer,
 }: SidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -648,7 +650,7 @@ export default function Sidebar({
 
       {/* Apps Panel */}
       <div className="border-t border-neutral-200/70 dark:border-neutral-800">
-        <AppPanel />
+        <AppPanel onOpenDbViewer={onOpenDbViewer} />
       </div>
 
       {/* File Tree - bottom section (collapsible) */}

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -11,8 +11,7 @@ describe('createSandboxApp', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'quickjs-test-'));
-    dataPath = join(tempDir, 'data.json');
-    writeFileSync(dataPath, '[]');
+    dataPath = join(tempDir, 'data.sqlite');
   });
 
   afterEach(() => {

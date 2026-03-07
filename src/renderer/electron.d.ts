@@ -270,6 +270,23 @@ export interface SkillDiscoverResponse {
   error?: string;
 }
 
+export interface DbColumn {
+  name: string;
+  type: string;
+  pk: boolean;
+}
+
+export interface DbQueryResponse {
+  success: boolean;
+  rows?: Record<string, unknown>[];
+  columns?: DbColumn[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
+  isRecordsTable?: boolean;
+  error?: string;
+}
+
 export interface ScheduledTask {
   id: string;
   name: string;
@@ -371,6 +388,29 @@ export interface ElectronAPI {
     stopDev: (appId: string) => Promise<{ success: boolean; error?: string }>;
     publish: (appId: string) => Promise<AppPublishResponse>;
     stop: (appId: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  db: {
+    getTables: (appId: string) => Promise<{ success: boolean; tables: string[]; error?: string }>;
+    queryTable: (
+      appId: string,
+      table: string,
+      page?: number,
+      pageSize?: number
+    ) => Promise<DbQueryResponse>;
+    updateCell: (
+      appId: string,
+      table: string,
+      rowId: string,
+      column: string,
+      value: unknown
+    ) => Promise<{ success: boolean; error?: string }>;
+    deleteRow: (
+      appId: string,
+      table: string,
+      rowId: string
+    ) => Promise<{ success: boolean; deleted?: boolean; error?: string }>;
+    runQuery: (appId: string, sql: string) => Promise<DbQueryResponse>;
+    getAppStatus: (appId: string) => Promise<{ success: boolean; status: string; error?: string }>;
   };
   skill: {
     list: () => Promise<SkillListResponse>;
