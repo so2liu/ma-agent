@@ -112,6 +112,8 @@ export interface UpdateInfo {
   releaseNotes?: string;
 }
 
+export type UpdateChannel = 'stable' | 'nightly';
+
 export interface UpdateStatus {
   checking: boolean;
   updateAvailable: boolean;
@@ -121,6 +123,7 @@ export interface UpdateStatus {
   error: string | null;
   updateInfo: UpdateInfo | null;
   lastCheckComplete: boolean;
+  updateChannel: UpdateChannel;
 }
 
 export interface ThinkingStart {
@@ -244,6 +247,8 @@ export interface ElectronAPI {
     check: () => Promise<{ success: boolean }>;
     download: () => Promise<{ success: boolean }>;
     install: () => Promise<{ success: boolean }>;
+    getChannel: () => Promise<{ channel: UpdateChannel }>;
+    setChannel: (channel: UpdateChannel) => Promise<{ success: boolean; channel: UpdateChannel }>;
     onStatusChanged: (callback: (status: UpdateStatus) => void) => () => void;
   };
 }

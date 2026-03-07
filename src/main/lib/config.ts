@@ -5,12 +5,15 @@ import { app } from 'electron';
 
 import type { ChatModelPreference } from '../../shared/types/ipc';
 
+export type UpdateChannel = 'stable' | 'nightly';
+
 export interface AppConfig {
   workspaceDir?: string;
   debugMode?: boolean;
   chatModelPreference?: ChatModelPreference | 'smart';
   apiKey?: string;
   apiBaseUrl?: string;
+  updateChannel?: UpdateChannel;
 }
 
 const DEFAULT_MODEL_PREFERENCE: ChatModelPreference = 'fast';
@@ -409,6 +412,17 @@ export function buildClaudeSessionEnv(): Record<string, string> {
   }
 
   return env;
+}
+
+export function getUpdateChannel(): UpdateChannel {
+  const config = loadConfig();
+  return config.updateChannel === 'nightly' ? 'nightly' : 'stable';
+}
+
+export function setUpdateChannel(channel: UpdateChannel): void {
+  const config = loadConfig();
+  config.updateChannel = channel === 'nightly' ? 'nightly' : 'stable';
+  saveConfig(config);
 }
 
 export async function ensureWorkspaceDir(): Promise<void> {

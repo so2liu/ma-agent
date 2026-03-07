@@ -1,6 +1,14 @@
 import { ipcMain } from 'electron';
 
-import { checkForUpdates, downloadUpdate, getUpdateStatus, installUpdate } from '../lib/updater';
+import type { UpdateChannel } from '../lib/config';
+import { getUpdateChannel, setUpdateChannel } from '../lib/config';
+import {
+  checkForUpdates,
+  downloadUpdate,
+  getUpdateStatus,
+  installUpdate,
+  onUpdateChannelChanged
+} from '../lib/updater';
 
 export function registerUpdateHandlers(): void {
   // Get current update status
@@ -24,5 +32,17 @@ export function registerUpdateHandlers(): void {
   ipcMain.handle('update:install', () => {
     installUpdate();
     return { success: true };
+  });
+
+  // Get update channel
+  ipcMain.handle('update:get-channel', () => {
+    return { channel: getUpdateChannel() };
+  });
+
+  // Set update channel
+  ipcMain.handle('update:set-channel', (_event, channel: UpdateChannel) => {
+    setUpdateChannel(channel);
+    onUpdateChannelChanged();
+    return { success: true, channel: getUpdateChannel() };
   });
 }

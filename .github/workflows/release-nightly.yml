@@ -1,0 +1,115 @@
+name: Nightly Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+
+concurrency:
+  group: nightly-release
+  cancel-in-progress: true
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint & typecheck
+        run: bun run lint && bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+      - name: Build Electron app
+        run: bun run build
+
+      - name: Package for macOS (${{ matrix.arch }})
+        env:
+          # Apple code signing
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Apple notarization
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          npx electron-builder --mac --${{ matrix.arch }} --publish never
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: |
+            dist/*.zip
+            dist/*.dmg
+            dist/*.blockmap
+            dist/latest-mac*.yml
+          retention-days: 7
+
+  publish-nightly:
+    needs: build-macos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate nightly version tag
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DATE=$(date -u +%Y%m%d)
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          NIGHTLY_VERSION="${BASE_VERSION}-nightly.${DATE}.${SHORT_SHA}"
+          echo "nightly_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Update latest-mac.yml for nightly
+        run: |
+          # Rewrite version in latest-mac.yml files so electron-updater picks up the nightly
+          for f in dist/latest-mac*.yml; do
+            if [ -f "$f" ]; then
+              sed -i "s/^version: .*/version: ${{ steps.version.outputs.nightly_version }}/" "$f"
+            fi
+          done
+
+      - name: Delete existing nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
+
+      - name: Create nightly prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create nightly \
+            --title "Nightly Build (${{ steps.version.outputs.short_sha }})" \
+            --notes "Automated nightly build from \`main\` branch.
+
+          **Commit:** ${{ github.sha }}
+          **Version:** ${{ steps.version.outputs.nightly_version }}
+          **Date:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          > This is a pre-release build and may be unstable. Enable the nightly update channel in Settings to receive these updates automatically." \
+            --prerelease \
+            dist/*

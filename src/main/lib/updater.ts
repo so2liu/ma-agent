@@ -1,6 +1,9 @@
 import { app, BrowserWindow } from 'electron';
 import electronUpdater from 'electron-updater';
 
+import type { UpdateChannel } from './config';
+import { getUpdateChannel } from './config';
+
 const { autoUpdater } = electronUpdater;
 
 let mainWindow: BrowserWindow | null = null;
@@ -23,6 +26,7 @@ export interface UpdateStatus {
   error: string | null;
   updateInfo: UpdateInfo | null;
   lastCheckComplete: boolean; // True when a manual check just completed
+  updateChannel: UpdateChannel;
 }
 
 let currentStatus: UpdateStatus = {
@@ -33,12 +37,23 @@ let currentStatus: UpdateStatus = {
   readyToInstall: false,
   error: null,
   updateInfo: null,
-  lastCheckComplete: false
+  lastCheckComplete: false,
+  updateChannel: getUpdateChannel()
 };
 
 // Configure autoUpdater
 autoUpdater.autoDownload = false; // Don't auto-download, let user decide
 autoUpdater.autoInstallOnAppQuit = true; // Auto-install on quit after download
+
+// Allow prereleases based on update channel setting
+function syncAllowPrerelease(): void {
+  const channel = getUpdateChannel();
+  autoUpdater.allowPrerelease = channel === 'nightly';
+  currentStatus = { ...currentStatus, updateChannel: channel };
+}
+
+// Initialize prerelease setting
+syncAllowPrerelease();
 
 // Configure update feed if provided
 if (updateFeedUrl) {
@@ -188,6 +203,9 @@ function notifyStatusChange(): void {
 export function checkForUpdates(): void {
   const isDev = process.env.ELECTRON_RENDERER_URL !== undefined;
 
+  // Sync prerelease setting before checking
+  syncAllowPrerelease();
+
   // Only check in production (not in dev mode)
   if (isDev && !hasCustomFeed) {
     console.log('Skipping update check in development mode');
@@ -290,6 +308,27 @@ export function installUpdate(): void {
 
 export function getUpdateStatus(): UpdateStatus {
   return { ...currentStatus };
+}
+
+/**
+ * Called when the user changes the update channel.
+ * Syncs the allowPrerelease setting and triggers an immediate check.
+ */
+export function onUpdateChannelChanged(): void {
+  syncAllowPrerelease();
+  // Reset any existing update state when switching channels
+  currentStatus = {
+    ...currentStatus,
+    updateAvailable: false,
+    readyToInstall: false,
+    downloadProgress: 0,
+    downloading: false,
+    updateInfo: null,
+    error: null
+  };
+  notifyStatusChange();
+  // Check for updates immediately with new channel setting
+  checkForUpdates();
 }
 
 export function startPeriodicUpdateCheck(): void {
