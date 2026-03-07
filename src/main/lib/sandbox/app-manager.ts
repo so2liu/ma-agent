@@ -7,7 +7,7 @@ import {
   readFileSync,
   writeFileSync
 } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { startAppServer, startStaticAppServer, type AppServer } from './http-server';
 import { createSandboxApp } from './quickjs-runtime';
@@ -88,7 +88,7 @@ function scaffoldApp(appDir: string, manifest: AppManifest): void {
     const filePath = join(appDir, file);
     if (existsSync(filePath)) {
       let content = readFileSync(filePath, 'utf-8');
-      content = content.replace(/\{\{APP_ID\}\}/g, appDir.split('/').pop() ?? 'app');
+      content = content.replace(/\{\{APP_ID\}\}/g, basename(appDir));
       content = content.replace(/\{\{APP_NAME\}\}/g, manifest.name);
       writeFileSync(filePath, content);
     }
@@ -106,7 +106,7 @@ function installDeps(appDir: string): void {
 
 /** Build the Vite app for production */
 function buildApp(appDir: string): void {
-  execSync('npx vite build', {
+  execSync('bunx vite build', {
     cwd: appDir,
     stdio: 'pipe',
     timeout: 120_000
@@ -232,7 +232,16 @@ class AppManager {
 
     // Start Vite dev server with proxy to sandbox
     this.appStatuses.set(appId, 'developing');
-    const viteServer = await startViteDevServer(appDir, sandboxServer.port);
+    let viteServer: ViteDevServer;
+    try {
+      viteServer = await startViteDevServer(appDir, sandboxServer.port);
+    } catch (err) {
+      // Clean up sandbox on Vite startup failure
+      await sandboxServer.stop();
+      sandbox.dispose();
+      this.appStatuses.delete(appId);
+      throw err;
+    }
 
     this.appStatuses.delete(appId);
     this.developingApps.set(appId, {

@@ -46,17 +46,20 @@ export async function startViteDevServer(
 ): Promise<ViteDevServer> {
   const port = await findAvailablePort();
 
-  // Patch vite.config.ts to use the correct sandbox port for API proxy
+  // Patch vite.config.ts to use the correct sandbox port for API proxy.
+  // Replace both the initial placeholder and any previously written port number.
   const { readFileSync, writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const viteConfigPath = join(appDir, 'vite.config.ts');
   const viteConfig = readFileSync(viteConfigPath, 'utf-8');
-  const patchedConfig = viteConfig.replace(/\{\{SANDBOX_PORT\}\}/g, String(sandboxPort));
+  const patchedConfig = viteConfig
+    .replace(/\{\{SANDBOX_PORT\}\}/g, String(sandboxPort))
+    .replace(/target:\s*['"]http:\/\/localhost:\d+['"]/g, `target: 'http://localhost:${String(sandboxPort)}'`);
   writeFileSync(viteConfigPath, patchedConfig);
 
   return new Promise<ViteDevServer>((resolve, reject) => {
     const child: ChildProcess = spawn(
-      'npx',
+      'bunx',
       ['vite', '--port', String(port), '--strictPort', '--host'],
       {
         cwd: appDir,

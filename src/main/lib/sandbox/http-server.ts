@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
-import { extname, join } from 'node:path';
+import { extname, join, resolve } from 'node:path';
 
 import type { SandboxApp, SandboxRequest } from './types';
 
@@ -233,7 +233,15 @@ export async function startStaticAppServer(
     }
 
     // Serve static files from dist/
-    let filePath = join(distDir, url.pathname);
+    let filePath = resolve(join(distDir, url.pathname));
+
+    // Prevent path traversal: resolved path must stay within distDir
+    const resolvedDistDir = resolve(distDir);
+    if (!filePath.startsWith(resolvedDistDir)) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('Forbidden');
+      return;
+    }
 
     // SPA fallback: if file doesn't exist and has no extension, serve index.html
     if (!existsSync(filePath) || url.pathname === '/') {
