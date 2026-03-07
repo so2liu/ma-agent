@@ -94,11 +94,15 @@ class AppManager {
       writeFileSync(dataPath, '[]');
     }
 
+    // Read preferred port from manifest
+    const manifest = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
+    const preferredPort = manifest.port;
+
     // Create sandbox first (validates backend code before stopping old app)
     const sandbox = await createSandboxApp(backendJs, appId, dataPath);
 
     // Start new HTTP server before stopping old one
-    const server = await startAppServer(frontendHtml, sandbox);
+    const server = await startAppServer(frontendHtml, sandbox, preferredPort);
 
     // Only stop old app after new one is successfully running
     if (this.runningApps.has(appId)) {
@@ -112,6 +116,12 @@ class AppManager {
       localUrl: server.localUrl,
       port: server.port
     });
+
+    // Persist port to app.json so it stays stable across restarts
+    if (server.port !== preferredPort) {
+      manifest.port = server.port;
+      writeFileSync(join(appDir, 'app.json'), JSON.stringify(manifest, null, 2));
+    }
 
     console.log(`[AppManager] Published "${appId}" at ${server.lanUrl}`);
 

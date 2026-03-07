@@ -1,5 +1,7 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
+import { logSessionEvent } from './session-logger';
+
 export interface MessageQueueItem {
   message: SDKUserMessage['message'];
   resolve: () => void;
@@ -87,12 +89,14 @@ export async function* messageGenerator(): AsyncGenerator<SDKUserMessage> {
     // Get the next message from the queue
     const item = messageQueue.shift();
     if (item) {
-      yield {
+      const userMessage: SDKUserMessage = {
         type: 'user',
         message: item.message,
         parent_tool_use_id: null,
         session_id: getSessionId()
       };
+      logSessionEvent(userMessage);
+      yield userMessage;
       item.resolve();
     }
   }
