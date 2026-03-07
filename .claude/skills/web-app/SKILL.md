@@ -63,26 +63,28 @@ Logger.error(message);
 
 #### handleRequest Signature
 
+**IMPORTANT:** `req.path` includes the `/api/` prefix (e.g., `/api/todos`, `/api/todos/123`).
+Strip the prefix before routing:
+
 ```javascript
-/**
- * @param {Object} req
- * @param {string} req.method  - "GET" | "POST" | "PUT" | "DELETE"
- * @param {string} req.path    - e.g., "/api/registrations"
- * @param {Object} req.headers - HTTP request headers
- * @param {string|null} req.body - Request body (JSON string)
- *
- * @returns {Object} response
- * @returns {number} response.status  - HTTP status code
- * @returns {Object} response.headers - Response headers
- * @returns {string} response.body    - Response body string
- */
 function handleRequest(req) {
-  // Route handling here...
-  return {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ok: true })
-  };
+  var method = req.method;
+  // Strip /api prefix so "/api/todos/123" becomes "/todos/123"
+  var path = req.path.replace(/^\/api/, '');
+  var parts = path.split('/').filter(Boolean); // ["todos", "123"]
+
+  if (parts[0] === 'todos') {
+    if (method === 'GET' && parts.length === 1) {
+      return {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(DB.getAll())
+      };
+    }
+    // ... more routes
+  }
+
+  return { status: 404, headers: { 'Content-Type': 'application/json' }, body: '{"error":"Not Found"}' };
 }
 ```
 

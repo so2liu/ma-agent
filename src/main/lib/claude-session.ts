@@ -20,6 +20,7 @@ import {
   resetAbortFlag,
   setSessionId
 } from './message-queue';
+import { endSessionLog, logSessionEvent, startSessionLog } from './session-logger';
 
 const requireModule = createRequire(import.meta.url);
 
@@ -222,6 +223,10 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
       }
     });
 
+    if (getDebugMode()) {
+      startSessionLog(isResumedSession ? resumeSessionId! : `new-${Date.now()}`);
+    }
+
     // Process streaming responses
     for await (const sdkMessage of querySession) {
       // Check if session should be aborted
@@ -232,6 +237,9 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
       if (!mainWindow || mainWindow.isDestroyed()) {
         break;
       }
+
+      // Log every SDK event to JSONL for debugging
+      logSessionEvent(sdkMessage);
 
       if (sdkMessage.type === 'stream_event') {
         // Handle streaming events
@@ -410,6 +418,7 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
       mainWindow.webContents.send('chat:message-error', errorMessage);
     }
   } finally {
+    endSessionLog();
     isProcessing = false;
     querySession = null;
 
