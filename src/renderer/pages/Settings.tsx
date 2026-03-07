@@ -295,7 +295,8 @@ function Settings({ onBack }: SettingsProps) {
     }
   };
 
-  const isFormLoading = isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl || isLoadingChannel;
+  const isFormLoading =
+    isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl || isLoadingChannel;
   const apiKeyPlaceholder = apiKeyStatus.lastFour ? `...${apiKeyStatus.lastFour}` : 'sk-ant-...';
 
   return (
@@ -513,9 +514,9 @@ function Settings({ onBack }: SettingsProps) {
                           {updateChannel === 'nightly' ? 'Nightly' : 'Stable'}
                         </p>
                         <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                          {updateChannel === 'nightly'
-                            ? 'Receiving nightly builds from main branch.'
-                            : 'Receiving stable releases only.'}
+                          {updateChannel === 'nightly' ?
+                            'Receiving nightly builds from main branch.'
+                          : 'Receiving stable releases only.'}
                         </p>
                       </div>
                       <button
@@ -523,9 +524,9 @@ function Settings({ onBack }: SettingsProps) {
                         onClick={handleToggleUpdateChannel}
                         disabled={isSavingChannel}
                         className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer items-center rounded-full border border-transparent px-0.5 transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-neutral-900/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
-                          updateChannel === 'nightly'
-                            ? 'bg-neutral-900 dark:bg-neutral-100'
-                            : 'bg-neutral-200 dark:bg-neutral-700'
+                          updateChannel === 'nightly' ?
+                            'bg-neutral-900 dark:bg-neutral-100'
+                          : 'bg-neutral-200 dark:bg-neutral-700'
                         }`}
                         role="switch"
                         aria-checked={updateChannel === 'nightly'}

@@ -152,8 +152,10 @@ export default function Sidebar({
       {/* Brand */}
       <div className="shrink-0 px-3 pb-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-xl" role="img" aria-label="horse">🐴</span>
-          <span className="select-none text-base font-bold text-neutral-800 dark:text-neutral-100">
+          <span className="text-xl" role="img" aria-label="horse">
+            🐴
+          </span>
+          <span className="text-base font-bold text-neutral-800 select-none dark:text-neutral-100">
             小马快跑
           </span>
         </div>

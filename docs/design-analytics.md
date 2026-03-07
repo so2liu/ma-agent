@@ -2,11 +2,11 @@
 
 ## 一、需求分析
 
-| 需求 | 说明 |
-|------|------|
-| 功能使用频率 | 统计用户对各功能的使用次数（发消息、切模型、用附件、创建/删除对话等） |
-| 回复反馈（踩/赞） | 用户对 AI 回复不满意时点踩，满意时点赞 |
-| AI 脱敏上报 | 点踩后，将对话内容通过 AI 去除隐私信息，再上报到后端 |
+| 需求              | 说明                                                                  |
+| ----------------- | --------------------------------------------------------------------- |
+| 功能使用频率      | 统计用户对各功能的使用次数（发消息、切模型、用附件、创建/删除对话等） |
+| 回复反馈（踩/赞） | 用户对 AI 回复不满意时点踩，满意时点赞                                |
+| AI 脱敏上报       | 点踩后，将对话内容通过 AI 去除隐私信息，再上报到后端                  |
 
 ---
 
@@ -54,10 +54,10 @@
 
 ```typescript
 // 新增 IPC 通道
-'analytics:track-event'      // 上报通用埋点事件
-'analytics:submit-feedback'  // 上报消息反馈（赞/踩 + 可选原因）
-'analytics:get-settings'     // 获取埋点开关（用户可关闭）
-'analytics:set-settings'     // 设置埋点开关
+'analytics:track-event'; // 上报通用埋点事件
+'analytics:submit-feedback'; // 上报消息反馈（赞/踩 + 可选原因）
+'analytics:get-settings'; // 获取埋点开关（用户可关闭）
+'analytics:set-settings'; // 设置埋点开关
 ```
 
 ### 事件类型定义 (`src/shared/types/analytics.ts`)
@@ -66,46 +66,46 @@
 /** 埋点事件类型 */
 type AnalyticsEventType =
   // 对话相关
-  | 'message_sent'           // 发送消息
-  | 'message_completed'      // 收到完整回复
-  | 'message_stopped'        // 用户中断回复
-  | 'message_error'          // 回复出错
+  | 'message_sent' // 发送消息
+  | 'message_completed' // 收到完整回复
+  | 'message_stopped' // 用户中断回复
+  | 'message_error' // 回复出错
   // 反馈相关
-  | 'message_feedback'       // 对消息点赞/点踩
+  | 'message_feedback' // 对消息点赞/点踩
   // 会话相关
-  | 'conversation_created'   // 新建对话
-  | 'conversation_deleted'   // 删除对话
-  | 'conversation_resumed'   // 恢复对话
+  | 'conversation_created' // 新建对话
+  | 'conversation_deleted' // 删除对话
+  | 'conversation_resumed' // 恢复对话
   // 功能使用
-  | 'model_switched'         // 切换模型
-  | 'attachment_added'       // 添加附件
-  | 'artifact_viewed'        // 查看 artifact
-  | 'tool_used'              // 工具被调用
-  | 'skill_executed'         // Skill 被执行
+  | 'model_switched' // 切换模型
+  | 'attachment_added' // 添加附件
+  | 'artifact_viewed' // 查看 artifact
+  | 'tool_used' // 工具被调用
+  | 'skill_executed' // Skill 被执行
   // 应用生命周期
-  | 'app_launched'           // 应用启动
-  | 'app_closed'             // 应用关闭
-  | 'app_error'              // 应用级错误
-  | 'settings_changed'       // 修改设置
-  | 'update_installed'       // 更新已安装
-  | 'workspace_changed';     // 工作目录变更
+  | 'app_launched' // 应用启动
+  | 'app_closed' // 应用关闭
+  | 'app_error' // 应用级错误
+  | 'settings_changed' // 修改设置
+  | 'update_installed' // 更新已安装
+  | 'workspace_changed'; // 工作目录变更
 
 /** 通用埋点事件 */
 interface AnalyticsEvent {
   type: AnalyticsEventType;
   timestamp: number;
-  sessionId?: string;          // 可选，SDK session 建立前为空
-  anonymousId: string;         // 必填，首次启动生成并持久化到 config.anonymousId 中
+  sessionId?: string; // 可选，SDK session 建立前为空
+  anonymousId: string; // 必填，首次启动生成并持久化到 config.anonymousId 中
   properties?: Record<string, string | number | boolean>;
 }
 
 /** 消息反馈 */
 interface MessageFeedback {
   messageId: string;
-  conversationId?: string;     // 可选，首条消息自动保存前可能为空
+  conversationId?: string; // 可选，首条消息自动保存前可能为空
   rating: 'positive' | 'negative';
-  reason?: string;              // 用户选择的原因标签
-  comment?: string;             // 用户自由输入的补充
+  reason?: string; // 用户选择的原因标签
+  comment?: string; // 用户自由输入的补充
   // 以下字段仅在用户同意上报对话内容时填充，会经过 AI 脱敏
   sanitizedUserMessage?: string;
   sanitizedAssistantMessage?: string;
@@ -113,7 +113,7 @@ interface MessageFeedback {
 
 /** 埋点设置 */
 interface AnalyticsSettings {
-  enabled: boolean;                    // 总开关
+  enabled: boolean; // 总开关
   shareConversationOnFeedback: boolean; // 反馈时是否上报脱敏后的对话内容
 }
 ```
@@ -136,11 +136,12 @@ const NEGATIVE_REASONS = [
   { id: 'irrelevant', label: '没有回答我的问题' },
   { id: 'too_slow', label: '响应太慢' },
   { id: 'tool_error', label: '工具调用出错' },
-  { id: 'other', label: '其他' },
+  { id: 'other', label: '其他' }
 ];
 ```
 
 **交互流程：**
+
 1. 点赞 → 直接上报 `{ rating: 'positive' }`
 2. 点踩 → 弹出浮层，选择原因 + 可选评论 → 上报
 3. 如果用户开启了"反馈时分享对话内容"，在主进程调用 AI 脱敏后一并上报
@@ -149,9 +150,12 @@ const NEGATIVE_REASONS = [
 
 ```typescript
 export function useAnalytics() {
-  const track = useCallback((type: AnalyticsEventType, properties?: Record<string, string | number | boolean>) => {
-    window.electron.analytics.trackEvent({ type, timestamp: Date.now(), properties });
-  }, []);
+  const track = useCallback(
+    (type: AnalyticsEventType, properties?: Record<string, string | number | boolean>) => {
+      window.electron.analytics.trackEvent({ type, timestamp: Date.now(), properties });
+    },
+    []
+  );
 
   const submitFeedback = useCallback((feedback: MessageFeedback) => {
     window.electron.analytics.submitFeedback(feedback);
@@ -163,18 +167,18 @@ export function useAnalytics() {
 
 **埋点注入位置：**
 
-| 文件 | 事件 | 说明 |
-|------|------|------|
-| `Chat.tsx` → `handleSendMessage` | `message_sent` | 发送消息时，记录模型、是否有附件 |
-| `useClaudeChat.ts` → `onMessageComplete` | `message_completed` | 收到完整回复 |
-| `useClaudeChat.ts` → `onMessageStopped` | `message_stopped` | 用户中断 |
-| `useClaudeChat.ts` → `onMessageError` | `message_error` | 错误 |
-| `ChatInput.tsx` → model selector | `model_switched` | 切换模型，记录 from/to |
-| `ChatInput.tsx` → attachment handler | `attachment_added` | 添加附件，记录类型和大小 |
-| `useClaudeChat.ts` → `onToolUseStart` | `tool_used` | 工具调用开始时记录一次，避免渲染重复计数 |
-| `useClaudeChat.ts` → conversation autosave | `conversation_created` | 对话首次保存时触发，而非 UI 点击时 |
-| `Sidebar.tsx` → delete handler (IPC 完成后) | `conversation_deleted` | 对话删除确认后 |
-| `Message.tsx` → 反馈按钮 | `message_feedback` | 赞/踩 |
+| 文件                                        | 事件                   | 说明                                     |
+| ------------------------------------------- | ---------------------- | ---------------------------------------- |
+| `Chat.tsx` → `handleSendMessage`            | `message_sent`         | 发送消息时，记录模型、是否有附件         |
+| `useClaudeChat.ts` → `onMessageComplete`    | `message_completed`    | 收到完整回复                             |
+| `useClaudeChat.ts` → `onMessageStopped`     | `message_stopped`      | 用户中断                                 |
+| `useClaudeChat.ts` → `onMessageError`       | `message_error`        | 错误                                     |
+| `ChatInput.tsx` → model selector            | `model_switched`       | 切换模型，记录 from/to                   |
+| `ChatInput.tsx` → attachment handler        | `attachment_added`     | 添加附件，记录类型和大小                 |
+| `useClaudeChat.ts` → `onToolUseStart`       | `tool_used`            | 工具调用开始时记录一次，避免渲染重复计数 |
+| `useClaudeChat.ts` → conversation autosave  | `conversation_created` | 对话首次保存时触发，而非 UI 点击时       |
+| `Sidebar.tsx` → delete handler (IPC 完成后) | `conversation_deleted` | 对话删除确认后                           |
+| `Message.tsx` → 反馈按钮                    | `message_feedback`     | 赞/踩                                    |
 
 ### 4.2 Main 端：事件处理 + AI 脱敏 + 上报
 
@@ -202,6 +206,7 @@ export function registerAnalyticsHandlers(): void {
 **两层脱敏策略：**
 
 **第一层：正则预处理（快速、零成本）**
+
 ```typescript
 const PATTERNS = [
   // 邮箱
@@ -228,7 +233,7 @@ const PATTERNS = [
   // 文件路径中的用户名
   { regex: /\/Users\/[^/\s]+/g, replacement: '/Users/[USER]' },
   { regex: /\/home\/[^/\s]+/g, replacement: '/home/[USER]' },
-  { regex: /C:\\Users\\[^\\\s]+/g, replacement: 'C:\\Users\\[USER]' },
+  { regex: /C:\\Users\\[^\\\s]+/g, replacement: 'C:\\Users\\[USER]' }
 ];
 
 function regexSanitize(text: string): string {
@@ -245,6 +250,7 @@ function regexSanitize(text: string): string {
 > **[!WARNING] 隐私与成本风险**
 > AI 脱敏需要将正则预处理后的文本发送到 Anthropic API，语义级隐私（人名、公司名）仍会以明文形式经过外部 API。
 > 实现时必须：
+>
 > 1. 在 UI 上明确告知用户"脱敏过程需要调用 AI 服务"
 > 2. 每次反馈前弹出确认对话框，展示将要发送的内容预览
 > 3. 使用项目内置 API key（而非用户的 key）以避免额外计费
@@ -258,7 +264,7 @@ async function aiSanitize(text: string): Promise<string> {
   // 限制输入长度，避免长对话产生高额费用
   const truncated = text.slice(0, 8000);
   const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',  // 用最便宜的模型
+    model: 'claude-haiku-4-5-20251001', // 用最便宜的模型
     max_tokens: 2048,
     system: `你是一个隐私数据脱敏专家。请将以下文本中的所有个人隐私信息替换为占位符，包括但不限于：
 - 人名 → [NAME]
@@ -274,7 +280,7 @@ async function aiSanitize(text: string): Promise<string> {
 
 保留技术内容（代码、错误信息、工具名称等），只替换隐私信息。
 直接返回脱敏后的文本，不要添加任何说明。`,
-    messages: [{ role: 'user', content: text }],
+    messages: [{ role: 'user', content: text }]
   });
   return response.content[0].type === 'text' ? response.content[0].text : text;
 }
@@ -288,6 +294,7 @@ export async function sanitize(text: string): Promise<string> {
 ```
 
 **为什么分两层：**
+
 - 正则层：捕获格式化的敏感数据（邮箱、手机号、API Key），速度快、零成本
 - AI 层：捕获语义级别的隐私（人名、公司名、地址），正则难以覆盖
 - 正则先行可以减少 AI 需要处理的敏感数据量，降低泄漏风险
@@ -301,7 +308,8 @@ class AnalyticsTransport {
   private readonly FLUSH_INTERVAL = 30_000; // 30秒
   private readonly MAX_RETRIES = 3;
   // TODO: 替换为实际的 analytics 服务端点，应从环境变量或配置文件读取
-  private readonly ENDPOINT = process.env.ANALYTICS_ENDPOINT ?? 'https://your-analytics-server.com/v1/events';
+  private readonly ENDPOINT =
+    process.env.ANALYTICS_ENDPOINT ?? 'https://your-analytics-server.com/v1/events';
 
   constructor() {
     // 定时 flush
@@ -342,12 +350,12 @@ class AnalyticsTransport {
     const res = await fetch(this.ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ events, appVersion: app.getVersion() }),
+      body: JSON.stringify({ events, appVersion: app.getVersion() })
     });
 
     if (!res.ok) {
       if (retries < this.MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, 2 ** retries * 1000));
+        await new Promise((r) => setTimeout(r, 2 ** retries * 1000));
         return this.send(events, retries + 1);
       }
       // 重试耗尽仍失败，写入本地队列而非丢弃
@@ -371,13 +379,13 @@ class AnalyticsTransport {
 
 ## 五、后端方案选型对比
 
-| 方案 | 优点 | 缺点 | 推荐场景 |
-|------|------|------|---------|
-| **自建后端 + ClickHouse** | 完全控制数据、无第三方依赖、查询灵活 | 需要运维、需要开发 Dashboard | 数据敏感、长期使用 |
-| **PostHog (自部署)** | 开源、功能全（事件分析+漏斗+留存）、有 SDK | 自部署需资源、学习成本 | 中小团队、快速启动 |
-| **PostHog (Cloud)** | 免运维、慷慨免费额度(100万事件/月) | 数据在第三方 | 快速验证 |
-| **Mixpanel** | 成熟的分析平台、丰富的可视化 | 免费额度较少、数据在第三方 | 产品分析为主 |
-| **仅本地 SQLite** | 零成本、完全离线、无隐私顾虑 | 无法跨设备聚合、无远程分析 | 个人使用/开发阶段 |
+| 方案                      | 优点                                       | 缺点                         | 推荐场景           |
+| ------------------------- | ------------------------------------------ | ---------------------------- | ------------------ |
+| **自建后端 + ClickHouse** | 完全控制数据、无第三方依赖、查询灵活       | 需要运维、需要开发 Dashboard | 数据敏感、长期使用 |
+| **PostHog (自部署)**      | 开源、功能全（事件分析+漏斗+留存）、有 SDK | 自部署需资源、学习成本       | 中小团队、快速启动 |
+| **PostHog (Cloud)**       | 免运维、慷慨免费额度(100万事件/月)         | 数据在第三方                 | 快速验证           |
+| **Mixpanel**              | 成熟的分析平台、丰富的可视化               | 免费额度较少、数据在第三方   | 产品分析为主       |
+| **仅本地 SQLite**         | 零成本、完全离线、无隐私顾虑               | 无法跨设备聚合、无远程分析   | 个人使用/开发阶段  |
 
 **推荐：PostHog 自部署或 Cloud** — 开源、Node.js SDK 成熟、支持 Electron 环境、免费额度足够。
 
@@ -428,6 +436,7 @@ class AnalyticsTransport {
 ### Phase 1：基础埋点框架（~2天）
 
 新增文件：
+
 - `src/shared/types/analytics.ts` — 类型定义
 - `src/main/lib/analytics-service.ts` — 事件收集服务
 - `src/main/lib/analytics-transport.ts` — 上报传输层
@@ -435,6 +444,7 @@ class AnalyticsTransport {
 - `src/renderer/hooks/useAnalytics.ts` — 前端埋点 Hook
 
 修改文件：
+
 - `src/preload/index.ts` — 新增 `analytics` IPC bridge
 - `src/renderer/electron.d.ts` — 新增类型
 - `src/main/index.ts` — 注册 handler
@@ -443,15 +453,18 @@ class AnalyticsTransport {
 ### Phase 2：反馈 UI（~1天）
 
 新增文件：
+
 - `src/renderer/components/MessageFeedback.tsx` — 👍👎 组件
 - `src/renderer/components/FeedbackModal.tsx` — 踩的原因浮层
 
 修改文件：
+
 - `src/renderer/components/Message.tsx` — 在 assistant 消息底部渲染反馈按钮
 
 ### Phase 3：Settings UI + 合规（~0.5天）
 
 修改文件：
+
 - `src/renderer/pages/Settings.tsx` — 新增隐私设置区域
 
 ### Phase 4：后端对接 + Dashboard（独立工作）
@@ -464,9 +477,11 @@ class AnalyticsTransport {
 ### Phase 5：AI 脱敏（~1天，依赖 Phase 4 后端代理）
 
 新增文件：
+
 - `src/main/lib/privacy-sanitizer.ts` — 正则 + AI 脱敏
 
 修改文件：
+
 - `src/main/handlers/analytics-handlers.ts` — 接入脱敏流程
 
 > 注意：AI 脱敏依赖 Phase 4 搭建的后端代理来提供项目内置 API key，
@@ -501,12 +516,12 @@ class AnalyticsTransport {
 
 ## 九、关键设计决策总结
 
-| 决策 | 选择 | 理由 |
-|------|------|------|
+| 决策         | 选择                 | 理由                                          |
+| ------------ | -------------------- | --------------------------------------------- |
 | 埋点触发位置 | Renderer + Main 两层 | UI 交互在 Renderer 追踪，系统事件在 Main 追踪 |
-| 脱敏策略 | 正则 + AI 两层 | 正则快速去格式化数据，AI 去语义级隐私 |
-| 脱敏模型 | Haiku | 最便宜，脱敏任务不需要强推理 |
-| 上报策略 | 批量 + 定时 | 减少网络请求，30秒或20条触发 |
-| 离线处理 | 本地文件队列 | 应用重启后重试上报 |
-| 用户控制 | Opt-in + 独立开关 | 尊重隐私，合规要求 |
-| 反馈 UI | 内联 👍👎 + 弹窗详情 | 低摩擦的反馈入口 |
+| 脱敏策略     | 正则 + AI 两层       | 正则快速去格式化数据，AI 去语义级隐私         |
+| 脱敏模型     | Haiku                | 最便宜，脱敏任务不需要强推理                  |
+| 上报策略     | 批量 + 定时          | 减少网络请求，30秒或20条触发                  |
+| 离线处理     | 本地文件队列         | 应用重启后重试上报                            |
+| 用户控制     | Opt-in + 独立开关    | 尊重隐私，合规要求                            |
+| 反馈 UI      | 内联 👍👎 + 弹窗详情 | 低摩擦的反馈入口                              |

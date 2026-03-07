@@ -61,7 +61,10 @@ export async function startAppServer(
 
     // CORS headers - restrict to same-origin (LAN app served from same host)
     const origin = req.headers.origin;
-    const allowedOrigin = origin && /^http:\/\/(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+):\d+$/.test(origin) ? origin : null;
+    const allowedOrigin =
+      origin && /^http:\/\/(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+):\d+$/.test(origin) ?
+        origin
+      : null;
     if (allowedOrigin) {
       res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
     }

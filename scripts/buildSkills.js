@@ -1,6 +1,15 @@
 import { spawnSync } from 'child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
 import { createHash, randomUUID } from 'crypto';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'fs';
 import { dirname, join, relative } from 'path';
 import { fileURLToPath } from 'url';
 
