@@ -1,12 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Group, Panel } from 'react-resizable-panels';
 
-import ChatHistoryDrawer from '@/components/ChatHistoryDrawer';
+import type { Artifact } from '@/components/ArtifactPanel';
+import ArtifactPanel from '@/components/ArtifactPanel';
 import ChatInput from '@/components/ChatInput';
 import MessageList from '@/components/MessageList';
+import ResizeHandle from '@/components/ResizeHandle';
+import Sidebar from '@/components/Sidebar';
 import TitleBar from '@/components/TitleBar';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
 import type { Message, MessageAttachment } from '@/types/chat';
+import { extractArtifacts } from '@/utils/artifacts';
 
 import { MAX_ATTACHMENT_BYTES } from '../../shared/constants';
 import type { ChatModelPreference, SerializedAttachmentPayload } from '../../shared/types/ipc';
@@ -51,9 +56,7 @@ function releaseAttachmentPreviews(attachments: PendingAttachment[]): void {
 }
 
 function isLikelyImageFile(file: File): boolean {
-  if (file.type?.startsWith('image/')) {
-    return true;
-  }
+  if (file.type?.startsWith('image/')) return true;
   const extension = file.name?.split('.').pop()?.toLowerCase() ?? '';
   return IMAGE_FILE_EXTENSIONS.has(extension);
 }
@@ -64,8 +67,7 @@ async function createImagePreview(file: File): Promise<{ url: string; isBlob: bo
     return dataUrl ? { url: dataUrl, isBlob: false } : null;
   } catch {
     try {
-      const objectUrl = URL.createObjectURL(file);
-      return { url: objectUrl, isBlob: true };
+      return { url: URL.createObjectURL(file), isBlob: true };
     } catch {
       return null;
     }
@@ -76,11 +78,8 @@ function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result);
-      } else {
-        reject(new Error('Invalid preview data'));
-      }
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('Invalid preview data'));
     };
     reader.onerror = () => reject(reader.error ?? new Error('Unable to read file'));
     reader.readAsDataURL(file);
@@ -101,7 +100,6 @@ function serializeMessagesForStorage(messages: Message[]): PersistedMessage[] {
 
 export default function Chat() {
   const [inputValue, setInputValue] = useState('');
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [chatInputHeight, setChatInputHeight] = useState(0);
@@ -110,24 +108,33 @@ export default function Chat() {
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
   const [modelPreference, setModelPreference] = useState<ChatModelPreference>('fast');
   const [isModelPreferenceUpdating, setIsModelPreferenceUpdating] = useState(false);
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const { messages, setMessages, isLoading, setIsLoading } = useClaudeChat();
   const messagesContainerRef = useAutoScroll(isLoading, messages);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef(true);
   const pendingAttachmentsRef = useRef<PendingAttachment[]>([]);
 
+  // Extract artifacts from messages
+  const artifacts = useMemo(() => extractArtifacts(messages), [messages]);
+
+  // Auto-select the latest artifact when new ones appear
+  const prevArtifactCountRef = useRef(0);
+  useEffect(() => {
+    if (artifacts.length > prevArtifactCountRef.current && artifacts.length > 0) {
+      setSelectedArtifact(artifacts[artifacts.length - 1]);
+    }
+    prevArtifactCountRef.current = artifacts.length;
+  }, [artifacts]);
+
   useEffect(() => {
     let isMounted = true;
     window.electron.config
       .getWorkspaceDir()
       .then(({ workspaceDir }) => {
-        if (isMounted) {
-          setWorkspaceDir(workspaceDir);
-        }
+        if (isMounted) setWorkspaceDir(workspaceDir);
       })
-      .catch((error) => {
-        console.error('Error loading workspace directory:', error);
-      });
+      .catch((error) => console.error('Error loading workspace directory:', error));
     return () => {
       isMounted = false;
     };
@@ -138,13 +145,9 @@ export default function Chat() {
     window.electron.chat
       .getModelPreference()
       .then(({ preference }) => {
-        if (isMounted && preference) {
-          setModelPreference(preference);
-        }
+        if (isMounted && preference) setModelPreference(preference);
       })
-      .catch((error) => {
-        console.error('Error loading model preference:', error);
-      });
+      .catch((error) => console.error('Error loading model preference:', error));
     return () => {
       isMounted = false;
     };
@@ -155,16 +158,12 @@ export default function Chat() {
   }, [pendingAttachments]);
 
   useEffect(() => {
-    return () => {
-      releaseAttachmentPreviews(pendingAttachmentsRef.current);
-    };
+    return () => releaseAttachmentPreviews(pendingAttachmentsRef.current);
   }, []);
 
   const handleFilesSelected = (fileList: FileList | File[]) => {
     const files = Array.from(fileList || []);
-    if (files.length === 0) {
-      return;
-    }
+    if (files.length === 0) return;
 
     const processFiles = async () => {
       const accepted: PendingAttachment[] = [];
@@ -191,24 +190,12 @@ export default function Chat() {
           }
         }
 
-        accepted.push({
-          id: crypto.randomUUID(),
-          file,
-          previewUrl,
-          previewIsBlobUrl,
-          isImage
-        });
+        accepted.push({ id: crypto.randomUUID(), file, previewUrl, previewIsBlobUrl, isImage });
       }
 
-      if (accepted.length > 0) {
-        setPendingAttachments((prev) => [...prev, ...accepted]);
-      }
-
-      if (rejectionMessage) {
-        setAttachmentError(rejectionMessage);
-      } else if (accepted.length > 0) {
-        setAttachmentError(null);
-      }
+      if (accepted.length > 0) setPendingAttachments((prev) => [...prev, ...accepted]);
+      if (rejectionMessage) setAttachmentError(rejectionMessage);
+      else if (accepted.length > 0) setAttachmentError(null);
     };
 
     void processFiles();
@@ -216,11 +203,9 @@ export default function Chat() {
 
   const handleRemoveAttachment = (attachmentId: string) => {
     setPendingAttachments((prev) => {
-      const target = prev.find((attachment) => attachment.id === attachmentId);
-      if (target?.previewUrl && target.previewIsBlobUrl) {
-        URL.revokeObjectURL(target.previewUrl);
-      }
-      return prev.filter((attachment) => attachment.id !== attachmentId);
+      const target = prev.find((a) => a.id === attachmentId);
+      if (target?.previewUrl && target.previewIsBlobUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((a) => a.id !== attachmentId);
     });
   };
 
@@ -234,29 +219,18 @@ export default function Chat() {
 
   // Auto-save conversation when messages change
   useEffect(() => {
-    // Skip auto-save on initial load
     if (isInitialLoadRef.current) {
       isInitialLoadRef.current = false;
       return;
     }
+    if (messages.length === 0) return;
 
-    // Don't save empty conversations
-    if (messages.length === 0) {
-      return;
-    }
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Debounce save by 2 seconds
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         const messagesToSave = serializeMessagesForStorage(messages);
-
         if (currentConversationId) {
-          // Update existing conversation
           await window.electron.conversation.update(
             currentConversationId,
             undefined,
@@ -264,7 +238,6 @@ export default function Chat() {
             currentSessionId ?? undefined
           );
         } else {
-          // Create new conversation
           const response = await window.electron.conversation.create(
             messagesToSave,
             currentSessionId ?? undefined
@@ -279,29 +252,22 @@ export default function Chat() {
     }, 2000);
 
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
   }, [messages, currentConversationId, currentSessionId]);
 
-  // Listen for session updates from the main process (new or resumed sessions)
   useEffect(() => {
     const unsubscribe = window.electron.chat.onSessionUpdated(({ sessionId }) => {
       setCurrentSessionId((prev) => (prev === sessionId ? prev : sessionId));
     });
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
   const handleNewChat = async () => {
     if (isLoading) return;
-
     clearPendingAttachments();
 
     try {
-      // Save current conversation before clearing
       if (currentConversationId && messages.length > 0) {
         try {
           const messagesToSave = serializeMessagesForStorage(messages);
@@ -316,15 +282,13 @@ export default function Chat() {
         }
       }
 
-      // Reset the backend session
       await window.electron.chat.resetSession();
-      // Clear frontend messages
       setMessages([]);
-      // Clear input
       setInputValue('');
-      // Clear current conversation ID and session
       setCurrentConversationId(null);
       setCurrentSessionId(null);
+      setSelectedArtifact(null);
+      prevArtifactCountRef.current = 0;
       isInitialLoadRef.current = true;
     } catch (error) {
       console.error('Error starting new chat:', error);
@@ -333,11 +297,9 @@ export default function Chat() {
 
   const handleLoadConversation = async (conversationId: string) => {
     if (isLoading) return;
-
     clearPendingAttachments();
 
     try {
-      // Save current conversation before switching
       if (currentConversationId && messages.length > 0) {
         try {
           const messagesToSave = serializeMessagesForStorage(messages);
@@ -352,10 +314,8 @@ export default function Chat() {
         }
       }
 
-      // Load the conversation
       const response = await window.electron.conversation.get(conversationId);
       if (response.success && response.conversation) {
-        // Parse messages from JSON string
         const parsedMessages: Message[] = JSON.parse(response.conversation.messages).map(
           (msg: Omit<Message, 'timestamp'> & { timestamp: string }) => ({
             ...msg,
@@ -363,11 +323,12 @@ export default function Chat() {
           })
         );
 
-        // Reset session and load messages
         await window.electron.chat.resetSession(response.conversation.sessionId ?? null);
         setMessages(parsedMessages);
         setCurrentConversationId(conversationId);
         setCurrentSessionId(response.conversation.sessionId ?? null);
+        setSelectedArtifact(null);
+        prevArtifactCountRef.current = 0;
         isInitialLoadRef.current = true;
       }
     } catch (error) {
@@ -381,12 +342,9 @@ export default function Chat() {
     if (!hasSendableContent || isLoading) return;
 
     const attachmentsToSend = pendingAttachments;
-    if (attachmentsToSend.length > 0) {
-      setPendingAttachments([]);
-    }
+    if (attachmentsToSend.length > 0) setPendingAttachments([]);
     setAttachmentError(null);
 
-    // Add user message
     const messageAttachments: MessageAttachment[] = attachmentsToSend.map((attachment) => ({
       id: attachment.id,
       name: attachment.file.name,
@@ -422,9 +380,7 @@ export default function Chat() {
       const errorMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant' as const,
-        content: `Error preparing attachments: ${
-          error instanceof Error ? error.message : 'Unknown error occurred'
-        }`,
+        content: `Error preparing attachments: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
         timestamp: new Date()
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -435,13 +391,11 @@ export default function Chat() {
     releaseAttachmentPreviews(attachmentsToSend);
 
     try {
-      // Send message to streaming session
       const response = await window.electron.chat.sendMessage({
         text: trimmedMessage,
         attachments: serializedAttachments.length > 0 ? serializedAttachments : undefined
       });
       if (!response.success && response.error) {
-        // Handle immediate errors (e.g., API key not configured)
         const errorMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant' as const,
@@ -453,25 +407,16 @@ export default function Chat() {
       } else if (response.attachments?.length) {
         setMessages((prev) =>
           prev.map((msg) => {
-            if (msg.id !== userMessage.id || !msg.attachments?.length) {
-              return msg;
-            }
+            if (msg.id !== userMessage.id || !msg.attachments?.length) return msg;
             const updatedAttachments = msg.attachments.map((attachment, index) => {
               const saved = response.attachments?.[index];
-              if (!saved) {
-                return attachment;
-              }
-              return {
-                ...attachment,
-                savedPath: saved.savedPath,
-                relativePath: saved.relativePath
-              };
+              if (!saved) return attachment;
+              return { ...attachment, savedPath: saved.savedPath, relativePath: saved.relativePath };
             });
             return { ...msg, attachments: updatedAttachments };
           })
         );
       }
-      // Otherwise, streaming events will handle the response
     } catch (error) {
       const errorMessage = {
         id: (Date.now() + 1).toString(),
@@ -486,7 +431,6 @@ export default function Chat() {
 
   const handleStopStreaming = async () => {
     if (!isLoading) return;
-
     try {
       const response = await window.electron.chat.stopMessage();
       if (!response.success && response.error) {
@@ -497,17 +441,32 @@ export default function Chat() {
     }
   };
 
-  const messageListBottomPadding = chatInputHeight > 0 ? chatInputHeight + 48 : 160;
+  const handleFileSelect = (filePath: string) => {
+    const fileName = filePath.split('/').pop() || filePath;
+    const ext = filePath.split('.').pop()?.toLowerCase() || '';
 
-  const handleNewChatFromTitleBar = async () => {
-    await handleNewChat();
-    setIsHistoryOpen(false);
+    const htmlExts = new Set(['html', 'htm', 'svg']);
+    const imageExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'ico']);
+
+    let type: 'html' | 'image' | null = null;
+    if (htmlExts.has(ext)) type = 'html';
+    else if (imageExts.has(ext)) type = 'image';
+
+    if (type) {
+      setSelectedArtifact({
+        id: `file-${filePath}`,
+        filePath,
+        fileName,
+        type
+        // No content -- will be loaded from disk by ArtifactPanel
+      });
+    }
   };
 
+  const messageListBottomPadding = chatInputHeight > 0 ? chatInputHeight + 48 : 160;
+
   const handleModelPreferenceChange = async (preference: ChatModelPreference) => {
-    if (preference === modelPreference) {
-      return;
-    }
+    if (preference === modelPreference) return;
 
     const previousPreference = modelPreference;
     setModelPreference(preference);
@@ -531,46 +490,69 @@ export default function Chat() {
 
   return (
     <div className="flex h-screen flex-col bg-white dark:bg-neutral-900">
-      <TitleBar
-        onOpenHistory={() => setIsHistoryOpen((prev) => !prev)}
-        onNewChat={handleNewChatFromTitleBar}
-      />
+      <TitleBar />
 
-      {/* Messages container with padding at bottom for floating input */}
-      <div className="flex flex-1 flex-col overflow-hidden pt-12">
-        <MessageList
-          messages={messages}
-          isLoading={isLoading}
-          containerRef={messagesContainerRef}
-          bottomPadding={messageListBottomPadding}
-        />
+      {/* Three-column layout below title bar */}
+      <Group className="flex-1 overflow-hidden pt-12">
+        {/* Left sidebar */}
+        <Panel
+          defaultSize="220px"
+          minSize="160px"
+          maxSize="400px"
+          className="[-webkit-app-region:no-drag]"
+        >
+          <Sidebar
+            onLoadConversation={handleLoadConversation}
+            currentConversationId={currentConversationId}
+            onNewChat={handleNewChat}
+            onFileSelect={handleFileSelect}
+            selectedFilePath={selectedArtifact?.filePath ?? null}
+          />
+        </Panel>
 
-        <ChatInput
-          value={inputValue}
-          onChange={setInputValue}
-          onSend={handleSendMessage}
-          isLoading={isLoading}
-          onStopStreaming={handleStopStreaming}
-          autoFocus
-          onHeightChange={setChatInputHeight}
-          attachments={pendingAttachments}
-          onFilesSelected={handleFilesSelected}
-          onRemoveAttachment={handleRemoveAttachment}
-          canSend={Boolean(inputValue.trim()) || pendingAttachments.length > 0}
-          attachmentError={attachmentError}
-          modelPreference={modelPreference}
-          onModelPreferenceChange={handleModelPreferenceChange}
-          isModelPreferenceUpdating={isModelPreferenceUpdating}
-        />
-      </div>
+        <ResizeHandle />
 
-      <ChatHistoryDrawer
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        onLoadConversation={handleLoadConversation}
-        currentConversationId={currentConversationId}
-        onNewChat={handleNewChat}
-      />
+        {/* Center: chat area */}
+        <Panel minSize="300px" className="relative flex flex-col overflow-hidden">
+          <MessageList
+            messages={messages}
+            isLoading={isLoading}
+            containerRef={messagesContainerRef}
+            bottomPadding={messageListBottomPadding}
+          />
+
+          <ChatInput
+            value={inputValue}
+            onChange={setInputValue}
+            onSend={handleSendMessage}
+            isLoading={isLoading}
+            onStopStreaming={handleStopStreaming}
+            autoFocus
+            onHeightChange={setChatInputHeight}
+            attachments={pendingAttachments}
+            onFilesSelected={handleFilesSelected}
+            onRemoveAttachment={handleRemoveAttachment}
+            canSend={Boolean(inputValue.trim()) || pendingAttachments.length > 0}
+            attachmentError={attachmentError}
+            modelPreference={modelPreference}
+            onModelPreferenceChange={handleModelPreferenceChange}
+            isModelPreferenceUpdating={isModelPreferenceUpdating}
+          />
+        </Panel>
+
+        {/* Right: artifact preview panel */}
+        {selectedArtifact && (
+          <>
+            <ResizeHandle />
+            <Panel defaultSize="400px" minSize="280px" maxSize="700px">
+              <ArtifactPanel
+                artifact={selectedArtifact}
+                onClose={() => setSelectedArtifact(null)}
+              />
+            </Panel>
+          </>
+        )}
+      </Group>
     </div>
   );
 }

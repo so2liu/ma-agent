@@ -7,6 +7,7 @@ import { registerConfigHandlers } from './handlers/config-handlers';
 import { registerConversationHandlers } from './handlers/conversation-handlers';
 import { registerShellHandlers } from './handlers/shell-handlers';
 import { registerUpdateHandlers } from './handlers/update-handlers';
+import { registerWorkspaceHandlers } from './handlers/workspace-handlers';
 import { buildEnhancedPath, ensureWorkspaceDir } from './lib/config';
 import { initializeUpdater, startPeriodicUpdateCheck } from './lib/updater';
 import { loadWindowBounds, saveWindowBounds } from './lib/window-state';
@@ -102,6 +103,7 @@ app.whenReady().then(async () => {
   registerConversationHandlers();
   registerShellHandlers();
   registerUpdateHandlers();
+  registerWorkspaceHandlers();
 
   createWindow();
 

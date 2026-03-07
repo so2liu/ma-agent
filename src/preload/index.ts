@@ -149,6 +149,11 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('conversation:update', id, title, messages, sessionId),
     delete: (id: string) => ipcRenderer.invoke('conversation:delete', id)
   },
+  workspace: {
+    listFiles: () => ipcRenderer.invoke('workspace:list-files'),
+    readFile: (relativePath: string) => ipcRenderer.invoke('workspace:read-file', relativePath),
+    openFile: (relativePath: string) => ipcRenderer.invoke('workspace:open-file', relativePath)
+  },
   update: {
     getStatus: () => ipcRenderer.invoke('update:get-status'),
     check: () => ipcRenderer.invoke('update:check'),

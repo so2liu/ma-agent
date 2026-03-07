@@ -84,6 +84,28 @@ export interface ToolResultComplete {
   isError?: boolean;
 }
 
+export interface FileTreeNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  children?: FileTreeNode[];
+}
+
+export interface WorkspaceListResponse {
+  success: boolean;
+  files: FileTreeNode[];
+  workspaceDir: string;
+  error?: string;
+}
+
+export interface WorkspaceReadFileResponse {
+  success: boolean;
+  content?: string;
+  mimeType?: string;
+  isText?: boolean;
+  error?: string;
+}
+
 export interface UpdateInfo {
   version: string;
   releaseDate: string;
@@ -199,6 +221,11 @@ export interface ElectronAPI {
   };
   shell: {
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  workspace: {
+    listFiles: () => Promise<WorkspaceListResponse>;
+    readFile: (relativePath: string) => Promise<WorkspaceReadFileResponse>;
+    openFile: (relativePath: string) => Promise<{ success: boolean; error?: string }>;
   };
   conversation: {
     list: () => Promise<ConversationListResponse>;
