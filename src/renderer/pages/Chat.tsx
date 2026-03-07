@@ -7,7 +7,7 @@ import ChatInput from '@/components/ChatInput';
 import MessageList from '@/components/MessageList';
 import ResizeHandle from '@/components/ResizeHandle';
 import Sidebar from '@/components/Sidebar';
-import TitleBar from '@/components/TitleBar';
+import DragRegion from '@/components/TitleBar';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
 import type { Message, MessageAttachment } from '@/types/chat';
@@ -98,7 +98,11 @@ function serializeMessagesForStorage(messages: Message[]): PersistedMessage[] {
   }));
 }
 
-export default function Chat() {
+interface ChatProps {
+  onSettingsClick?: () => void;
+}
+
+export default function Chat({ onSettingsClick }: ChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -493,11 +497,9 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-white dark:bg-neutral-900">
-      <TitleBar />
-
-      {/* Three-column layout below title bar */}
-      <Group className="flex-1 overflow-hidden pt-12">
+    <div className="flex h-screen bg-white dark:bg-neutral-900">
+      {/* Three-column layout */}
+      <Group className="flex-1 overflow-hidden">
         {/* Left sidebar */}
         <Panel
           defaultSize="220px"
@@ -511,6 +513,7 @@ export default function Chat() {
             onNewChat={handleNewChat}
             onFileSelect={handleFileSelect}
             selectedFilePath={selectedArtifact?.filePath ?? null}
+            onSettingsClick={onSettingsClick}
           />
         </Panel>
 
@@ -518,6 +521,7 @@ export default function Chat() {
 
         {/* Center: chat area */}
         <Panel minSize="300px" className="relative flex flex-col overflow-hidden">
+          <DragRegion />
           <MessageList
             messages={messages}
             isLoading={isLoading}
