@@ -1,11 +1,12 @@
-import { Copy, ExternalLink, Globe, Loader2, Play, Square } from 'lucide-react';
+import { Code, Copy, ExternalLink, Globe, Hammer, Loader2, Play, Square } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { AppInfo } from '@/electron';
 
 export default function AppPanel() {
   const [apps, setApps] = useState<AppInfo[]>([]);
-  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
 
   const loadApps = useCallback(async () => {
     try {
@@ -24,8 +25,35 @@ export default function AppPanel() {
     return () => clearInterval(timer);
   }, [loadApps]);
 
+  const handleStartDev = async (appId: string) => {
+    setBusyId(appId);
+    setBusyAction('Starting dev...');
+    try {
+      const result = await window.electron.app.startDev(appId);
+      if (!result.success) {
+        console.error('Start dev failed:', result.error);
+      }
+      await loadApps();
+    } catch (error) {
+      console.error('Error starting dev:', error);
+    } finally {
+      setBusyId(null);
+      setBusyAction(null);
+    }
+  };
+
+  const handleStopDev = async (appId: string) => {
+    try {
+      await window.electron.app.stopDev(appId);
+      await loadApps();
+    } catch (error) {
+      console.error('Error stopping dev:', error);
+    }
+  };
+
   const handlePublish = async (appId: string) => {
-    setPublishingId(appId);
+    setBusyId(appId);
+    setBusyAction('Publishing...');
     try {
       const result = await window.electron.app.publish(appId);
       if (!result.success) {
@@ -35,7 +63,8 @@ export default function AppPanel() {
     } catch (error) {
       console.error('Error publishing app:', error);
     } finally {
-      setPublishingId(null);
+      setBusyId(null);
+      setBusyAction(null);
     }
   };
 
@@ -81,6 +110,14 @@ export default function AppPanel() {
               {app.status === 'running' && (
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
               )}
+              {app.status === 'developing' && (
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+              )}
+              {(app.status === 'scaffolding' ||
+                app.status === 'installing' ||
+                app.status === 'building') && (
+                <Loader2 className="h-3 w-3 shrink-0 animate-spin text-amber-500" />
+              )}
             </div>
 
             {app.description && (
@@ -89,61 +126,164 @@ export default function AppPanel() {
               </p>
             )}
 
-            {app.status === 'stopped' ?
-              <button
-                onClick={() => handlePublish(app.id)}
-                disabled={publishingId === app.id}
-                className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {publishingId === app.id ?
-                  <>
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Publishing...
-                  </>
-                : <>
-                    <Play className="h-3 w-3" />
-                    Publish to LAN
-                  </>
-                }
-              </button>
-            : <div className="mt-1.5 space-y-1">
-                {app.lanUrl && (
-                  <div className="flex items-center gap-1 rounded bg-neutral-50 px-1.5 py-0.5 dark:bg-neutral-700/50">
-                    <code className="min-w-0 flex-1 truncate text-[9px] text-neutral-600 dark:text-neutral-300">
-                      {app.lanUrl}
-                    </code>
-                    <button
-                      onClick={() => handleCopyUrl(app.lanUrl!)}
-                      className="shrink-0 p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-                      title="Copy URL"
-                    >
-                      <Copy className="h-2.5 w-2.5" />
-                    </button>
-                  </div>
-                )}
-                <div className="flex gap-1">
-                  {app.localUrl && (
-                    <button
-                      onClick={() => handleOpenPreview(app.localUrl!)}
-                      className="flex flex-1 items-center justify-center gap-1 rounded-md bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 transition-colors hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600"
-                    >
-                      <ExternalLink className="h-2.5 w-2.5" />
-                      Preview
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleStop(app.id)}
-                    className="flex flex-1 items-center justify-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
-                  >
-                    <Square className="h-2.5 w-2.5" />
-                    Stop
-                  </button>
-                </div>
-              </div>
-            }
+            {renderAppActions(app)}
           </div>
         ))}
       </div>
     </div>
   );
+
+  function renderAppActions(app: AppInfo) {
+    const isBusy = busyId === app.id;
+
+    // Transitional states
+    if (app.status === 'scaffolding' || app.status === 'installing' || app.status === 'building') {
+      return (
+        <div className="mt-1.5 flex items-center justify-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {app.status === 'scaffolding' && 'Scaffolding...'}
+          {app.status === 'installing' && 'Installing deps...'}
+          {app.status === 'building' && 'Building...'}
+        </div>
+      );
+    }
+
+    // Developing state (Vite dev server running)
+    if (app.status === 'developing') {
+      return (
+        <div className="mt-1.5 space-y-1">
+          {app.lanUrl && (
+            <div className="flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 dark:bg-blue-900/20">
+              <Code className="h-2.5 w-2.5 shrink-0 text-blue-500" />
+              <code className="min-w-0 flex-1 truncate text-[9px] text-blue-600 dark:text-blue-300">
+                {app.lanUrl}
+              </code>
+              <button
+                onClick={() => handleCopyUrl(app.lanUrl!)}
+                className="shrink-0 p-0.5 text-blue-400 hover:text-blue-600 dark:hover:text-blue-200"
+                title="Copy URL"
+              >
+                <Copy className="h-2.5 w-2.5" />
+              </button>
+            </div>
+          )}
+          <div className="flex gap-1">
+            {app.localUrl && (
+              <button
+                onClick={() => handleOpenPreview(app.localUrl!)}
+                className="flex flex-1 items-center justify-center gap-1 rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+              >
+                <ExternalLink className="h-2.5 w-2.5" />
+                Preview
+              </button>
+            )}
+            <button
+              onClick={() => handlePublish(app.id)}
+              disabled={isBusy}
+              className="flex flex-1 items-center justify-center gap-1 rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 transition-colors hover:bg-indigo-200 disabled:opacity-50 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+            >
+              <Hammer className="h-2.5 w-2.5" />
+              Build & Publish
+            </button>
+            <button
+              onClick={() => handleStopDev(app.id)}
+              className="flex items-center justify-center rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
+            >
+              <Square className="h-2.5 w-2.5" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Running state (published)
+    if (app.status === 'running') {
+      return (
+        <div className="mt-1.5 space-y-1">
+          {app.lanUrl && (
+            <div className="flex items-center gap-1 rounded bg-neutral-50 px-1.5 py-0.5 dark:bg-neutral-700/50">
+              <code className="min-w-0 flex-1 truncate text-[9px] text-neutral-600 dark:text-neutral-300">
+                {app.lanUrl}
+              </code>
+              <button
+                onClick={() => handleCopyUrl(app.lanUrl!)}
+                className="shrink-0 p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                title="Copy URL"
+              >
+                <Copy className="h-2.5 w-2.5" />
+              </button>
+            </div>
+          )}
+          <div className="flex gap-1">
+            {app.localUrl && (
+              <button
+                onClick={() => handleOpenPreview(app.localUrl!)}
+                className="flex flex-1 items-center justify-center gap-1 rounded-md bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 transition-colors hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600"
+              >
+                <ExternalLink className="h-2.5 w-2.5" />
+                Preview
+              </button>
+            )}
+            <button
+              onClick={() => handleStop(app.id)}
+              className="flex flex-1 items-center justify-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
+            >
+              <Square className="h-2.5 w-2.5" />
+              Stop
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Stopped state
+    return (
+      <div className="mt-1.5 flex gap-1">
+        {app.isViteApp ?
+          <>
+            <button
+              onClick={() => handleStartDev(app.id)}
+              disabled={isBusy}
+              className="flex flex-1 items-center justify-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isBusy ?
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {busyAction}
+                </>
+              : <>
+                  <Code className="h-3 w-3" />
+                  Dev
+                </>
+              }
+            </button>
+            <button
+              onClick={() => handlePublish(app.id)}
+              disabled={isBusy}
+              className="flex flex-1 items-center justify-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+            >
+              <Play className="h-3 w-3" />
+              Publish
+            </button>
+          </>
+        : <button
+            onClick={() => handlePublish(app.id)}
+            disabled={isBusy}
+            className="flex w-full items-center justify-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {isBusy ?
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {busyAction}
+              </>
+            : <>
+                <Play className="h-3 w-3" />
+                Publish to LAN
+              </>
+            }
+          </button>
+        }
+      </div>
+    );
+  }
 }

@@ -28,6 +28,27 @@ export function registerAppHandlers(): void {
     }
   });
 
+  ipcMain.handle('app:start-dev', async (_event, appId: unknown) => {
+    try {
+      const id = validateAppId(appId);
+      const workspaceDir = getWorkspaceDir();
+      const result = await appManager.startDev(workspaceDir, id);
+      return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('app:stop-dev', async (_event, appId: unknown) => {
+    try {
+      const id = validateAppId(appId);
+      await appManager.stopDev(id);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  });
+
   ipcMain.handle('app:publish', async (_event, appId: unknown) => {
     try {
       const id = validateAppId(appId);

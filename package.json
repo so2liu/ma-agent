@@ -120,6 +120,10 @@
         {
           "from": "resources/uv",
           "to": "uv"
+        },
+        {
+          "from": "resources/app-template",
+          "to": "app-template"
         }
       ]
     },
@@ -147,6 +151,10 @@
         {
           "from": "resources/msys2",
           "to": "msys2"
+        },
+        {
+          "from": "resources/app-template",
+          "to": "app-template"
         }
       ]
     },

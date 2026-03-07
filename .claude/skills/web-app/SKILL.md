@@ -26,16 +26,54 @@ Each app requires these files:
 }
 ```
 
-### 2. `index.html` — Frontend (single file with inline CSS + JS)
+### 2. `src/App.tsx` — Frontend (React component)
+
+This is the main React component rendered by the platform.
 
 Requirements:
 
-- Single HTML file with all CSS and JS inlined
+- Write a single `App.tsx` component as the default export
+- Use **Tailwind CSS 4** utility classes for styling (imported via `@import 'tailwindcss'` in the template's `index.css`)
+- Use **@tanstack/react-query** for data fetching (the `QueryClientProvider` is already set up in the template)
+- All API calls use `/api/` prefix (e.g., `fetch('/api/items')`)
 - Mobile-first responsive design (users may open on phones)
-- All API calls use `/api/` prefix
-- No external CDN dependencies (LAN may have no internet)
 - Chinese UI by default (unless user specifies otherwise)
-- Include proper `<meta charset="UTF-8">` and viewport meta
+- No external CDN dependencies (LAN may have no internet)
+- You may create additional components as separate files under `src/` and import them
+
+Example:
+
+```tsx
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+
+export default function App() {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState('');
+
+  const { data: items = [] } = useQuery({
+    queryKey: ['items'],
+    queryFn: () => fetch('/api/items').then((r) => r.json())
+  });
+
+  const addItem = useMutation({
+    mutationFn: (newItem: { name: string }) =>
+      fetch('/api/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newItem)
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['items'] })
+  });
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <h1 className="text-2xl font-bold text-gray-900">My App</h1>
+      {/* ... */}
+    </div>
+  );
+}
+```
 
 ### 3. `server.js` — Backend logic (runs in QuickJS WASM sandbox)
 
@@ -86,11 +124,31 @@ function handleRequest(req) {
 }
 ```
 
+## What NOT to Write
+
+The platform automatically provides these files from a template — do NOT create them:
+
+- `package.json` — auto-generated with React, Tailwind, TanStack Query, Vite
+- `vite.config.ts` — auto-configured with React plugin, Tailwind, API proxy
+- `tsconfig.json` — auto-configured for React + TypeScript
+- `index.html` — auto-generated entry point that loads `src/main.tsx`
+- `src/main.tsx` — auto-generated with React root + QueryClientProvider
+- `src/index.css` — auto-generated with Tailwind import
+
+## Available Libraries
+
+These are pre-installed in every app and can be imported in `src/App.tsx`:
+
+- **React 19** — `import { useState, useEffect } from 'react'`
+- **Tailwind CSS 4** — use utility classes directly in JSX
+- **@tanstack/react-query** — `import { useQuery, useMutation } from '@tanstack/react-query'`
+
 ## After Generating Files
 
 Tell the user:
 
 - The app files have been generated
 - They can find the app card in the sidebar under "My Apps"
-- Click "Publish to LAN" to start the server
+- Click **"Dev"** to start the development server with hot reload
+- Click **"Build & Publish"** or **"Publish"** to build for production and share via LAN
 - Share the generated LAN URL with colleagues

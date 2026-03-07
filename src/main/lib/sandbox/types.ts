@@ -18,15 +18,25 @@ export interface AppManifest {
   icon: string;
 }
 
+export type AppStatus =
+  | 'stopped'
+  | 'scaffolding'
+  | 'installing'
+  | 'developing'
+  | 'building'
+  | 'running';
+
 export interface AppInfo {
   id: string;
   name: string;
   description: string;
   icon: string;
-  status: 'running' | 'stopped';
+  status: AppStatus;
   lanUrl: string | null;
   localUrl: string | null;
   port: number | null;
+  /** Whether this app uses the React + Vite architecture */
+  isViteApp: boolean;
 }
 
 export interface PublishResult {

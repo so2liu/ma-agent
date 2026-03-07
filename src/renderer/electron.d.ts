@@ -106,15 +106,24 @@ export interface WorkspaceReadFileResponse {
   error?: string;
 }
 
+export type AppStatus =
+  | 'stopped'
+  | 'scaffolding'
+  | 'installing'
+  | 'developing'
+  | 'building'
+  | 'running';
+
 export interface AppInfo {
   id: string;
   name: string;
   description: string;
   icon: string;
-  status: 'running' | 'stopped';
+  status: AppStatus;
   lanUrl: string | null;
   localUrl: string | null;
   port: number | null;
+  isViteApp: boolean;
 }
 
 export interface AppScanResponse {
@@ -257,6 +266,8 @@ export interface ElectronAPI {
   };
   app: {
     scan: () => Promise<AppScanResponse>;
+    startDev: (appId: string) => Promise<AppPublishResponse>;
+    stopDev: (appId: string) => Promise<{ success: boolean; error?: string }>;
     publish: (appId: string) => Promise<AppPublishResponse>;
     stop: (appId: string) => Promise<{ success: boolean; error?: string }>;
   };
