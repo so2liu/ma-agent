@@ -24,8 +24,24 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Generate nightly version
+        id: nightly-version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DATE=$(date -u +%Y%m%d)
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          # Use a higher patch version so nightly > stable in semver
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+          NEXT_PATCH=$((PATCH + 1))
+          NIGHTLY_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-nightly.${DATE}.${SHORT_SHA}"
+          echo "nightly_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Set nightly version in package.json
+        run: node -e "const fs = require('fs'); const p = JSON.parse(fs.readFileSync('package.json','utf-8')); p.version = '${{ steps.nightly-version.outputs.nightly_version }}'; fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');"
+
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --no-save
 
       - name: Lint & typecheck
         run: bun run lint && bun run typecheck
@@ -73,41 +89,21 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Generate nightly version tag
+      - name: Get nightly version info
         id: version
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
-          DATE=$(date -u +%Y%m%d)
-          BASE_VERSION=$(node -p "require('./package.json').version")
-          NIGHTLY_VERSION="${BASE_VERSION}-nightly.${DATE}.${SHORT_SHA}"
+          NIGHTLY_VERSION=$(node -p "require('./package.json').version")
           echo "nightly_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
-      - name: Update latest-mac.yml for nightly
-        run: |
-          # Rewrite version in latest-mac.yml files so electron-updater picks up the nightly
-          for f in dist/latest-mac*.yml; do
-            if [ -f "$f" ]; then
-              node -e "
-                const fs = require('fs');
-                const content = fs.readFileSync('$f', 'utf-8');
-                const updated = content.replace(/^version: .*/m, 'version: ${{ steps.version.outputs.nightly_version }}');
-                fs.writeFileSync('$f', updated);
-              "
-            fi
-          done
-
-      - name: Delete existing nightly release
+      - name: Create nightly prerelease (replacing previous)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
-
-      - name: Create nightly prerelease
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create nightly \
+          # Create new release first, then delete old one to minimize downtime
+          TEMP_TAG="nightly-$(date -u +%s)"
+          gh release create "$TEMP_TAG" \
             --title "Nightly Build (${{ steps.version.outputs.short_sha }})" \
             --notes "Automated nightly build from \`main\` branch.
 
@@ -118,3 +114,11 @@ jobs:
           > This is a pre-release build and may be unstable. Enable the nightly update channel in Settings to receive these updates automatically." \
             --prerelease \
             dist/*
+
+          # Delete old nightly release if it exists
+          gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
+
+          # Rename the new release tag to 'nightly'
+          gh release edit "$TEMP_TAG" --tag nightly
+          git tag -d "$TEMP_TAG" 2>/dev/null || true
+          gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$TEMP_TAG" 2>/dev/null || true
