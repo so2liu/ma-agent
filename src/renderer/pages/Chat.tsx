@@ -415,7 +415,11 @@ export default function Chat({ onSettingsClick }: ChatProps) {
             const updatedAttachments = msg.attachments.map((attachment, index) => {
               const saved = response.attachments?.[index];
               if (!saved) return attachment;
-              return { ...attachment, savedPath: saved.savedPath, relativePath: saved.relativePath };
+              return {
+                ...attachment,
+                savedPath: saved.savedPath,
+                relativePath: saved.relativePath
+              };
             });
             return { ...msg, attachments: updatedAttachments };
           })

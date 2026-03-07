@@ -221,7 +221,7 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* File Tree */}
+      {/* File Tree - bottom section */}
       <div
         className="flex min-h-[200px] flex-col border-t border-neutral-200/70 dark:border-neutral-800"
         style={{ flex: '0 0 40%' }}
