@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { cp, mkdir, rm } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { app } from 'electron';
@@ -417,33 +417,38 @@ export async function ensureWorkspaceDir(): Promise<void> {
     await mkdir(workspaceDir, { recursive: true });
   }
 
-  // Always sync .claude directory - delete and replace to ensure clean state
+  // Sync built-in skills to workspace, preserving user-installed skills
   try {
-    // .claude directory is at out/.claude in both dev and production
-    // In development: buildSkills.js builds to out/.claude, app.getAppPath() returns project root
-    // In production: .claude is unpacked to app.asar.unpacked/out/.claude
     const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL;
-    const sourceClaudeDir =
+    const sourceSkillsDir =
       isDev ?
-        join(app.getAppPath(), 'out', '.claude')
-      : join(process.resourcesPath, 'app.asar.unpacked', 'out', '.claude');
+        join(app.getAppPath(), 'out', '.claude', 'skills')
+      : join(process.resourcesPath, 'app.asar.unpacked', 'out', '.claude', 'skills');
 
-    if (existsSync(sourceClaudeDir)) {
-      console.log('Syncing .claude directory to workspace...');
-      const destClaudeDir = join(workspaceDir, '.claude');
+    if (existsSync(sourceSkillsDir)) {
+      console.log('Syncing built-in skills to workspace...');
+      const destSkillsDir = join(workspaceDir, '.claude', 'skills');
+      await mkdir(destSkillsDir, { recursive: true });
 
-      // Remove existing .claude directory if it exists
-      if (existsSync(destClaudeDir)) {
-        await rm(destClaudeDir, { recursive: true, force: true });
+      // Only sync skills that have a .builtin marker in the source
+      const sourceSkills = readdirSync(sourceSkillsDir, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .filter((entry) => existsSync(join(sourceSkillsDir, entry.name, '.builtin')));
+
+      for (const skill of sourceSkills) {
+        const destSkillDir = join(destSkillsDir, skill.name);
+        if (existsSync(destSkillDir)) {
+          await rm(destSkillDir, { recursive: true, force: true });
+        }
+        await cp(join(sourceSkillsDir, skill.name), destSkillDir, { recursive: true });
+        console.log(`  Synced built-in skill: ${skill.name}`);
       }
 
-      // Copy entire .claude directory (including skills)
-      await cp(sourceClaudeDir, destClaudeDir, { recursive: true });
-      console.log('.claude directory synced successfully');
+      console.log('Built-in skills synced successfully');
     } else {
-      console.warn(`Could not find .claude directory at ${sourceClaudeDir}`);
+      console.warn(`Could not find skills directory at ${sourceSkillsDir}`);
     }
   } catch (error) {
-    console.error('Failed to sync .claude directory:', error);
+    console.error('Failed to sync built-in skills:', error);
   }
 }
