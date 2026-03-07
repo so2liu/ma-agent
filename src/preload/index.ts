@@ -154,6 +154,11 @@ contextBridge.exposeInMainWorld('electron', {
     readFile: (relativePath: string) => ipcRenderer.invoke('workspace:read-file', relativePath),
     openFile: (relativePath: string) => ipcRenderer.invoke('workspace:open-file', relativePath)
   },
+  app: {
+    scan: () => ipcRenderer.invoke('app:scan'),
+    publish: (appId: string) => ipcRenderer.invoke('app:publish', appId),
+    stop: (appId: string) => ipcRenderer.invoke('app:stop', appId)
+  },
   update: {
     getStatus: () => ipcRenderer.invoke('update:get-status'),
     check: () => ipcRenderer.invoke('update:check'),

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Conversation } from '@/electron';
 
+import AppPanel from './AppPanel';
 import FileTree from './FileTree';
 
 const truncateText = (text: string, maxLength: number = 60) => {
@@ -204,8 +205,16 @@ export default function Sidebar({
         </div>
       </div>
 
+      {/* Apps Panel */}
+      <div className="border-t border-neutral-200/70 dark:border-neutral-800">
+        <AppPanel />
+      </div>
+
       {/* File Tree - bottom section */}
-      <div className="flex min-h-[200px] flex-col border-t border-neutral-200/70 dark:border-neutral-800" style={{ flex: '0 0 40%' }}>
+      <div
+        className="flex min-h-[200px] flex-col border-t border-neutral-200/70 dark:border-neutral-800"
+        style={{ flex: '0 0 40%' }}
+      >
         <FileTree onFileSelect={onFileSelect} selectedPath={selectedFilePath} />
       </div>
     </div>

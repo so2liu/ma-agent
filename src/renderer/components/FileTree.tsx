@@ -1,4 +1,12 @@
-import { ChevronDown, ChevronRight, File, FileImage, FileText, Folder, RefreshCw } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  File,
+  FileImage,
+  FileText,
+  Folder,
+  RefreshCw
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { FileTreeNode } from '@/electron';
@@ -85,8 +93,7 @@ function TreeNode({ node, depth, onFileSelect, selectedPath }: TreeNodeProps) {
     <button
       onClick={() => previewable && onFileSelect(node.path)}
       className={`flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-xs ${
-        isSelected ?
-          'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+        isSelected ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
         : previewable ?
           'cursor-pointer text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
         : 'cursor-default text-neutral-400 dark:text-neutral-500'

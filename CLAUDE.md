@@ -31,6 +31,7 @@ src/shared/        → Types shared across processes
 ### Agent Integration
 
 The **only file coupled to Claude Agent SDK** is `src/main/lib/claude-session.ts`. It:
+
 1. Calls `query()` from `@anthropic-ai/claude-agent-sdk` to start an agent session
 2. Consumes the async iterable of SDK events (`stream_event`, `assistant`, `result`, `system`)
 3. Translates them into IPC events sent to renderer
@@ -48,6 +49,7 @@ All communication follows `namespace:action` naming. Key namespaces:
 - **`shell:open-external`** -- Open URLs in system browser
 
 Adding a new IPC channel requires changes in 3 places:
+
 1. Handler in `src/main/handlers/` (register in `src/main/index.ts`)
 2. Bridge in `src/preload/index.ts`
 3. Type in `src/renderer/electron.d.ts`

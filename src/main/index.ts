@@ -2,6 +2,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { app, BrowserWindow, Menu } from 'electron';
 
+import { registerAppHandlers } from './handlers/app-handlers';
 import { registerChatHandlers } from './handlers/chat-handlers';
 import { registerConfigHandlers } from './handlers/config-handlers';
 import { registerConversationHandlers } from './handlers/conversation-handlers';
@@ -9,6 +10,7 @@ import { registerShellHandlers } from './handlers/shell-handlers';
 import { registerUpdateHandlers } from './handlers/update-handlers';
 import { registerWorkspaceHandlers } from './handlers/workspace-handlers';
 import { buildEnhancedPath, ensureWorkspaceDir } from './lib/config';
+import { appManager } from './lib/sandbox/app-manager';
 import { initializeUpdater, startPeriodicUpdateCheck } from './lib/updater';
 import { loadWindowBounds, saveWindowBounds } from './lib/window-state';
 import { createApplicationMenu } from './menu';
@@ -104,6 +106,7 @@ app.whenReady().then(async () => {
   registerShellHandlers();
   registerUpdateHandlers();
   registerWorkspaceHandlers();
+  registerAppHandlers();
 
   createWindow();
 
@@ -133,4 +136,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  appManager.disposeAll().catch((error) => {
+    console.error('Error disposing apps on quit:', error);
+  });
 });
