@@ -249,6 +249,7 @@ export default function FileTree({ onFileSelect, selectedPath, onFileDeleted }: 
 
   useEffect(() => {
     loadFiles();
+    return window.electron.workspace.onFilesChanged(loadFiles);
   }, [loadFiles]);
 
   const handleDelete = useCallback(

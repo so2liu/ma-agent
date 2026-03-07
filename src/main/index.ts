@@ -8,10 +8,12 @@ import { registerConfigHandlers } from './handlers/config-handlers';
 import { registerConversationHandlers } from './handlers/conversation-handlers';
 import { registerProjectHandlers } from './handlers/project-handlers';
 import { registerShellHandlers } from './handlers/shell-handlers';
+import { registerSkillHandlers } from './handlers/skill-handlers';
 import { registerUpdateHandlers } from './handlers/update-handlers';
-import { registerWorkspaceHandlers } from './handlers/workspace-handlers';
+import { registerWorkspaceHandlers, restartFileWatcher } from './handlers/workspace-handlers';
 import { buildEnhancedPath, ensureWorkspaceDir } from './lib/config';
 import { appManager } from './lib/sandbox/app-manager';
+import { skillDiscovery } from './lib/skill-discovery';
 import { initializeUpdater, startPeriodicUpdateCheck } from './lib/updater';
 import { loadWindowBounds, saveWindowBounds } from './lib/window-state';
 import { createApplicationMenu } from './menu';
@@ -107,8 +109,9 @@ app.whenReady().then(async () => {
   registerProjectHandlers();
   registerShellHandlers();
   registerUpdateHandlers();
-  registerWorkspaceHandlers();
+  registerWorkspaceHandlers(() => mainWindow);
   registerAppHandlers();
+  registerSkillHandlers(() => mainWindow);
 
   createWindow();
 
@@ -120,10 +123,13 @@ app.whenReady().then(async () => {
   const menu = createApplicationMenu(mainWindow);
   Menu.setApplicationMenu(menu);
 
-  // Ensure workspace directory exists and sync skills (run in background after window creation)
-  ensureWorkspaceDir().catch((error) => {
-    console.error('Failed to ensure workspace directory:', error);
-  });
+  // Ensure workspace directory exists, then start file watcher and LAN discovery
+  ensureWorkspaceDir()
+    .then(() => restartFileWatcher())
+    .then(() => skillDiscovery.start())
+    .catch((error) => {
+      console.error('Failed to ensure workspace directory:', error);
+    });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -141,6 +147,9 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  skillDiscovery.stop().catch((error) => {
+    console.error('Error stopping skill discovery on quit:', error);
+  });
   appManager.disposeAll().catch((error) => {
     console.error('Error disposing apps on quit:', error);
   });

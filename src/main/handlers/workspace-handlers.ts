@@ -1,6 +1,7 @@
+import { watch, type FSWatcher } from 'fs';
 import { readdir, readFile, rm, stat } from 'fs/promises';
 import { join, relative, resolve, sep } from 'path';
-import { ipcMain, shell } from 'electron';
+import { type BrowserWindow, ipcMain, shell } from 'electron';
 
 import { ALL_TEXT_EXTENSIONS, MAX_PREVIEW_FILE_SIZE } from '../../shared/file-extensions';
 import { getWorkspaceDir } from '../lib/config';
@@ -118,7 +119,52 @@ async function listDirectory(
   return nodes;
 }
 
-export function registerWorkspaceHandlers(): void {
+let fileWatcher: FSWatcher | null = null;
+let debounceTimer: NodeJS.Timeout | null = null;
+let storedGetMainWindow: (() => BrowserWindow | null) | null = null;
+
+/** Restart the file watcher on the current workspace directory. Safe to call repeatedly. */
+export function restartFileWatcher(): void {
+  stopFileWatcher();
+  if (!storedGetMainWindow) return;
+
+  const getMainWindow = storedGetMainWindow;
+  const workspaceDir = getWorkspaceDir();
+  try {
+    fileWatcher = watch(workspaceDir, { recursive: true }, (_eventType, filename) => {
+      if (filename && IGNORED_NAMES.has(filename.split(sep)[0]!)) return;
+
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const mainWindow = getMainWindow();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('workspace:files-changed');
+        }
+      }, 300);
+    });
+
+    fileWatcher.on('error', () => {
+      stopFileWatcher();
+    });
+  } catch {
+    // watch() can throw if directory doesn't exist yet
+  }
+}
+
+function stopFileWatcher(): void {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  if (fileWatcher) {
+    fileWatcher.close();
+    fileWatcher = null;
+  }
+}
+
+export function registerWorkspaceHandlers(getMainWindow: () => BrowserWindow | null): void {
+  storedGetMainWindow = getMainWindow;
+
   ipcMain.handle('workspace:list-files', async () => {
     const workspaceDir = getWorkspaceDir();
     try {

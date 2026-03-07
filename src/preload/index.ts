@@ -164,7 +164,12 @@ contextBridge.exposeInMainWorld('electron', {
     readFile: (relativePath: string) => ipcRenderer.invoke('workspace:read-file', relativePath),
     openFile: (relativePath: string) => ipcRenderer.invoke('workspace:open-file', relativePath),
     deleteFile: (relativePath: string, isDirectory: boolean) =>
-      ipcRenderer.invoke('workspace:delete-file', relativePath, isDirectory)
+      ipcRenderer.invoke('workspace:delete-file', relativePath, isDirectory),
+    onFilesChanged: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('workspace:files-changed', listener);
+      return () => ipcRenderer.removeListener('workspace:files-changed', listener);
+    }
   },
   app: {
     scan: () => ipcRenderer.invoke('app:scan'),
@@ -172,6 +177,19 @@ contextBridge.exposeInMainWorld('electron', {
     stopDev: (appId: string) => ipcRenderer.invoke('app:stop-dev', appId),
     publish: (appId: string) => ipcRenderer.invoke('app:publish', appId),
     stop: (appId: string) => ipcRenderer.invoke('app:stop', appId)
+  },
+  skill: {
+    list: () => ipcRenderer.invoke('skill:list'),
+    toggleShared: (skillName: string) => ipcRenderer.invoke('skill:toggle-shared', skillName),
+    updateTags: (skillName: string, tags: string[]) =>
+      ipcRenderer.invoke('skill:update-tags', skillName, tags),
+    export: (skillName: string) => ipcRenderer.invoke('skill:export', skillName),
+    import: () => ipcRenderer.invoke('skill:import'),
+    discover: () => ipcRenderer.invoke('skill:discover'),
+    install: (peerInstanceId: string, skillName: string) =>
+      ipcRenderer.invoke('skill:install', peerInstanceId, skillName),
+    startDiscovery: () => ipcRenderer.invoke('skill:start-discovery'),
+    stopDiscovery: () => ipcRenderer.invoke('skill:stop-discovery')
   },
   update: {
     getStatus: () => ipcRenderer.invoke('update:get-status'),

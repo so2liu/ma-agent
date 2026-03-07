@@ -5,6 +5,7 @@ import type {
   SendMessageResponse,
   SetChatModelPreferenceResponse
 } from '../shared/types/ipc';
+import type { SkillManifest } from '../shared/types/skill-manifest';
 
 export type ChatResponse = SendMessageResponse;
 
@@ -234,6 +235,41 @@ export interface ConversationDeleteResponse {
   error?: string;
 }
 
+export interface SkillInfo {
+  name: string;
+  manifest: SkillManifest | null;
+  isBuiltin: boolean;
+}
+
+export interface SkillListResponse {
+  success: boolean;
+  skills: SkillInfo[];
+  error?: string;
+}
+
+export interface DiscoveredSkill {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  tags?: string[];
+  author?: string;
+}
+
+export interface DiscoveredPeer {
+  instanceId: string;
+  hostname: string;
+  httpPort: number;
+  skills: DiscoveredSkill[];
+  lastSeen: number;
+}
+
+export interface SkillDiscoverResponse {
+  success: boolean;
+  peers: DiscoveredPeer[];
+  error?: string;
+}
+
 export interface ElectronAPI {
   onNavigate: (callback: (view: string) => void) => () => void;
   chat: {
@@ -295,6 +331,7 @@ export interface ElectronAPI {
       relativePath: string,
       isDirectory: boolean
     ) => Promise<{ success: boolean; error?: string }>;
+    onFilesChanged: (callback: () => void) => () => void;
   };
   app: {
     scan: () => Promise<AppScanResponse>;
@@ -302,6 +339,17 @@ export interface ElectronAPI {
     stopDev: (appId: string) => Promise<{ success: boolean; error?: string }>;
     publish: (appId: string) => Promise<AppPublishResponse>;
     stop: (appId: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  skill: {
+    list: () => Promise<SkillListResponse>;
+    toggleShared: (skillName: string) => Promise<{ success: boolean; shared?: boolean; error?: string }>;
+    updateTags: (skillName: string, tags: string[]) => Promise<{ success: boolean; error?: string }>;
+    export: (skillName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
+    import: () => Promise<{ success: boolean; manifest?: SkillManifest; canceled?: boolean; error?: string }>;
+    discover: () => Promise<SkillDiscoverResponse>;
+    install: (peerInstanceId: string, skillName: string) => Promise<{ success: boolean; manifest?: SkillManifest; error?: string }>;
+    startDiscovery: () => Promise<{ success: boolean; error?: string }>;
+    stopDiscovery: () => Promise<{ success: boolean; error?: string }>;
   };
   conversation: {
     list: () => Promise<ConversationListResponse>;

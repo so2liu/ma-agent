@@ -4,6 +4,7 @@ import { Group, Panel } from 'react-resizable-panels';
 import type { Artifact } from '@/components/ArtifactPanel';
 import ArtifactPanel from '@/components/ArtifactPanel';
 import ChatInput from '@/components/ChatInput';
+import FloatingTaskPanel from '@/components/FloatingTaskPanel';
 import MessageList from '@/components/MessageList';
 import ResizeHandle from '@/components/ResizeHandle';
 import Sidebar from '@/components/Sidebar';
@@ -102,9 +103,10 @@ function serializeMessagesForStorage(messages: Message[]): PersistedMessage[] {
 
 interface ChatProps {
   onSettingsClick?: () => void;
+  onSkillsClick?: () => void;
 }
 
-export default function Chat({ onSettingsClick }: ChatProps) {
+export default function Chat({ onSettingsClick, onSkillsClick }: ChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -525,6 +527,7 @@ export default function Chat({ onSettingsClick }: ChatProps) {
             selectedFilePath={selectedArtifact?.filePath ?? null}
             onFileDeleted={handleFileDeleted}
             onSettingsClick={onSettingsClick}
+            onSkillsClick={onSkillsClick}
           />
         </Panel>
 
@@ -588,6 +591,7 @@ export default function Chat({ onSettingsClick }: ChatProps) {
                   modelPreference={modelPreference}
                   onModelPreferenceChange={handleModelPreferenceChange}
                   isModelPreferenceUpdating={isModelPreferenceUpdating}
+                  floatingPanel={<FloatingTaskPanel messages={messages} />}
                 />
               </div>
             </>
