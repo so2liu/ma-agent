@@ -168,6 +168,19 @@ contextBridge.exposeInMainWorld('electron', {
     publish: (appId: string) => ipcRenderer.invoke('app:publish', appId),
     stop: (appId: string) => ipcRenderer.invoke('app:stop', appId)
   },
+  skill: {
+    list: () => ipcRenderer.invoke('skill:list'),
+    toggleShared: (skillName: string) => ipcRenderer.invoke('skill:toggle-shared', skillName),
+    updateTags: (skillName: string, tags: string[]) =>
+      ipcRenderer.invoke('skill:update-tags', skillName, tags),
+    export: (skillName: string) => ipcRenderer.invoke('skill:export', skillName),
+    import: () => ipcRenderer.invoke('skill:import'),
+    discover: () => ipcRenderer.invoke('skill:discover'),
+    install: (peerInstanceId: string, skillName: string) =>
+      ipcRenderer.invoke('skill:install', peerInstanceId, skillName),
+    startDiscovery: () => ipcRenderer.invoke('skill:start-discovery'),
+    stopDiscovery: () => ipcRenderer.invoke('skill:stop-discovery')
+  },
   update: {
     getStatus: () => ipcRenderer.invoke('update:get-status'),
     check: () => ipcRenderer.invoke('update:check'),
