@@ -128,7 +128,8 @@ export function importSkill(
   // Ensure manifest exists (generate if ZIP didn't include one)
   const manifest = syncManifest(destDir, rootDir);
   if (!manifest) {
-    throw new Error('Failed to generate manifest after import');
+    // Workaround: avoid ending string with "import" -- triggers electron-vite esmShimPlugin false ESM import regex match
+    throw new Error('Failed to generate manifest after skill installation');
   }
 
   return { manifest, skillDir: destDir };
