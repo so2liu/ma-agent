@@ -417,38 +417,80 @@ export async function ensureWorkspaceDir(): Promise<void> {
     await mkdir(workspaceDir, { recursive: true });
   }
 
-  // Sync built-in skills to workspace, preserving user-installed skills
+  // Sync .claude directory to workspace, preserving user-installed skills
   try {
     const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL;
-    const sourceSkillsDir =
+    const sourceClaudeDir =
       isDev ?
-        join(app.getAppPath(), 'out', '.claude', 'skills')
-      : join(process.resourcesPath, 'app.asar.unpacked', 'out', '.claude', 'skills');
+        join(app.getAppPath(), 'out', '.claude')
+      : join(process.resourcesPath, 'app.asar.unpacked', 'out', '.claude');
 
+    if (!existsSync(sourceClaudeDir)) {
+      console.warn(`Could not find .claude directory at ${sourceClaudeDir}`);
+      return;
+    }
+
+    const destClaudeDir = join(workspaceDir, '.claude');
+    await mkdir(destClaudeDir, { recursive: true });
+
+    // Sync non-skills files from .claude/ (e.g., CLAUDE.md, settings)
+    const sourceTopLevel = readdirSync(sourceClaudeDir, { withFileTypes: true });
+    for (const entry of sourceTopLevel) {
+      if (entry.name === 'skills') continue;
+      const src = join(sourceClaudeDir, entry.name);
+      const dest = join(destClaudeDir, entry.name);
+      await cp(src, dest, { recursive: true, force: true });
+    }
+
+    // Sync built-in skills, preserving user-installed skills
+    const sourceSkillsDir = join(sourceClaudeDir, 'skills');
     if (existsSync(sourceSkillsDir)) {
-      console.log('Syncing built-in skills to workspace...');
-      const destSkillsDir = join(workspaceDir, '.claude', 'skills');
+      const destSkillsDir = join(destClaudeDir, 'skills');
       await mkdir(destSkillsDir, { recursive: true });
 
-      // Only sync skills that have a .builtin marker in the source
       const sourceSkills = readdirSync(sourceSkillsDir, { withFileTypes: true })
         .filter((entry) => entry.isDirectory())
         .filter((entry) => existsSync(join(sourceSkillsDir, entry.name, '.builtin')));
 
+      const sourceSkillNames = new Set(sourceSkills.map((s) => s.name));
+
+      // Sync each built-in skill
       for (const skill of sourceSkills) {
         const destSkillDir = join(destSkillsDir, skill.name);
-        if (existsSync(destSkillDir)) {
-          await rm(destSkillDir, { recursive: true, force: true });
+        // Only overwrite if destination is also a built-in (has .builtin marker) or doesn't exist
+        if (existsSync(destSkillDir) && !existsSync(join(destSkillDir, '.builtin'))) {
+          console.log(`  Skipping "${skill.name}": user-installed skill with same name`);
+          continue;
         }
-        await cp(join(sourceSkillsDir, skill.name), destSkillDir, { recursive: true });
-        console.log(`  Synced built-in skill: ${skill.name}`);
+        try {
+          if (existsSync(destSkillDir)) {
+            await rm(destSkillDir, { recursive: true, force: true });
+          }
+          await cp(join(sourceSkillsDir, skill.name), destSkillDir, { recursive: true });
+          console.log(`  Synced built-in skill: ${skill.name}`);
+        } catch (skillError) {
+          console.error(`  Failed to sync skill "${skill.name}":`, skillError);
+        }
+      }
+
+      // Clean up stale built-in skills that are no longer shipped
+      if (existsSync(destSkillsDir)) {
+        const destSkills = readdirSync(destSkillsDir, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory());
+        for (const skill of destSkills) {
+          if (
+            existsSync(join(destSkillsDir, skill.name, '.builtin')) &&
+            !sourceSkillNames.has(skill.name)
+          ) {
+            await rm(join(destSkillsDir, skill.name), { recursive: true, force: true });
+            console.log(`  Removed stale built-in skill: ${skill.name}`);
+          }
+        }
       }
 
       console.log('Built-in skills synced successfully');
-    } else {
-      console.warn(`Could not find skills directory at ${sourceSkillsDir}`);
     }
   } catch (error) {
-    console.error('Failed to sync built-in skills:', error);
+    console.error('Failed to sync .claude directory:', error);
   }
 }
