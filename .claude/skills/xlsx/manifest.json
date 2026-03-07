@@ -1,0 +1,11 @@
+{
+  "id": "a1b2c3d4-1005-4000-8000-000000000005",
+  "name": "xlsx",
+  "version": "1.0.0",
+  "description": "Comprehensive spreadsheet creation, editing, and analysis with support for formulas, formatting, data analysis, and visualization. When Claude needs to work with spreadsheets (.xlsx, .xlsm, .csv, .tsv, etc) for: (1) Creating new spreadsheets with formulas and formatting, (2) Reading or analyzing data, (3) Modify existing spreadsheets while preserving formulas, (4) Data analysis and visualization in spreadsheets, or (5) Recalculating formulas",
+  "license": "Proprietary. LICENSE.txt has complete terms",
+  "shared": false,
+  "tags": ["spreadsheet", "xlsx", "excel", "data"],
+  "createdAt": "2025-01-01T00:00:00.000Z",
+  "updatedAt": "2025-01-01T00:00:00.000Z"
+}
