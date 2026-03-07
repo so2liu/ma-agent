@@ -105,7 +105,7 @@ app.whenReady().then(async () => {
   registerConversationHandlers();
   registerShellHandlers();
   registerUpdateHandlers();
-  registerWorkspaceHandlers();
+  registerWorkspaceHandlers(() => mainWindow);
   registerAppHandlers();
 
   createWindow();

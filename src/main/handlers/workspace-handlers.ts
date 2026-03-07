@@ -1,6 +1,7 @@
+import { watch, type FSWatcher } from 'fs';
 import { readdir, readFile, rm, stat } from 'fs/promises';
 import { join, relative, resolve, sep } from 'path';
-import { ipcMain, shell } from 'electron';
+import { type BrowserWindow, ipcMain, shell } from 'electron';
 
 import { ALL_TEXT_EXTENSIONS, MAX_PREVIEW_FILE_SIZE } from '../../shared/file-extensions';
 import { getWorkspaceDir } from '../lib/config';
@@ -118,7 +119,50 @@ async function listDirectory(
   return nodes;
 }
 
-export function registerWorkspaceHandlers(): void {
+let fileWatcher: FSWatcher | null = null;
+let debounceTimer: NodeJS.Timeout | null = null;
+
+function startFileWatcher(getMainWindow: () => BrowserWindow | null): void {
+  stopFileWatcher();
+
+  const workspaceDir = getWorkspaceDir();
+  try {
+    fileWatcher = watch(workspaceDir, { recursive: true }, (_eventType, filename) => {
+      // Ignore changes in hidden/ignored directories
+      if (filename && IGNORED_NAMES.has(filename.split(sep)[0]!)) return;
+
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const mainWindow = getMainWindow();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('workspace:files-changed');
+        }
+      }, 300);
+    });
+
+    fileWatcher.on('error', () => {
+      // Watcher failed (e.g. directory deleted) -- clean up silently
+      stopFileWatcher();
+    });
+  } catch {
+    // watch() can throw if directory doesn't exist yet
+  }
+}
+
+function stopFileWatcher(): void {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  if (fileWatcher) {
+    fileWatcher.close();
+    fileWatcher = null;
+  }
+}
+
+export function registerWorkspaceHandlers(getMainWindow: () => BrowserWindow | null): void {
+  startFileWatcher(getMainWindow);
+
   ipcMain.handle('workspace:list-files', async () => {
     const workspaceDir = getWorkspaceDir();
     try {

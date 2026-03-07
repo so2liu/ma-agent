@@ -154,7 +154,12 @@ contextBridge.exposeInMainWorld('electron', {
     readFile: (relativePath: string) => ipcRenderer.invoke('workspace:read-file', relativePath),
     openFile: (relativePath: string) => ipcRenderer.invoke('workspace:open-file', relativePath),
     deleteFile: (relativePath: string, isDirectory: boolean) =>
-      ipcRenderer.invoke('workspace:delete-file', relativePath, isDirectory)
+      ipcRenderer.invoke('workspace:delete-file', relativePath, isDirectory),
+    onFilesChanged: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('workspace:files-changed', listener);
+      return () => ipcRenderer.removeListener('workspace:files-changed', listener);
+    }
   },
   app: {
     scan: () => ipcRenderer.invoke('app:scan'),
