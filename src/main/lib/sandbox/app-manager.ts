@@ -35,7 +35,7 @@ interface DevelopingApp {
 function getTemplatePath(): string {
   // In development: resources/app-template relative to project root
   // In production: process.resourcesPath + '/app-template'
-  const devPath = join(__dirname, '../../../../resources/app-template');
+  const devPath = join(__dirname, '../../resources/app-template');
   if (existsSync(devPath)) return devPath;
 
   const prodPath = join(process.resourcesPath ?? '', 'app-template');
@@ -195,14 +195,24 @@ class AppManager {
     // Scaffold if needed
     if (!isScaffolded(appDir)) {
       this.appStatuses.set(appId, 'scaffolding');
-      const meta = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
-      scaffoldApp(appDir, meta);
+      try {
+        const meta = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
+        scaffoldApp(appDir, meta);
+      } catch (err) {
+        this.appStatuses.delete(appId);
+        throw err;
+      }
     }
 
     // Install deps if needed
     if (!hasNodeModules(appDir)) {
       this.appStatuses.set(appId, 'installing');
-      installDeps(appDir);
+      try {
+        installDeps(appDir);
+      } catch (err) {
+        this.appStatuses.delete(appId);
+        throw err;
+      }
     }
 
     // Initialize data file if missing
@@ -306,12 +316,24 @@ class AppManager {
       // Ensure scaffolded and installed
       if (!isScaffolded(appDir)) {
         this.appStatuses.set(appId, 'scaffolding');
-        const meta = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
-        scaffoldApp(appDir, meta);
+        try {
+          const meta = JSON.parse(
+            readFileSync(join(appDir, 'app.json'), 'utf-8')
+          ) as AppManifest;
+          scaffoldApp(appDir, meta);
+        } catch (err) {
+          this.appStatuses.delete(appId);
+          throw err;
+        }
       }
       if (!hasNodeModules(appDir)) {
         this.appStatuses.set(appId, 'installing');
-        installDeps(appDir);
+        try {
+          installDeps(appDir);
+        } catch (err) {
+          this.appStatuses.delete(appId);
+          throw err;
+        }
       }
 
       // Build for production
