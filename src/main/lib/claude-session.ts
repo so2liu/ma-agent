@@ -20,6 +20,7 @@ import {
   resetAbortFlag,
   setSessionId
 } from './message-queue';
+import { isScheduledTaskExecuting } from './schedule-state';
 import { endSessionLog, logSessionEvent, startSessionLog } from './session-logger';
 
 const requireModule = createRequire(import.meta.url);
@@ -28,7 +29,7 @@ const FAST_MODEL_ID = 'claude-haiku-4-5-20251001';
 const SMART_SONNET_MODEL_ID = 'claude-sonnet-4-5-20250929';
 const SMART_OPUS_MODEL_ID = 'claude-opus-4-5-20251101';
 
-const MODEL_BY_PREFERENCE: Record<ChatModelPreference, string> = {
+export const MODEL_BY_PREFERENCE: Record<ChatModelPreference, string> = {
   fast: FAST_MODEL_ID,
   'smart-sonnet': SMART_SONNET_MODEL_ID,
   'smart-opus': SMART_OPUS_MODEL_ID
@@ -36,7 +37,7 @@ const MODEL_BY_PREFERENCE: Record<ChatModelPreference, string> = {
 
 let currentModelPreference: ChatModelPreference = getChatModelPreferenceSetting();
 
-function resolveClaudeCodeCli(): string {
+export function resolveClaudeCodeCli(): string {
   const cliPath = requireModule.resolve('@anthropic-ai/claude-agent-sdk/cli.js');
   if (cliPath.includes('app.asar')) {
     const unpackedPath = cliPath.replace('app.asar', 'app.asar.unpacked');
@@ -50,7 +51,7 @@ function resolveClaudeCodeCli(): string {
 /**
  * System prompt append for Claude Agent Desktop tooling preferences.
  */
-const SYSTEM_PROMPT_APPEND = `**Workspace Context:**
+export const SYSTEM_PROMPT_APPEND = `**Workspace Context:**
 This is a multi-purpose workspace for diverse projects, scripts, and workflows—not a single monolithic codebase. Each subdirectory may represent different applications or tasks. Always understand context before making assumptions about project structure.
 
 **Tooling preferences:**
@@ -99,7 +100,7 @@ export async function setChatModelPreference(preference: ChatModelPreference): P
 }
 
 export function isSessionActive(): boolean {
-  return isProcessing || querySession !== null;
+  return isProcessing || querySession !== null || isScheduledTaskExecuting();
 }
 
 export async function interruptCurrentResponse(mainWindow: BrowserWindow | null): Promise<boolean> {

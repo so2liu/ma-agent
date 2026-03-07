@@ -19,6 +19,7 @@ import {
   setChatModelPreference,
   startStreamingSession
 } from '../lib/claude-session';
+import { isScheduledTaskExecuting } from '../lib/schedule-state';
 import { getApiKey, getWorkspaceDir } from '../lib/config';
 import { messageQueue } from '../lib/message-queue';
 
@@ -42,6 +43,15 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
     }
 
     try {
+      // Reject messages while a scheduled task is running -- no interactive
+      // session exists to drain the queue, so the message would sit forever.
+      if (isScheduledTaskExecuting()) {
+        return {
+          success: false,
+          error: '定时任务正在执行中，请稍后再试',
+        };
+      }
+
       const savedAttachments = await persistAttachments(attachments);
 
       const userMessage = buildUserMessage(text, savedAttachments);

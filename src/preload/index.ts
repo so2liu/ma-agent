@@ -191,6 +191,27 @@ contextBridge.exposeInMainWorld('electron', {
     startDiscovery: () => ipcRenderer.invoke('skill:start-discovery'),
     stopDiscovery: () => ipcRenderer.invoke('skill:stop-discovery')
   },
+  schedule: {
+    list: () => ipcRenderer.invoke('schedule:list'),
+    create: (data: {
+      name: string;
+      prompt: string;
+      cronExpression: string;
+      modelPreference: ChatModelPreference;
+    }) => ipcRenderer.invoke('schedule:create', data),
+    update: (
+      id: string,
+      updates: {
+        name?: string;
+        prompt?: string;
+        cronExpression?: string;
+        enabled?: boolean;
+        modelPreference?: ChatModelPreference;
+      }
+    ) => ipcRenderer.invoke('schedule:update', id, updates),
+    delete: (id: string) => ipcRenderer.invoke('schedule:delete', id),
+    runNow: (id: string) => ipcRenderer.invoke('schedule:run-now', id),
+  },
   update: {
     getStatus: () => ipcRenderer.invoke('update:get-status'),
     check: () => ipcRenderer.invoke('update:check'),
