@@ -1,9 +1,10 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { cp, mkdir, rm } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { app } from 'electron';
 
 import type { ChatModelPreference } from '../../shared/types/ipc';
+import type { SkillManifest } from '../../shared/types/skill-manifest';
 
 export interface AppConfig {
   workspaceDir?: string;
@@ -411,6 +412,76 @@ export function buildClaudeSessionEnv(): Record<string, string> {
   return env;
 }
 
+/**
+ * Read user-customized manifest fields (shared, tags) from workspace skills
+ * before the workspace is overwritten, so we can restore them after sync.
+ */
+function collectUserManifestSettings(
+  skillsDir: string
+): Map<string, Pick<SkillManifest, 'shared' | 'tags'>> {
+  const settings = new Map<string, Pick<SkillManifest, 'shared' | 'tags'>>();
+  if (!existsSync(skillsDir)) return settings;
+
+  try {
+    const entries = readdirSync(skillsDir).filter((name) => {
+      const fullPath = join(skillsDir, name);
+      return statSync(fullPath).isDirectory();
+    });
+
+    for (const skillName of entries) {
+      const manifestPath = join(skillsDir, skillName, 'manifest.json');
+      if (!existsSync(manifestPath)) continue;
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillManifest;
+        if (manifest.shared || (manifest.tags && manifest.tags.length > 0)) {
+          settings.set(manifest.id, { shared: manifest.shared, tags: manifest.tags });
+        }
+      } catch {
+        // Skip invalid manifest files
+      }
+    }
+  } catch {
+    // Skip if we can't read the directory
+  }
+
+  return settings;
+}
+
+/**
+ * Restore user-customized manifest fields after workspace sync.
+ */
+function restoreUserManifestSettings(
+  skillsDir: string,
+  settings: Map<string, Pick<SkillManifest, 'shared' | 'tags'>>
+): void {
+  if (settings.size === 0 || !existsSync(skillsDir)) return;
+
+  try {
+    const entries = readdirSync(skillsDir).filter((name) => {
+      const fullPath = join(skillsDir, name);
+      return statSync(fullPath).isDirectory();
+    });
+
+    for (const skillName of entries) {
+      const manifestPath = join(skillsDir, skillName, 'manifest.json');
+      if (!existsSync(manifestPath)) continue;
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillManifest;
+        const saved = settings.get(manifest.id);
+        if (saved) {
+          manifest.shared = saved.shared;
+          if (saved.tags) manifest.tags = saved.tags;
+          writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+        }
+      } catch {
+        // Skip invalid manifest files
+      }
+    }
+  } catch {
+    // Skip if we can't read the directory
+  }
+}
+
 export async function ensureWorkspaceDir(): Promise<void> {
   const workspaceDir = getWorkspaceDir();
   if (!existsSync(workspaceDir)) {
@@ -431,6 +502,10 @@ export async function ensureWorkspaceDir(): Promise<void> {
     if (existsSync(sourceClaudeDir)) {
       console.log('Syncing .claude directory to workspace...');
       const destClaudeDir = join(workspaceDir, '.claude');
+      const destSkillsDir = join(destClaudeDir, 'skills');
+
+      // Preserve user manifest settings (shared, tags) before overwriting
+      const userSettings = collectUserManifestSettings(destSkillsDir);
 
       // Remove existing .claude directory if it exists
       if (existsSync(destClaudeDir)) {
@@ -439,6 +514,10 @@ export async function ensureWorkspaceDir(): Promise<void> {
 
       // Copy entire .claude directory (including skills)
       await cp(sourceClaudeDir, destClaudeDir, { recursive: true });
+
+      // Restore user manifest settings
+      restoreUserManifestSettings(destSkillsDir, userSettings);
+
       console.log('.claude directory synced successfully');
     } else {
       console.warn(`Could not find .claude directory at ${sourceClaudeDir}`);
