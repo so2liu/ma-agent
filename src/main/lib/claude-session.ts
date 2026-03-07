@@ -208,9 +208,19 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
         executable: 'bun',
         env,
         stderr: (message: string) => {
-          // Only send debug messages if debug mode is enabled
-          if (getDebugMode() && mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('chat:debug-message', message);
+          // Always check for error patterns and surface to user
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            const isError =
+              /rate.?limit|429|401|403|5\d{2}|error|ECONNREFUSED|ETIMEDOUT|unauthorized|forbidden/i.test(
+                message
+              );
+            if (isError) {
+              mainWindow.webContents.send('chat:message-error', message.trim());
+            }
+            // Send debug messages if debug mode is enabled
+            if (getDebugMode()) {
+              mainWindow.webContents.send('chat:debug-message', message);
+            }
           }
         },
         systemPrompt: {
