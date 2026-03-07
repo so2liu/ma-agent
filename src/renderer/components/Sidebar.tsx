@@ -10,11 +10,12 @@ import {
   Plus,
   Settings,
   Sparkles,
+  Timer,
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { Conversation, Project } from '@/electron';
+import type { Conversation, Project, ScheduledTask } from '@/electron';
 
 import AppPanel from './AppPanel';
 import FileTree from './FileTree';
@@ -33,6 +34,7 @@ interface SidebarProps {
   onFileDeleted?: (path: string, isDirectory: boolean) => void;
   onSettingsClick?: () => void;
   onSkillsClick?: () => void;
+  onSchedulesClick?: () => void;
   onOpenDbViewer?: (appId: string, appName: string) => void;
 }
 
@@ -45,10 +47,19 @@ export default function Sidebar({
   onFileDeleted,
   onSettingsClick,
   onSkillsClick,
+  onSchedulesClick,
   onOpenDbViewer,
 }: SidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
+  const [isSchedulesCollapsed, setIsSchedulesCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sidebar-schedules-collapsed') !== 'false';
+    } catch {
+      return true;
+    }
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [isFilesCollapsed, setIsFilesCollapsed] = useState(() => {
     try {
@@ -88,15 +99,19 @@ export default function Sidebar({
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [convResponse, projResponse] = await Promise.all([
+      const [convResponse, projResponse, schedResponse] = await Promise.all([
         window.electron.conversation.list(),
         window.electron.project.list(),
+        window.electron.schedule.list(),
       ]);
       if (convResponse.success && convResponse.conversations) {
         setConversations(convResponse.conversations);
       }
       if (projResponse.success && projResponse.projects) {
         setProjects(projResponse.projects);
+      }
+      if (schedResponse.success && schedResponse.tasks) {
+        setScheduledTasks(schedResponse.tasks);
       }
     } catch (error) {
       console.error('Error loading sidebar data:', error);
@@ -396,6 +411,78 @@ export default function Sidebar({
         </div>
 
         <div className="flex-1 overflow-y-auto px-1.5 pb-1">
+          {/* Scheduled Tasks Section */}
+          {scheduledTasks.length > 0 && (
+            <div className="mb-1">
+              <button
+                onClick={() => {
+                  setIsSchedulesCollapsed((prev) => {
+                    const next = !prev;
+                    try {
+                      localStorage.setItem('sidebar-schedules-collapsed', String(next));
+                    } catch {
+                      /* ignore */
+                    }
+                    return next;
+                  });
+                }}
+                className="flex w-full items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+              >
+                {isSchedulesCollapsed ? (
+                  <ChevronRight className="h-3 w-3" />
+                ) : (
+                  <ChevronDown className="h-3 w-3" />
+                )}
+                <Timer className="h-3 w-3" />
+                定时任务
+                <span className="ml-auto text-[10px] font-normal text-neutral-400 dark:text-neutral-500">
+                  {scheduledTasks.filter((t) => t.enabled).length}/{scheduledTasks.length}
+                </span>
+              </button>
+              {!isSchedulesCollapsed && (
+                <div className="mt-0.5 space-y-0.5">
+                  {scheduledTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      onClick={onSchedulesClick}
+                      className="group cursor-pointer rounded-lg px-2 py-1.5 transition-colors hover:bg-white/60 dark:hover:bg-neutral-800/50"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                            task.enabled
+                              ? 'bg-green-400 dark:bg-green-500'
+                              : 'bg-neutral-300 dark:bg-neutral-600'
+                          }`}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-xs text-neutral-700 dark:text-neutral-300">
+                          {task.name}
+                        </span>
+                        {task.lastRunStatus && (
+                          <span
+                            className={`shrink-0 text-[9px] ${
+                              task.lastRunStatus === 'success'
+                                ? 'text-green-500'
+                                : task.lastRunStatus === 'error'
+                                  ? 'text-red-500'
+                                  : 'text-yellow-500'
+                            }`}
+                          >
+                            {task.lastRunStatus === 'success'
+                              ? 'OK'
+                              : task.lastRunStatus === 'error'
+                                ? 'ERR'
+                                : 'SKIP'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {isLoading ? (
             <div className="px-2 py-4 text-center text-xs text-neutral-400">Loading...</div>
           ) : conversations.length === 0 && projects.length === 0 ? (
@@ -601,16 +688,26 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Bottom bar - Skills & Settings */}
+      {/* Bottom bar - Skills, Schedules & Settings */}
       <div className="flex shrink-0 items-center justify-between border-t border-neutral-200/70 px-2 py-1.5 dark:border-neutral-800">
-        <button
-          onClick={onSkillsClick}
-          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-          title="Skill 精选"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>Skill 精选</span>
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={onSkillsClick}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            title="Skill 精选"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Skill 精选</span>
+          </button>
+          <button
+            onClick={onSchedulesClick}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            title="定时任务"
+          >
+            <Timer className="h-3.5 w-3.5" />
+            <span>定时任务</span>
+          </button>
+        </div>
         <button
           onClick={onSettingsClick}
           className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"

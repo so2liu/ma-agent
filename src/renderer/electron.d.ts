@@ -287,6 +287,38 @@ export interface DbQueryResponse {
   error?: string;
 }
 
+export interface ScheduledTask {
+  id: string;
+  name: string;
+  prompt: string;
+  cronExpression: string;
+  enabled: boolean;
+  modelPreference: ChatModelPreference;
+  lastRunAt?: number;
+  lastRunStatus?: 'success' | 'error' | 'skipped';
+  lastRunConversationId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ScheduleListResponse {
+  success: boolean;
+  tasks?: ScheduledTask[];
+  error?: string;
+}
+
+export interface ScheduleTaskResponse {
+  success: boolean;
+  task?: ScheduledTask;
+  error?: string;
+}
+
+export interface ScheduleRunResponse {
+  success: boolean;
+  conversationId?: string;
+  error?: string;
+}
+
 export interface ElectronAPI {
   onNavigate: (callback: (view: string) => void) => () => void;
   chat: {
@@ -417,10 +449,30 @@ export interface ElectronAPI {
     reorder: (orderedIds: string[]) => Promise<{ success: boolean; error?: string }>;
     delete: (id: string) => Promise<{ success: boolean; error?: string }>;
   };
+  schedule: {
+    list: () => Promise<ScheduleListResponse>;
+    create: (data: {
+      name: string;
+      prompt: string;
+      cronExpression: string;
+      modelPreference: ChatModelPreference;
+    }) => Promise<ScheduleTaskResponse>;
+    update: (
+      id: string,
+      updates: {
+        name?: string;
+        prompt?: string;
+        cronExpression?: string;
+        enabled?: boolean;
+        modelPreference?: ChatModelPreference;
+      }
+    ) => Promise<ScheduleTaskResponse>;
+    delete: (id: string) => Promise<{ success: boolean; error?: string }>;
+    runNow: (id: string) => Promise<ScheduleRunResponse>;
+  };
   update: {
     getStatus: () => Promise<UpdateStatus>;
     check: () => Promise<{ success: boolean }>;
-    download: () => Promise<{ success: boolean }>;
     install: () => Promise<{ success: boolean }>;
     getChannel: () => Promise<{ channel: UpdateChannel }>;
     setChannel: (channel: UpdateChannel) => Promise<{ success: boolean; channel: UpdateChannel }>;

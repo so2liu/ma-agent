@@ -104,10 +104,11 @@ function serializeMessagesForStorage(messages: Message[]): PersistedMessage[] {
 interface ChatProps {
   onSettingsClick?: () => void;
   onSkillsClick?: () => void;
+  onSchedulesClick?: () => void;
   onOpenDbViewer?: (appId: string, appName: string) => void;
 }
 
-export default function Chat({ onSettingsClick, onSkillsClick, onOpenDbViewer }: ChatProps) {
+export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick, onOpenDbViewer }: ChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -529,6 +530,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onOpenDbViewer }:
             onFileDeleted={handleFileDeleted}
             onSettingsClick={onSettingsClick}
             onSkillsClick={onSkillsClick}
+            onSchedulesClick={onSchedulesClick}
             onOpenDbViewer={onOpenDbViewer}
           />
         </Panel>

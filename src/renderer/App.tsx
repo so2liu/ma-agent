@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 
 import DbViewer from '@/components/DbViewer';
 import UpdateCheckFeedback from '@/components/UpdateCheckFeedback';
-import UpdateNotification from '@/components/UpdateNotification';
 import UpdateReadyBanner from '@/components/UpdateReadyBanner';
 import Chat from '@/pages/Chat';
+import Schedules from '@/pages/Schedules';
 import Settings from '@/pages/Settings';
 import Skills from '@/pages/Skills';
 
-type View = 'home' | 'settings' | 'skills' | 'db-viewer';
+type View = 'home' | 'settings' | 'skills' | 'schedules' | 'db-viewer';
 
 interface DbViewerState {
   appId: string;
@@ -49,13 +49,15 @@ export default function App() {
   return (
     <>
       <UpdateCheckFeedback />
-      <UpdateNotification />
       <UpdateReadyBanner />
       <div className={currentView === 'settings' ? 'block' : 'hidden'}>
         <Settings onBack={() => setCurrentView('home')} />
       </div>
       <div className={currentView === 'skills' ? 'block' : 'hidden'}>
         <Skills onBack={() => setCurrentView('home')} />
+      </div>
+      <div className={currentView === 'schedules' ? 'block' : 'hidden'}>
+        <Schedules onBack={() => setCurrentView('home')} />
       </div>
       {currentView === 'db-viewer' && dbViewerState && (
         <div className="h-screen">
@@ -70,6 +72,7 @@ export default function App() {
         <Chat
           onSettingsClick={() => setCurrentView('settings')}
           onSkillsClick={() => setCurrentView('skills')}
+          onSchedulesClick={() => setCurrentView('schedules')}
           onOpenDbViewer={openDbViewer}
         />
       </div>

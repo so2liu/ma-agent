@@ -8,6 +8,7 @@ import { registerConfigHandlers } from './handlers/config-handlers';
 import { registerDbHandlers } from './handlers/db-handlers';
 import { registerConversationHandlers } from './handlers/conversation-handlers';
 import { registerProjectHandlers } from './handlers/project-handlers';
+import { registerScheduleHandlers } from './handlers/schedule-handlers';
 import { registerShellHandlers } from './handlers/shell-handlers';
 import { registerSkillHandlers } from './handlers/skill-handlers';
 import { registerUpdateHandlers } from './handlers/update-handlers';
@@ -15,6 +16,7 @@ import { registerWorkspaceHandlers, restartFileWatcher } from './handlers/worksp
 import { buildEnhancedPath, ensureWorkspaceDir } from './lib/config';
 import { appManager } from './lib/sandbox/app-manager';
 import { skillDiscovery } from './lib/skill-discovery';
+import { startScheduler, stopScheduler } from './lib/scheduler';
 import { initializeUpdater, startPeriodicUpdateCheck } from './lib/updater';
 import { loadWindowBounds, saveWindowBounds } from './lib/window-state';
 import { createApplicationMenu } from './menu';
@@ -114,6 +116,7 @@ app.whenReady().then(async () => {
   registerAppHandlers();
   registerDbHandlers();
   registerSkillHandlers(() => mainWindow);
+  registerScheduleHandlers();
 
   createWindow();
 
@@ -125,10 +128,15 @@ app.whenReady().then(async () => {
   const menu = createApplicationMenu(mainWindow);
   Menu.setApplicationMenu(menu);
 
-  // Ensure workspace directory exists, then start file watcher and LAN discovery
+  // Ensure workspace directory exists, then start file watcher, LAN discovery, and scheduler
   ensureWorkspaceDir()
-    .then(() => restartFileWatcher())
-    .then(() => skillDiscovery.start())
+    .then(() => {
+      restartFileWatcher();
+      skillDiscovery.start().catch((error: unknown) => {
+        console.error('Failed to start skill discovery:', error);
+      });
+      startScheduler();
+    })
     .catch((error) => {
       console.error('Failed to ensure workspace directory:', error);
     });
@@ -149,6 +157,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  stopScheduler();
   skillDiscovery.stop().catch((error) => {
     console.error('Error stopping skill discovery on quit:', error);
   });
