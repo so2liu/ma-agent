@@ -8,7 +8,7 @@ import { registerConfigHandlers } from './handlers/config-handlers';
 import { registerConversationHandlers } from './handlers/conversation-handlers';
 import { registerShellHandlers } from './handlers/shell-handlers';
 import { registerUpdateHandlers } from './handlers/update-handlers';
-import { registerWorkspaceHandlers } from './handlers/workspace-handlers';
+import { registerWorkspaceHandlers, restartFileWatcher } from './handlers/workspace-handlers';
 import { buildEnhancedPath, ensureWorkspaceDir } from './lib/config';
 import { appManager } from './lib/sandbox/app-manager';
 import { initializeUpdater, startPeriodicUpdateCheck } from './lib/updater';
@@ -118,10 +118,12 @@ app.whenReady().then(async () => {
   const menu = createApplicationMenu(mainWindow);
   Menu.setApplicationMenu(menu);
 
-  // Ensure workspace directory exists and sync skills (run in background after window creation)
-  ensureWorkspaceDir().catch((error) => {
-    console.error('Failed to ensure workspace directory:', error);
-  });
+  // Ensure workspace directory exists, then start file watcher
+  ensureWorkspaceDir()
+    .then(() => restartFileWatcher())
+    .catch((error) => {
+      console.error('Failed to ensure workspace directory:', error);
+    });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

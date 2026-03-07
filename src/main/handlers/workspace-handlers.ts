@@ -121,14 +121,17 @@ async function listDirectory(
 
 let fileWatcher: FSWatcher | null = null;
 let debounceTimer: NodeJS.Timeout | null = null;
+let storedGetMainWindow: (() => BrowserWindow | null) | null = null;
 
-function startFileWatcher(getMainWindow: () => BrowserWindow | null): void {
+/** Restart the file watcher on the current workspace directory. Safe to call repeatedly. */
+export function restartFileWatcher(): void {
   stopFileWatcher();
+  if (!storedGetMainWindow) return;
 
+  const getMainWindow = storedGetMainWindow;
   const workspaceDir = getWorkspaceDir();
   try {
     fileWatcher = watch(workspaceDir, { recursive: true }, (_eventType, filename) => {
-      // Ignore changes in hidden/ignored directories
       if (filename && IGNORED_NAMES.has(filename.split(sep)[0]!)) return;
 
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -141,7 +144,6 @@ function startFileWatcher(getMainWindow: () => BrowserWindow | null): void {
     });
 
     fileWatcher.on('error', () => {
-      // Watcher failed (e.g. directory deleted) -- clean up silently
       stopFileWatcher();
     });
   } catch {
@@ -161,7 +163,7 @@ function stopFileWatcher(): void {
 }
 
 export function registerWorkspaceHandlers(getMainWindow: () => BrowserWindow | null): void {
-  startFileWatcher(getMainWindow);
+  storedGetMainWindow = getMainWindow;
 
   ipcMain.handle('workspace:list-files', async () => {
     const workspaceDir = getWorkspaceDir();
