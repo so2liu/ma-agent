@@ -178,6 +178,17 @@ contextBridge.exposeInMainWorld('electron', {
     publish: (appId: string) => ipcRenderer.invoke('app:publish', appId),
     stop: (appId: string) => ipcRenderer.invoke('app:stop', appId)
   },
+  db: {
+    getTables: (appId: string) => ipcRenderer.invoke('db:get-tables', appId),
+    queryTable: (appId: string, table: string, page?: number, pageSize?: number) =>
+      ipcRenderer.invoke('db:query-table', appId, table, page, pageSize),
+    updateCell: (appId: string, table: string, rowId: string, column: string, value: unknown) =>
+      ipcRenderer.invoke('db:update-cell', appId, table, rowId, column, value),
+    deleteRow: (appId: string, table: string, rowId: string) =>
+      ipcRenderer.invoke('db:delete-row', appId, table, rowId),
+    runQuery: (appId: string, sql: string) => ipcRenderer.invoke('db:run-query', appId, sql),
+    getAppStatus: (appId: string) => ipcRenderer.invoke('db:get-app-status', appId)
+  },
   skill: {
     list: () => ipcRenderer.invoke('skill:list'),
     toggleShared: (skillName: string) => ipcRenderer.invoke('skill:toggle-shared', skillName),

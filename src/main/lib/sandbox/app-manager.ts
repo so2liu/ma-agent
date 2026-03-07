@@ -11,6 +11,7 @@ import { basename, join } from 'node:path';
 
 import { startAppServer, startStaticAppServer, type AppServer } from './http-server';
 import { createSandboxApp } from './quickjs-runtime';
+import { migrateJsonToSqlite } from './sandbox-api';
 import type { AppInfo, AppManifest, AppStatus, PublishResult, SandboxApp } from './types';
 import { startViteDevServer, type ViteDevServer } from './vite-dev-server';
 
@@ -186,7 +187,7 @@ class AppManager {
 
     const appDir = join(workspaceDir, 'apps', appId);
     const serverPath = join(appDir, 'server.js');
-    const dataPath = join(appDir, 'data.json');
+    const dataPath = join(appDir, 'data.sqlite');
 
     if (!isViteApp(appDir)) {
       throw new Error(`App "${appId}" is not a Vite app (missing src/App.tsx)`);
@@ -206,10 +207,8 @@ class AppManager {
         installDeps(appDir);
       }
 
-      // Initialize data file if missing
-      if (!existsSync(dataPath)) {
-        writeFileSync(dataPath, '[]');
-      }
+      // Migrate from data.json if needed
+      migrateJsonToSqlite(join(appDir, 'data.json'), dataPath);
 
       // Start sandbox for API routes (if server.js exists)
       let sandbox: SandboxApp;
@@ -299,7 +298,7 @@ class AppManager {
   private async _doPublish(workspaceDir: string, appId: string): Promise<PublishResult> {
     const appDir = join(workspaceDir, 'apps', appId);
     const serverPath = join(appDir, 'server.js');
-    const dataPath = join(appDir, 'data.json');
+    const dataPath = join(appDir, 'data.sqlite');
 
     const viteApp = isViteApp(appDir);
 
@@ -330,10 +329,8 @@ class AppManager {
           throw new Error(`Build failed: dist/ directory not found for app "${appId}"`);
         }
 
-        // Initialize data file if missing
-        if (!existsSync(dataPath)) {
-          writeFileSync(dataPath, '[]');
-        }
+        // Migrate from data.json if needed
+        migrateJsonToSqlite(join(appDir, 'data.json'), dataPath);
 
         // Create sandbox for API routes
         let sandbox: SandboxApp;
@@ -393,10 +390,8 @@ class AppManager {
     const frontendHtml = readFileSync(indexPath, 'utf-8');
     const backendJs = readFileSync(serverPath, 'utf-8');
 
-    // Initialize data file if missing
-    if (!existsSync(dataPath)) {
-      writeFileSync(dataPath, '[]');
-    }
+    // Migrate from data.json if needed
+    migrateJsonToSqlite(join(appDir, 'data.json'), dataPath);
 
     // Read preferred port from manifest
     const manifest = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;

@@ -203,7 +203,7 @@ export async function createSandboxApp(
   return {
     handleRequest,
     dispose: () => {
-      // Each request creates a fresh VM context, nothing persistent to dispose
+      db.close();
     }
   };
 }
@@ -211,11 +211,11 @@ export async function createSandboxApp(
 /** Sync sandbox DB changes back to host by replacing the entire dataset.
  * This preserves sandbox-generated IDs so frontend references remain valid. */
 function syncDbChanges(
-  dataPath: string,
+  dbPath: string,
   original: Record<string, unknown>[],
   updated: Record<string, unknown>[]
 ): void {
   if (JSON.stringify(original) !== JSON.stringify(updated)) {
-    replaceAll(dataPath, updated);
+    replaceAll(dbPath, updated);
   }
 }

@@ -5,6 +5,7 @@ import { app, BrowserWindow, Menu } from 'electron';
 import { registerAppHandlers } from './handlers/app-handlers';
 import { registerChatHandlers } from './handlers/chat-handlers';
 import { registerConfigHandlers } from './handlers/config-handlers';
+import { registerDbHandlers } from './handlers/db-handlers';
 import { registerConversationHandlers } from './handlers/conversation-handlers';
 import { registerProjectHandlers } from './handlers/project-handlers';
 import { registerShellHandlers } from './handlers/shell-handlers';
@@ -111,6 +112,7 @@ app.whenReady().then(async () => {
   registerUpdateHandlers();
   registerWorkspaceHandlers(() => mainWindow);
   registerAppHandlers();
+  registerDbHandlers();
   registerSkillHandlers(() => mainWindow);
 
   createWindow();
