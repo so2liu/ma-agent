@@ -10,10 +10,21 @@ export interface AppServer {
   stop: () => Promise<void>;
 }
 
+const MAX_BODY_SIZE = 1024 * 1024; // 1MB limit
+
 function readBody(req: import('node:http').IncomingMessage): Promise<string | null> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    let totalSize = 0;
+    req.on('data', (chunk: Buffer) => {
+      totalSize += chunk.length;
+      if (totalSize > MAX_BODY_SIZE) {
+        req.destroy();
+        reject(new Error('Request body too large'));
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => {
       if (chunks.length === 0) {
         resolve(null);
@@ -63,8 +74,12 @@ export async function startAppServer(
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${String(port)}`);
 
-    // CORS headers for local development
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // CORS headers - restrict to same-origin (LAN app served from same host)
+    const origin = req.headers.origin;
+    const allowedOrigin = origin && /^http:\/\/(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+):\d+$/.test(origin) ? origin : null;
+    if (allowedOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -98,7 +113,15 @@ export async function startAppServer(
 
       try {
         const sandboxRes = await sandboxApp.handleRequest(sandboxReq);
-        res.writeHead(sandboxRes.status, sandboxRes.headers);
+        // Only allow safe response headers from sandbox
+        const safeHeaders: Record<string, string> = {};
+        const ALLOWED_HEADERS = new Set(['content-type', 'cache-control', 'x-request-id']);
+        for (const [key, value] of Object.entries(sandboxRes.headers)) {
+          if (ALLOWED_HEADERS.has(key.toLowerCase())) {
+            safeHeaders[key] = value;
+          }
+        }
+        res.writeHead(sandboxRes.status, safeHeaders);
         res.end(sandboxRes.body);
       } catch (err) {
         console.error('Sandbox request error:', err);

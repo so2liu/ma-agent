@@ -15,6 +15,7 @@ interface RunningApp {
 
 class AppManager {
   private runningApps = new Map<string, RunningApp>();
+  private publishLocks = new Map<string, Promise<PublishResult>>();
 
   /** Scan workspace/apps/ directory and return all app info */
   scanApps(workspaceDir: string): AppInfo[] {
@@ -43,7 +44,7 @@ class AppManager {
           id: dirName,
           name: meta.name ?? dirName,
           description: meta.description ?? '',
-          icon: meta.icon ?? '📱',
+          icon: meta.icon ?? 'app',
           status: running ? 'running' : 'stopped',
           lanUrl: running?.lanUrl ?? null,
           localUrl: running?.localUrl ?? null,
@@ -58,6 +59,21 @@ class AppManager {
 
   /** Publish an app: start sandbox + HTTP server */
   async publish(workspaceDir: string, appId: string): Promise<PublishResult> {
+    // Prevent concurrent publish for the same app
+    const existing = this.publishLocks.get(appId);
+    if (existing) {
+      return existing;
+    }
+    const promise = this._doPublish(workspaceDir, appId);
+    this.publishLocks.set(appId, promise);
+    try {
+      return await promise;
+    } finally {
+      this.publishLocks.delete(appId);
+    }
+  }
+
+  private async _doPublish(workspaceDir: string, appId: string): Promise<PublishResult> {
     // Stop if already running
     if (this.runningApps.has(appId)) {
       await this.stop(appId);

@@ -27,6 +27,10 @@ function saveData(dataPath: string, records: Record<string, unknown>[]): void {
   writeFileSync(dataPath, JSON.stringify(records, null, 2));
 }
 
+export function replaceAll(dataPath: string, records: Record<string, unknown>[]): void {
+  saveData(dataPath, records);
+}
+
 export function createDBApi(dataPath: string): DBApi {
   return {
     getAll: () => loadData(dataPath),

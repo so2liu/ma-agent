@@ -1,6 +1,6 @@
 import { getQuickJS, type QuickJSWASMModule } from 'quickjs-emscripten';
 
-import { createDBApi, createLoggerApi } from './sandbox-api';
+import { createDBApi, createLoggerApi, replaceAll } from './sandbox-api';
 import type { SandboxApp, SandboxRequest, SandboxResponse } from './types';
 
 let modulePromise: Promise<QuickJSWASMModule> | null = null;
@@ -121,6 +121,10 @@ export async function createSandboxApp(
     // Set memory limit (32MB)
     vm.runtime.setMemoryLimit(32 * 1024 * 1024);
 
+    // Set CPU time limit (5 seconds)
+    const deadline = Date.now() + 5000;
+    vm.runtime.setInterruptHandler(() => Date.now() > deadline);
+
     try {
       const result = vm.evalCode(code);
 
@@ -144,7 +148,7 @@ export async function createSandboxApp(
       const parsed = JSON.parse(resultJson) as SandboxResult;
 
       // Sync DB changes back to host
-      syncDbChanges(db, dbSnapshot, parsed.dbRecords);
+      syncDbChanges(dataPath, dbSnapshot, parsed.dbRecords);
 
       // Replay logs
       for (const log of parsed.logs) {
@@ -171,41 +175,14 @@ export async function createSandboxApp(
   };
 }
 
-/** Diff sandbox DB records against original snapshot and apply changes to host DB */
+/** Sync sandbox DB changes back to host by replacing the entire dataset.
+ * This preserves sandbox-generated IDs so frontend references remain valid. */
 function syncDbChanges(
-  db: ReturnType<typeof createDBApi>,
+  dataPath: string,
   original: Record<string, unknown>[],
   updated: Record<string, unknown>[]
 ): void {
-  const originalIds = new Set(original.map((r) => r.id as string));
-  const updatedIds = new Set(updated.map((r) => r.id as string));
-
-  // New records (in updated but not in original)
-  for (const record of updated) {
-    const id = record.id as string;
-    if (!originalIds.has(id)) {
-      const { id: _id, createdAt: _createdAt, ...rest } = record;
-      db.insert(rest);
-    }
-  }
-
-  // Deleted records (in original but not in updated)
-  for (const record of original) {
-    const id = record.id as string;
-    if (!updatedIds.has(id)) {
-      db.remove(id);
-    }
-  }
-
-  // Updated records
-  for (const record of updated) {
-    const id = record.id as string;
-    if (originalIds.has(id)) {
-      const orig = original.find((r) => r.id === id);
-      if (orig && JSON.stringify(orig) !== JSON.stringify(record)) {
-        const { id: _id, ...rest } = record;
-        db.update(id, rest);
-      }
-    }
+  if (JSON.stringify(original) !== JSON.stringify(updated)) {
+    replaceAll(dataPath, updated);
   }
 }
