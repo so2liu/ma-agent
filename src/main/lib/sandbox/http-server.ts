@@ -53,7 +53,8 @@ function getLanIPs(): string[] {
 
 export async function startAppServer(
   frontendHtml: string,
-  sandboxApp: SandboxApp
+  sandboxApp: SandboxApp,
+  preferredPort?: number
 ): Promise<AppServer> {
   const server = createServer(async (req, res) => {
     const addr = server.address();
@@ -128,13 +129,30 @@ export async function startAppServer(
     res.end('Not Found');
   });
 
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, () => resolve());
+  const listenPort = await new Promise<number>((resolve, reject) => {
+    if (preferredPort) {
+      // Try preferred port first, fall back to random only on EADDRINUSE
+      server.once('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          server.listen(0, () => {
+            const addr = server.address();
+            resolve(typeof addr === 'object' && addr ? addr.port : 0);
+          });
+        } else {
+          reject(err);
+        }
+      });
+      server.listen(preferredPort, () => resolve(preferredPort));
+    } else {
+      server.once('error', reject);
+      server.listen(0, () => {
+        const addr = server.address();
+        resolve(typeof addr === 'object' && addr ? addr.port : 0);
+      });
+    }
   });
 
-  const addr = server.address();
-  const port = typeof addr === 'object' && addr ? addr.port : 0;
+  const port = listenPort;
   const lanIps = getLanIPs();
   const primaryIp = lanIps[0] ?? 'localhost';
 

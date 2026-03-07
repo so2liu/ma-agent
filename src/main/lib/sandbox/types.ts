@@ -16,6 +16,7 @@ export interface AppManifest {
   description: string;
   version: string;
   icon: string;
+  port?: number;
 }
 
 export type AppStatus =
