@@ -1,11 +1,16 @@
 import { ExternalLink, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { codeToHtml } from 'shiki';
+
+import Markdown from '@/components/Markdown';
+
+export type ArtifactType = 'html' | 'image' | 'markdown' | 'code' | 'text';
 
 export interface Artifact {
   id: string;
   filePath: string;
   fileName: string;
-  type: 'html' | 'image';
+  type: ArtifactType;
   // For HTML artifacts extracted from Write tool, content is available directly
   content?: string;
 }
@@ -20,6 +25,98 @@ interface DiskLoadResult {
   content: string | null;
   dataUrl: string | null;
   error: string | null;
+}
+
+const EXT_TO_SHIKI_LANG: Record<string, string> = {
+  js: 'javascript',
+  jsx: 'jsx',
+  ts: 'typescript',
+  tsx: 'tsx',
+  py: 'python',
+  rb: 'ruby',
+  go: 'go',
+  rs: 'rust',
+  java: 'java',
+  c: 'c',
+  cpp: 'cpp',
+  h: 'c',
+  hpp: 'cpp',
+  sh: 'bash',
+  bash: 'bash',
+  css: 'css',
+  json: 'json',
+  yaml: 'yaml',
+  yml: 'yaml',
+  toml: 'toml',
+  xml: 'xml',
+  sql: 'sql',
+  graphql: 'graphql',
+  vue: 'vue',
+  svelte: 'svelte',
+  svg: 'xml',
+  html: 'html',
+  htm: 'html'
+};
+
+function getShikiLang(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  return EXT_TO_SHIKI_LANG[ext] || 'text';
+}
+
+function CodePreview({ content, fileName }: { content: string; fileName: string }) {
+  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
+  const lang = getShikiLang(fileName);
+
+  useEffect(() => {
+    let cancelled = false;
+    codeToHtml(content, {
+      lang,
+      theme: 'github-dark'
+    })
+      .then((html) => {
+        if (!cancelled) setHighlightedHtml(html);
+      })
+      .catch(() => {
+        if (!cancelled) setHighlightedHtml(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [content, lang]);
+
+  if (highlightedHtml) {
+    return (
+      <div
+        className="h-full overflow-auto p-4 text-sm [&_pre]:!bg-transparent"
+        dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+      />
+    );
+  }
+
+  // Fallback to plain text while loading
+  return (
+    <pre className="h-full overflow-auto p-4 text-sm text-neutral-300">
+      <code>{content}</code>
+    </pre>
+  );
+}
+
+function MarkdownPreview({ content }: { content: string }) {
+  return (
+    <div className="h-full overflow-auto p-4">
+      <div className="prose prose-sm max-w-none prose-neutral dark:prose-invert">
+        <Markdown>{content}</Markdown>
+      </div>
+    </div>
+  );
+}
+
+function TextPreview({ content }: { content: string }) {
+  return (
+    <pre className="h-full overflow-auto p-4 text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">
+      {content}
+    </pre>
+  );
 }
 
 export default function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps) {
@@ -142,7 +239,7 @@ export default function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps)
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden bg-white dark:bg-neutral-950">
         {display.loading && (
           <div className="flex h-full items-center justify-center text-xs text-neutral-400">
             Loading...
@@ -172,6 +269,18 @@ export default function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps)
               className="max-h-full max-w-full object-contain"
             />
           </div>
+        )}
+
+        {!display.loading && !display.error && artifact.type === 'markdown' && display.content && (
+          <MarkdownPreview content={display.content} />
+        )}
+
+        {!display.loading && !display.error && artifact.type === 'code' && display.content && (
+          <CodePreview content={display.content} fileName={artifact.fileName} />
+        )}
+
+        {!display.loading && !display.error && artifact.type === 'text' && display.content && (
+          <TextPreview content={display.content} />
         )}
       </div>
     </div>

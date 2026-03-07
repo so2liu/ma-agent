@@ -152,7 +152,9 @@ contextBridge.exposeInMainWorld('electron', {
   workspace: {
     listFiles: () => ipcRenderer.invoke('workspace:list-files'),
     readFile: (relativePath: string) => ipcRenderer.invoke('workspace:read-file', relativePath),
-    openFile: (relativePath: string) => ipcRenderer.invoke('workspace:open-file', relativePath)
+    openFile: (relativePath: string) => ipcRenderer.invoke('workspace:open-file', relativePath),
+    deleteFile: (relativePath: string, isDirectory: boolean) =>
+      ipcRenderer.invoke('workspace:delete-file', relativePath, isDirectory)
   },
   app: {
     scan: () => ipcRenderer.invoke('app:scan'),

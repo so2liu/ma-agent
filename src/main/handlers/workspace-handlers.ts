@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'fs/promises';
+import { readdir, readFile, rm, stat } from 'fs/promises';
 import { join, relative, resolve } from 'path';
 import { ipcMain, shell } from 'electron';
 
@@ -34,7 +34,34 @@ const MIME_TYPES: Record<string, string> = {
   webp: 'image/webp',
   bmp: 'image/bmp',
   ico: 'image/x-icon',
-  avif: 'image/avif'
+  avif: 'image/avif',
+  json: 'application/json',
+  md: 'text/markdown',
+  txt: 'text/plain',
+  css: 'text/css',
+  js: 'text/javascript',
+  jsx: 'text/javascript',
+  ts: 'text/typescript',
+  tsx: 'text/typescript',
+  py: 'text/x-python',
+  rb: 'text/x-ruby',
+  go: 'text/x-go',
+  rs: 'text/x-rust',
+  java: 'text/x-java',
+  c: 'text/x-c',
+  cpp: 'text/x-c++',
+  h: 'text/x-c',
+  hpp: 'text/x-c++',
+  sh: 'text/x-sh',
+  bash: 'text/x-sh',
+  yaml: 'text/yaml',
+  yml: 'text/yaml',
+  toml: 'text/toml',
+  xml: 'text/xml',
+  sql: 'text/x-sql',
+  graphql: 'text/x-graphql',
+  vue: 'text/x-vue',
+  svelte: 'text/x-svelte'
 };
 
 async function listDirectory(
@@ -108,7 +135,49 @@ export function registerWorkspaceHandlers(): void {
     try {
       const ext = relativePath.split('.').pop()?.toLowerCase() || '';
       const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
-      const isText = ['html', 'htm', 'svg', 'md', 'txt', 'css', 'js', 'json'].includes(ext);
+      const TEXT_EXTENSIONS = new Set([
+        'html',
+        'htm',
+        'svg',
+        'md',
+        'txt',
+        'css',
+        'js',
+        'jsx',
+        'ts',
+        'tsx',
+        'json',
+        'py',
+        'rb',
+        'go',
+        'rs',
+        'java',
+        'c',
+        'cpp',
+        'h',
+        'hpp',
+        'sh',
+        'bash',
+        'yaml',
+        'yml',
+        'toml',
+        'xml',
+        'sql',
+        'graphql',
+        'vue',
+        'svelte',
+        'env',
+        'gitignore',
+        'dockerignore',
+        'makefile',
+        'cfg',
+        'ini',
+        'conf',
+        'log',
+        'csv',
+        'tsv'
+      ]);
+      const isText = TEXT_EXTENSIONS.has(ext);
 
       if (isText) {
         const content = await readFile(fullPath, 'utf-8');
@@ -122,6 +191,32 @@ export function registerWorkspaceHandlers(): void {
       return { success: false, error: String(error) };
     }
   });
+
+  ipcMain.handle(
+    'workspace:delete-file',
+    async (_event, relativePath: string, isDirectory: boolean) => {
+      const workspaceDir = getWorkspaceDir();
+      const fullPath = resolve(join(workspaceDir, relativePath));
+
+      if (!fullPath.startsWith(resolve(workspaceDir))) {
+        return { success: false, error: 'Path traversal not allowed' };
+      }
+
+      try {
+        const fileStat = await stat(fullPath);
+        if (isDirectory && !fileStat.isDirectory()) {
+          return { success: false, error: 'Expected directory but found file' };
+        }
+        if (!isDirectory && fileStat.isDirectory()) {
+          return { success: false, error: 'Expected file but found directory' };
+        }
+        await rm(fullPath, { recursive: isDirectory });
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: String(error) };
+      }
+    }
+  );
 
   ipcMain.handle('workspace:open-file', async (_event, relativePath: string) => {
     const workspaceDir = getWorkspaceDir();

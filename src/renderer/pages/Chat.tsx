@@ -455,10 +455,43 @@ export default function Chat({ onSettingsClick }: ChatProps) {
 
     const htmlExts = new Set(['html', 'htm', 'svg']);
     const imageExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'ico']);
+    const mdExts = new Set(['md']);
+    const codeExts = new Set([
+      'js',
+      'jsx',
+      'ts',
+      'tsx',
+      'py',
+      'rb',
+      'go',
+      'rs',
+      'java',
+      'c',
+      'cpp',
+      'h',
+      'hpp',
+      'sh',
+      'bash',
+      'css',
+      'json',
+      'yaml',
+      'yml',
+      'toml',
+      'xml',
+      'sql',
+      'graphql',
+      'vue',
+      'svelte'
+    ]);
+    const textExts = new Set(['txt', 'csv', 'tsv']);
 
-    let type: 'html' | 'image' | null = null;
+    type ArtifactFileType = 'html' | 'image' | 'markdown' | 'code' | 'text';
+    let type: ArtifactFileType | null = null;
     if (htmlExts.has(ext)) type = 'html';
     else if (imageExts.has(ext)) type = 'image';
+    else if (mdExts.has(ext)) type = 'markdown';
+    else if (codeExts.has(ext)) type = 'code';
+    else if (textExts.has(ext)) type = 'text';
 
     if (type) {
       setSelectedArtifact({
@@ -466,7 +499,6 @@ export default function Chat({ onSettingsClick }: ChatProps) {
         filePath,
         fileName,
         type
-        // No content -- will be loaded from disk by ArtifactPanel
       });
     }
   };
