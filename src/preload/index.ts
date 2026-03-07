@@ -133,7 +133,9 @@ contextBridge.exposeInMainWorld('electron', {
     getEnvVars: () => ipcRenderer.invoke('config:get-env-vars'),
     getDiagnosticMetadata: () => ipcRenderer.invoke('config:get-diagnostic-metadata'),
     getApiKeyStatus: () => ipcRenderer.invoke('config:get-api-key-status'),
-    setApiKey: (apiKey?: string | null) => ipcRenderer.invoke('config:set-api-key', apiKey)
+    setApiKey: (apiKey?: string | null) => ipcRenderer.invoke('config:set-api-key', apiKey),
+    getApiBaseUrl: () => ipcRenderer.invoke('config:get-api-base-url'),
+    setApiBaseUrl: (url?: string | null) => ipcRenderer.invoke('config:set-api-base-url', url)
   },
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)

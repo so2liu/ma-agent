@@ -191,6 +191,11 @@ export interface ElectronAPI {
       success: boolean;
       status: { configured: boolean; source: 'env' | 'local' | null; lastFour: string | null };
     }>;
+    getApiBaseUrl: () => Promise<{ apiBaseUrl: string | null }>;
+    setApiBaseUrl: (url?: string | null) => Promise<{
+      success: boolean;
+      apiBaseUrl: string | null;
+    }>;
   };
   shell: {
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;

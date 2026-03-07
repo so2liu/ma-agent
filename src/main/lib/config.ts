@@ -10,6 +10,7 @@ export interface AppConfig {
   debugMode?: boolean;
   chatModelPreference?: ChatModelPreference | 'smart';
   apiKey?: string;
+  apiBaseUrl?: string;
 }
 
 const DEFAULT_MODEL_PREFERENCE: ChatModelPreference = 'fast';
@@ -72,6 +73,25 @@ export function setApiKey(apiKey: string | null): void {
     config.apiKey = apiKey.trim();
   } else {
     delete config.apiKey;
+  }
+  saveConfig(config);
+}
+
+export function getApiBaseUrl(): string | null {
+  const envBaseUrl = process.env.ANTHROPIC_BASE_URL?.trim();
+  if (envBaseUrl) {
+    return envBaseUrl;
+  }
+  const storedBaseUrl = loadConfig().apiBaseUrl?.trim();
+  return storedBaseUrl || null;
+}
+
+export function setApiBaseUrl(url: string | null): void {
+  const config = loadConfig();
+  if (url && url.trim()) {
+    config.apiBaseUrl = url.trim();
+  } else {
+    delete config.apiBaseUrl;
   }
   saveConfig(config);
 }
@@ -354,6 +374,12 @@ export function buildClaudeSessionEnv(): Record<string, string> {
   // Add API key if available
   if (apiKey) {
     env.ANTHROPIC_API_KEY = apiKey;
+  }
+
+  // Add custom base URL if configured
+  const baseUrl = getApiBaseUrl();
+  if (baseUrl) {
+    env.ANTHROPIC_BASE_URL = baseUrl;
   }
 
   // Set CLAUDE_CODE_GIT_BASH_PATH for Windows (required by Claude Code)

@@ -58,6 +58,11 @@ function Settings({ onBack }: SettingsProps) {
   const [isSavingApiKey, setIsSavingApiKey] = useState(false);
   const [apiKeySaveState, setApiKeySaveState] = useState<'idle' | 'success' | 'error'>('idle');
 
+  const [apiBaseUrl, setApiBaseUrl] = useState<string>('');
+  const [isLoadingBaseUrl, setIsLoadingBaseUrl] = useState(true);
+  const [isSavingBaseUrl, setIsSavingBaseUrl] = useState(false);
+  const [baseUrlSaveState, setBaseUrlSaveState] = useState<'idle' | 'success' | 'error'>('idle');
+
   useEffect(() => {
     // Load current workspace directory
     window.electron.config
@@ -89,6 +94,17 @@ function Settings({ onBack }: SettingsProps) {
       })
       .catch(() => {
         // ignore - will show as not configured
+      });
+
+    // Load API base URL
+    window.electron.config
+      .getApiBaseUrl()
+      .then((response) => {
+        setApiBaseUrl(response.apiBaseUrl || '');
+        setIsLoadingBaseUrl(false);
+      })
+      .catch(() => {
+        setIsLoadingBaseUrl(false);
       });
   }, []);
 
@@ -233,7 +249,23 @@ function Settings({ onBack }: SettingsProps) {
     }
   };
 
-  const isFormLoading = isLoadingWorkspace || isLoadingDebugMode;
+  const handleSaveBaseUrl = async () => {
+    setIsSavingBaseUrl(true);
+    setBaseUrlSaveState('idle');
+    try {
+      const response = await window.electron.config.setApiBaseUrl(apiBaseUrl.trim() || null);
+      setApiBaseUrl(response.apiBaseUrl || '');
+      setBaseUrlSaveState('success');
+      setTimeout(() => setBaseUrlSaveState('idle'), 2000);
+    } catch {
+      setBaseUrlSaveState('error');
+      setTimeout(() => setBaseUrlSaveState('idle'), 2500);
+    } finally {
+      setIsSavingBaseUrl(false);
+    }
+  };
+
+  const isFormLoading = isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl;
   const apiKeyPlaceholder = apiKeyStatus.lastFour ? `...${apiKeyStatus.lastFour}` : 'sk-ant-...';
 
   return (
@@ -342,6 +374,47 @@ function Settings({ onBack }: SettingsProps) {
                           </span>
                         )}
                       </div>
+                    </div>
+                  </section>
+
+                  <div className="border-t border-neutral-200/80 dark:border-neutral-800" />
+
+                  {/* API Base URL */}
+                  <section className="space-y-4">
+                    <div>
+                      <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-50">
+                        API Base URL
+                      </h2>
+                      <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                        Custom Anthropic-compatible API endpoint. Leave empty for the default
+                        Anthropic API.
+                      </p>
+                    </div>
+                    <input
+                      type="text"
+                      value={apiBaseUrl}
+                      onChange={(e) => setApiBaseUrl(e.target.value)}
+                      placeholder="https://api.example.com/anthropic"
+                      className="w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 font-mono text-sm text-neutral-900 placeholder-neutral-400 transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900/60 dark:text-neutral-100 dark:placeholder-neutral-500 dark:focus:border-neutral-300"
+                    />
+                    <div className="flex flex-wrap items-center justify-end gap-3">
+                      <button
+                        onClick={handleSaveBaseUrl}
+                        disabled={isSavingBaseUrl}
+                        className="rounded-full bg-neutral-900 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+                      >
+                        {isSavingBaseUrl ? 'Saving...' : 'Save'}
+                      </button>
+                      {baseUrlSaveState === 'success' && (
+                        <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                          Saved
+                        </span>
+                      )}
+                      {baseUrlSaveState === 'error' && (
+                        <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                          Failed to save
+                        </span>
+                      )}
                     </div>
                   </section>
 

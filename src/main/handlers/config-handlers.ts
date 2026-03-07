@@ -7,11 +7,13 @@ import {
   buildClaudeSessionEnv,
   buildEnhancedPath,
   ensureWorkspaceDir,
+  getApiBaseUrl,
   getApiKeyStatus,
   getDebugMode,
   getWorkspaceDir,
   loadConfig,
   saveConfig,
+  setApiBaseUrl,
   setApiKey
 } from '../lib/config';
 
@@ -87,6 +89,18 @@ export function registerConfigHandlers(): void {
     const normalized = apiKey?.trim() || null;
     setApiKey(normalized);
     return { success: true, status: getApiKeyStatus() };
+  });
+
+  // Get API base URL
+  ipcMain.handle('config:get-api-base-url', () => {
+    return { apiBaseUrl: getApiBaseUrl() };
+  });
+
+  // Set API base URL
+  ipcMain.handle('config:set-api-base-url', (_event, url?: string | null) => {
+    const normalized = url?.trim() || null;
+    setApiBaseUrl(normalized);
+    return { success: true, apiBaseUrl: getApiBaseUrl() };
   });
 
   // Get PATH environment variable info (for debug/dev section)
