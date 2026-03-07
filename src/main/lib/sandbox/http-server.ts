@@ -1,5 +1,7 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
+import { extname, join, resolve } from 'node:path';
 
 import type { SandboxApp, SandboxRequest } from './types';
 
@@ -61,7 +63,10 @@ export async function startAppServer(
 
     // CORS headers - restrict to same-origin (LAN app served from same host)
     const origin = req.headers.origin;
-    const allowedOrigin = origin && /^http:\/\/(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+):\d+$/.test(origin) ? origin : null;
+    const allowedOrigin =
+      origin && /^http:\/\/(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+):\d+$/.test(origin) ?
+        origin
+      : null;
     if (allowedOrigin) {
       res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
     }
@@ -148,6 +153,154 @@ export async function startAppServer(
   });
 
   const port = listenPort;
+  const lanIps = getLanIPs();
+  const primaryIp = lanIps[0] ?? 'localhost';
+
+  return {
+    port,
+    lanUrl: `http://${primaryIp}:${String(port)}`,
+    localUrl: `http://localhost:${String(port)}`,
+    stop: () =>
+      new Promise((resolve) => {
+        server.close(() => resolve());
+      })
+  };
+}
+
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.eot': 'application/vnd.ms-fontobject'
+};
+
+/**
+ * Start a static file server for a Vite production build (dist/ directory).
+ * API routes are still handled by the sandbox.
+ * Supports SPA fallback (serves index.html for non-file routes).
+ */
+export async function startStaticAppServer(
+  distDir: string,
+  sandboxApp: SandboxApp
+): Promise<AppServer> {
+  const server = createServer(async (req, res) => {
+    const addr = server.address();
+    const boundPort = typeof addr === 'object' && addr ? addr.port : 0;
+    const url = new URL(req.url ?? '/', `http://localhost:${String(boundPort)}`);
+
+    // CORS headers
+    const origin = req.headers.origin;
+    const allowedOrigin =
+      origin && /^http:\/\/(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+):\d+$/.test(origin) ?
+        origin
+      : null;
+    if (allowedOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    // API routes → sandbox
+    if (url.pathname.startsWith('/api/')) {
+      const body = await readBody(req);
+      const sandboxReq: SandboxRequest = {
+        method: req.method ?? 'GET',
+        path: url.pathname,
+        headers: Object.fromEntries(
+          Object.entries(req.headers).map(([k, v]) => [
+            k,
+            Array.isArray(v) ? v.join(', ') : (v ?? '')
+          ])
+        ),
+        body
+      };
+
+      try {
+        const sandboxRes = await sandboxApp.handleRequest(sandboxReq);
+        const safeHeaders: Record<string, string> = {};
+        const ALLOWED_HEADERS = new Set(['content-type', 'cache-control', 'x-request-id']);
+        for (const [key, value] of Object.entries(sandboxRes.headers)) {
+          if (ALLOWED_HEADERS.has(key.toLowerCase())) {
+            safeHeaders[key] = value;
+          }
+        }
+        res.writeHead(sandboxRes.status, safeHeaders);
+        res.end(sandboxRes.body);
+      } catch (err) {
+        console.error('Sandbox request error:', err);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal sandbox error' }));
+      }
+      return;
+    }
+
+    // Serve static files from dist/
+    let filePath = resolve(join(distDir, url.pathname));
+
+    // Prevent path traversal: resolved path must stay within distDir
+    const resolvedDistDir = resolve(distDir);
+    if (!filePath.startsWith(resolvedDistDir)) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('Forbidden');
+      return;
+    }
+
+    // SPA fallback: if file doesn't exist and has no extension, serve index.html
+    if (!existsSync(filePath) || url.pathname === '/') {
+      const ext = extname(url.pathname);
+      if (!ext || url.pathname === '/') {
+        filePath = join(distDir, 'index.html');
+      }
+    }
+
+    if (existsSync(filePath)) {
+      try {
+        const content = readFileSync(filePath);
+        const ext = extname(filePath);
+        const contentType = MIME_TYPES[ext] ?? 'application/octet-stream';
+
+        // Add cache headers for hashed assets
+        const cacheControl =
+          url.pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache';
+
+        res.writeHead(200, {
+          'Content-Type': contentType,
+          'Cache-Control': cacheControl
+        });
+        res.end(content);
+        return;
+      } catch {
+        // Fall through to 404
+      }
+    }
+
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found');
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, () => resolve());
+  });
+
+  const addr = server.address();
+  const port = typeof addr === 'object' && addr ? addr.port : 0;
   const lanIps = getLanIPs();
   const primaryIp = lanIps[0] ?? 'localhost';
 

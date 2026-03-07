@@ -156,6 +156,8 @@ contextBridge.exposeInMainWorld('electron', {
   },
   app: {
     scan: () => ipcRenderer.invoke('app:scan'),
+    startDev: (appId: string) => ipcRenderer.invoke('app:start-dev', appId),
+    stopDev: (appId: string) => ipcRenderer.invoke('app:stop-dev', appId),
     publish: (appId: string) => ipcRenderer.invoke('app:publish', appId),
     stop: (appId: string) => ipcRenderer.invoke('app:stop', appId)
   },
