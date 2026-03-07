@@ -5,6 +5,7 @@ import { app } from 'electron';
 
 import type { ChatModelPreference } from '../../shared/types/ipc';
 import type { SkillManifest } from '../../shared/types/skill-manifest';
+import { syncManifest } from './skill-manifest';
 
 export interface AppConfig {
   workspaceDir?: string;
@@ -433,9 +434,7 @@ function collectUserManifestSettings(
       if (!existsSync(manifestPath)) continue;
       try {
         const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillManifest;
-        if (manifest.shared || (manifest.tags && manifest.tags.length > 0)) {
-          settings.set(manifest.id, { shared: manifest.shared, tags: manifest.tags });
-        }
+        settings.set(manifest.id, { shared: manifest.shared, tags: manifest.tags });
       } catch {
         // Skip invalid manifest files
       }
@@ -470,7 +469,7 @@ function restoreUserManifestSettings(
         const saved = settings.get(manifest.id);
         if (saved) {
           manifest.shared = saved.shared;
-          if (saved.tags) manifest.tags = saved.tags;
+          manifest.tags = saved.tags;
           writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
         }
       } catch {
@@ -517,6 +516,20 @@ export async function ensureWorkspaceDir(): Promise<void> {
 
       // Restore user manifest settings
       restoreUserManifestSettings(destSkillsDir, userSettings);
+
+      // Sync manifests for all skills (generate if missing, update if SKILL.md changed)
+      if (existsSync(destSkillsDir)) {
+        try {
+          const skillDirs = readdirSync(destSkillsDir).filter((name) =>
+            statSync(join(destSkillsDir, name)).isDirectory()
+          );
+          for (const skillName of skillDirs) {
+            syncManifest(join(destSkillsDir, skillName), skillName);
+          }
+        } catch (err) {
+          console.warn('Failed to sync skill manifests:', err);
+        }
+      }
 
       console.log('.claude directory synced successfully');
     } else {

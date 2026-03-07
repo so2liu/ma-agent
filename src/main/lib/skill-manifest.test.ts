@@ -183,6 +183,8 @@ license: MIT
     expect(manifest!.version).toBe('1.0.0');
     expect(manifest!.shared).toBe(false);
     expect(manifest!.id).toBeTruthy();
+    // skillMdHash should be set for idempotent sync
+    expect((manifest as unknown as Record<string, unknown>).skillMdHash).toBeTruthy();
   });
 
   test('uses directory name when frontmatter name is missing', () => {
@@ -248,6 +250,25 @@ description: Updated description
     // shared and tags are preserved as they're identity fields
     expect(updated!.shared).toBe(true);
     expect(updated!.tags).toEqual(['custom']);
+  });
+
+  test('does not update when SKILL.md has not changed', () => {
+    writeFileSync(
+      join(TEST_DIR, 'SKILL.md'),
+      `---
+name: stable-skill
+description: No changes
+---`
+    );
+
+    const first = syncManifest(TEST_DIR, 'stable-skill');
+    expect(first).not.toBeNull();
+    const firstUpdatedAt = first!.updatedAt;
+
+    // Second sync with same SKILL.md should be a no-op
+    const second = syncManifest(TEST_DIR, 'stable-skill');
+    expect(second).not.toBeNull();
+    expect(second!.updatedAt).toBe(firstUpdatedAt);
   });
 
   test('returns null when SKILL.md is missing', () => {

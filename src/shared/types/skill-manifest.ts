@@ -58,12 +58,11 @@ export interface SkillManifest {
   updatedAt: string;
 }
 
-/** Fields parsed from SKILL.md YAML frontmatter */
+/** Fields parsed from SKILL.md YAML frontmatter (flat key: value only) */
 export interface SkillFrontmatter {
   name?: string;
   description?: string;
   license?: string;
   compatibility?: string;
-  metadata?: SkillMetadata;
   version?: string;
 }

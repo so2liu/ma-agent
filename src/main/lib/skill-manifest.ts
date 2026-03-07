@@ -150,10 +150,10 @@ export function generateManifest(skillDir: string, dirName: string): SkillManife
     license: frontmatter.license,
     shared: false,
     compatibility: frontmatter.compatibility,
-    metadata: frontmatter.metadata,
     createdAt: now,
-    updatedAt: now
-  };
+    updatedAt: now,
+    skillMdHash: hashContent(skillMdContent)
+  } as SkillManifest;
 }
 
 /**
