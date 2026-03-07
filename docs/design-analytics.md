@@ -81,16 +81,21 @@ type AnalyticsEventType =
   | 'attachment_added'       // 添加附件
   | 'artifact_viewed'        // 查看 artifact
   | 'tool_used'              // 工具被调用
+  | 'skill_executed'         // Skill 被执行
   // 应用生命周期
   | 'app_launched'           // 应用启动
   | 'app_closed'             // 应用关闭
-  | 'settings_changed';      // 修改设置
+  | 'app_error'              // 应用级错误
+  | 'settings_changed'       // 修改设置
+  | 'update_installed'       // 更新已安装
+  | 'workspace_changed';     // 工作目录变更
 
 /** 通用埋点事件 */
 interface AnalyticsEvent {
   type: AnalyticsEventType;
   timestamp: number;
-  sessionId?: string;
+  sessionId: string;           // 必填，启动时生成 UUID 作为会话 ID
+  anonymousId: string;         // 必填，首次启动生成并持久化到 config 中
   properties?: Record<string, string | number | boolean>;
 }
 
@@ -197,13 +202,31 @@ export function registerAnalyticsHandlers(): void {
 **第一层：正则预处理（快速、零成本）**
 ```typescript
 const PATTERNS = [
+  // 邮箱
   { regex: /\b[\w.+-]+@[\w-]+\.[\w.]+\b/g, replacement: '[EMAIL]' },
+  // 电话号码（中国手机、美国、国际格式）
   { regex: /\b1[3-9]\d{9}\b/g, replacement: '[PHONE]' },
   { regex: /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, replacement: '[PHONE]' },
+  { regex: /\+\d{1,3}[-.\s]?\d{4,14}/g, replacement: '[PHONE]' },
+  // IP 地址
   { regex: /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, replacement: '[IP]' },
-  { regex: /\b[A-Za-z0-9+/]{40,}={0,2}\b/g, replacement: '[TOKEN]' },
+  // 中国身份证号
+  { regex: /\b\d{17}[\dXx]\b/g, replacement: '[ID_NUMBER]' },
+  // 信用卡号（16 位数字，可带分隔符）
+  { regex: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, replacement: '[CARD_NUMBER]' },
+  // 各类 API Key
   { regex: /sk-[a-zA-Z0-9]{20,}/g, replacement: '[API_KEY]' },
+  { regex: /AKIA[0-9A-Z]{16}/g, replacement: '[API_KEY]' },
+  { regex: /ghp_[a-zA-Z0-9]{36,}/g, replacement: '[API_KEY]' },
+  { regex: /gho_[a-zA-Z0-9]{36,}/g, replacement: '[API_KEY]' },
+  // URL 中的凭据
+  { regex: /https?:\/\/[^:]+:[^@]+@/g, replacement: 'https://[CREDENTIALS]@' },
+  // 证书
   { regex: /-----BEGIN[A-Z ]+-----[\s\S]+?-----END[A-Z ]+-----/g, replacement: '[CERTIFICATE]' },
+  // 文件路径中的用户名
+  { regex: /\/Users\/[^/\s]+/g, replacement: '/Users/[USER]' },
+  { regex: /\/home\/[^/\s]+/g, replacement: '/home/[USER]' },
+  { regex: /C:\\Users\\[^\\\s]+/g, replacement: 'C:\\Users\\[USER]' },
 ];
 
 function regexSanitize(text: string): string {
@@ -216,8 +239,22 @@ function regexSanitize(text: string): string {
 ```
 
 **第二层：AI 深度脱敏（语义级别）**
+
+> **[!WARNING] 隐私与成本风险**
+> AI 脱敏需要将正则预处理后的文本发送到 Anthropic API，语义级隐私（人名、公司名）仍会以明文形式经过外部 API。
+> 实现时必须：
+> 1. 在 UI 上明确告知用户"脱敏过程需要调用 AI 服务"
+> 2. 每次反馈前弹出确认对话框，展示将要发送的内容预览
+> 3. 使用项目内置 API key（而非用户的 key）以避免额外计费
+> 4. 对发送内容施加 token 上限（最多 4096 tokens），避免长对话产生高费用
+> 5. 长期方案：考虑使用本地模型（如 ONNX Runtime + 小型 NER 模型）完全消除外部 API 依赖
+> 6. AI 脱敏失败时，不得回退到仅正则脱敏后直接上报，应丢弃此次反馈内容并通知用户
+
 ```typescript
+// TODO: 使用项目内置 API key，需在后端实现代理以避免 key 暴露
 async function aiSanitize(text: string): Promise<string> {
+  // 限制输入长度，避免长对话产生高额费用
+  const truncated = text.slice(0, 8000);
   const response = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',  // 用最便宜的模型
     max_tokens: 2048,
@@ -240,9 +277,10 @@ async function aiSanitize(text: string): Promise<string> {
   return response.content[0].type === 'text' ? response.content[0].text : text;
 }
 
-/** 组合脱敏：先正则后 AI */
+/** 组合脱敏：先正则后 AI。AI 失败时不回退，抛出错误 */
 export async function sanitize(text: string): Promise<string> {
-  const regexResult = regexSanitize(text);
+  const regexResult = regexSanitize(truncated);
+  // AI 脱敏失败时抛出错误，调用方应捕获并通知用户脱敏失败，不上报对话内容
   return aiSanitize(regexResult);
 }
 ```
@@ -260,7 +298,8 @@ class AnalyticsTransport {
   private readonly BATCH_SIZE = 20;
   private readonly FLUSH_INTERVAL = 30_000; // 30秒
   private readonly MAX_RETRIES = 3;
-  private readonly ENDPOINT = 'https://your-analytics-server.com/v1/events';
+  // TODO: 替换为实际的 analytics 服务端点，应从环境变量或配置文件读取
+  private readonly ENDPOINT = process.env.ANALYTICS_ENDPOINT ?? 'https://your-analytics-server.com/v1/events';
 
   constructor() {
     // 定时 flush
@@ -337,15 +376,18 @@ class AnalyticsTransport {
 ┌────────────────────────────────────────────────┐
 │  数据与隐私                                      │
 │                                                  │
-│  [✓] 发送匿名使用统计                             │
+│  [ ] 发送匿名使用统计（默认关闭）                   │
 │      帮助我们改进产品，仅收集功能使用频率            │
 │                                                  │
-│  [✓] 反馈时分享脱敏后的对话内容                     │
+│  [ ] 反馈时分享脱敏后的对话内容（默认关闭）          │
 │      点踩时，AI 会先去除隐私信息再上报对话内容       │
+│      注意：脱敏过程需调用 AI 服务                   │
 │                                                  │
 │  [查看已收集的数据]  [清除本地数据]                  │
 └────────────────────────────────────────────────┘
 ```
+
+> 注意：两个选项默认均为关闭状态（Opt-in），首次启动时弹窗提示用户选择。
 
 ### 关键原则
 
