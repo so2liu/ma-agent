@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
-import { cp, mkdir, rm } from 'fs/promises';
+import { cp, mkdir, rename, rm } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { app } from 'electron';
 
@@ -457,16 +457,26 @@ export async function ensureWorkspaceDir(): Promise<void> {
       // Sync each built-in skill
       for (const skill of sourceSkills) {
         const destSkillDir = join(destSkillsDir, skill.name);
-        // Only overwrite if destination is also a built-in (has .builtin marker) or doesn't exist
         if (existsSync(destSkillDir) && !existsSync(join(destSkillDir, '.builtin'))) {
-          console.log(`  Skipping "${skill.name}": user-installed skill with same name`);
-          continue;
+          // Migration: if this skill exists in source as builtin, treat legacy dest as builtin too
+          if (sourceSkillNames.has(skill.name)) {
+            console.log(`  Migrating legacy built-in skill: ${skill.name}`);
+          } else {
+            console.log(`  Skipping "${skill.name}": user-installed skill with same name`);
+            continue;
+          }
         }
         try {
+          // Copy to temp dir first, then swap to avoid data loss on copy failure
+          const tempDir = `${destSkillDir}.tmp`;
+          if (existsSync(tempDir)) {
+            await rm(tempDir, { recursive: true, force: true });
+          }
+          await cp(join(sourceSkillsDir, skill.name), tempDir, { recursive: true });
           if (existsSync(destSkillDir)) {
             await rm(destSkillDir, { recursive: true, force: true });
           }
-          await cp(join(sourceSkillsDir, skill.name), destSkillDir, { recursive: true });
+          await rename(tempDir, destSkillDir);
           console.log(`  Synced built-in skill: ${skill.name}`);
         } catch (skillError) {
           console.error(`  Failed to sync skill "${skill.name}":`, skillError);
