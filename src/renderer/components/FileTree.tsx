@@ -14,82 +14,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { FileTreeNode } from '@/electron';
 
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'ico']);
-
-const CODE_EXTENSIONS = new Set([
-  'js',
-  'jsx',
-  'ts',
-  'tsx',
-  'py',
-  'rb',
-  'go',
-  'rs',
-  'java',
-  'c',
-  'cpp',
-  'h',
-  'hpp',
-  'sh',
-  'bash',
-  'vue',
-  'svelte',
-  'sql',
-  'graphql',
-  'css'
-]);
-
-const PREVIEWABLE_EXTENSIONS = new Set([
-  // HTML
-  'html',
-  'htm',
-  'svg',
-  // Images
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'webp',
-  'bmp',
-  'avif',
-  'ico',
-  // Text/Markdown
-  'md',
-  'txt',
-  // Data
-  'json',
-  'yaml',
-  'yml',
-  'toml',
-  'xml',
-  'csv',
-  'tsv',
-  // Code
-  'js',
-  'jsx',
-  'ts',
-  'tsx',
-  'py',
-  'rb',
-  'go',
-  'rs',
-  'java',
-  'c',
-  'cpp',
-  'h',
-  'hpp',
-  'sh',
-  'bash',
-  'css',
-  'vue',
-  'svelte',
-  'sql',
-  'graphql'
-]);
-
-function getFileExtension(name: string): string {
-  return name.split('.').pop()?.toLowerCase() || '';
-}
+import {
+  CODE_EXTENSIONS,
+  getFileExtension,
+  IMAGE_EXTENSIONS,
+  PREVIEWABLE_EXTENSIONS
+} from '../../shared/file-extensions';
 
 function isPreviewable(name: string): boolean {
   return PREVIEWABLE_EXTENSIONS.has(getFileExtension(name));
@@ -296,9 +226,10 @@ function TreeNode({ node, depth, onFileSelect, selectedPath, onDelete }: TreeNod
 interface FileTreeProps {
   onFileSelect: (path: string) => void;
   selectedPath: string | null;
+  onFileDeleted?: (path: string, isDirectory: boolean) => void;
 }
 
-export default function FileTree({ onFileSelect, selectedPath }: FileTreeProps) {
+export default function FileTree({ onFileSelect, selectedPath, onFileDeleted }: FileTreeProps) {
   const [files, setFiles] = useState<FileTreeNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -326,6 +257,7 @@ export default function FileTree({ onFileSelect, selectedPath }: FileTreeProps) 
         const response = await window.electron.workspace.deleteFile(path, isDirectory);
         if (response.success) {
           await loadFiles();
+          onFileDeleted?.(path, isDirectory);
         } else {
           console.error('Error deleting file:', response.error);
         }
@@ -333,7 +265,7 @@ export default function FileTree({ onFileSelect, selectedPath }: FileTreeProps) 
         console.error('Error deleting file:', error);
       }
     },
-    [loadFiles]
+    [loadFiles, onFileDeleted]
   );
 
   return (

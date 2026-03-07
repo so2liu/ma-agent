@@ -17,6 +17,7 @@ interface SidebarProps {
   onNewChat: () => void | Promise<void>;
   onFileSelect: (path: string) => void;
   selectedFilePath: string | null;
+  onFileDeleted?: (path: string, isDirectory: boolean) => void;
   onSettingsClick?: () => void;
   onSkillsClick?: () => void;
 }
@@ -27,6 +28,7 @@ export default function Sidebar({
   onNewChat,
   onFileSelect,
   selectedFilePath,
+  onFileDeleted,
   onSettingsClick,
   onSkillsClick
 }: SidebarProps) {
@@ -234,7 +236,7 @@ export default function Sidebar({
         className="flex min-h-[200px] flex-col border-t border-neutral-200/70 dark:border-neutral-800"
         style={{ flex: '0 0 40%' }}
       >
-        <FileTree onFileSelect={onFileSelect} selectedPath={selectedFilePath} />
+        <FileTree onFileSelect={onFileSelect} selectedPath={selectedFilePath} onFileDeleted={onFileDeleted} />
       </div>
 
       {/* Bottom bar - Skills & Settings */}

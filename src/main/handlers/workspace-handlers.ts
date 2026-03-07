@@ -1,8 +1,14 @@
 import { readdir, readFile, rm, stat } from 'fs/promises';
-import { join, relative, resolve } from 'path';
+import { join, relative, resolve, sep } from 'path';
 import { ipcMain, shell } from 'electron';
 
+import { ALL_TEXT_EXTENSIONS, MAX_PREVIEW_FILE_SIZE } from '../../shared/file-extensions';
 import { getWorkspaceDir } from '../lib/config';
+
+function isWithinWorkspace(fullPath: string, workspaceDir: string): boolean {
+  const resolved = resolve(workspaceDir);
+  return fullPath === resolved || fullPath.startsWith(resolved + sep);
+}
 
 export interface FileTreeNode {
   name: string;
@@ -128,58 +134,23 @@ export function registerWorkspaceHandlers(): void {
     const fullPath = resolve(join(workspaceDir, relativePath));
 
     // Security: prevent path traversal
-    if (!fullPath.startsWith(resolve(workspaceDir))) {
+    if (!isWithinWorkspace(fullPath, workspaceDir)) {
       return { success: false, error: 'Path traversal not allowed' };
     }
 
     try {
       const ext = relativePath.split('.').pop()?.toLowerCase() || '';
       const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
-      const TEXT_EXTENSIONS = new Set([
-        'html',
-        'htm',
-        'svg',
-        'md',
-        'txt',
-        'css',
-        'js',
-        'jsx',
-        'ts',
-        'tsx',
-        'json',
-        'py',
-        'rb',
-        'go',
-        'rs',
-        'java',
-        'c',
-        'cpp',
-        'h',
-        'hpp',
-        'sh',
-        'bash',
-        'yaml',
-        'yml',
-        'toml',
-        'xml',
-        'sql',
-        'graphql',
-        'vue',
-        'svelte',
-        'env',
-        'gitignore',
-        'dockerignore',
-        'makefile',
-        'cfg',
-        'ini',
-        'conf',
-        'log',
-        'csv',
-        'tsv'
-      ]);
-      const isText = TEXT_EXTENSIONS.has(ext);
+      const isText = ALL_TEXT_EXTENSIONS.has(ext);
 
       if (isText) {
+        const fileStat = await stat(fullPath);
+        if (fileStat.size > MAX_PREVIEW_FILE_SIZE) {
+          return {
+            success: false,
+            error: `File is too large to preview (${Math.round(fileStat.size / 1024)}KB, max ${Math.round(MAX_PREVIEW_FILE_SIZE / 1024)}KB)`
+          };
+        }
         const content = await readFile(fullPath, 'utf-8');
         return { success: true, content, mimeType, isText: true };
       } else {
@@ -198,7 +169,7 @@ export function registerWorkspaceHandlers(): void {
       const workspaceDir = getWorkspaceDir();
       const fullPath = resolve(join(workspaceDir, relativePath));
 
-      if (!fullPath.startsWith(resolve(workspaceDir))) {
+      if (!isWithinWorkspace(fullPath, workspaceDir)) {
         return { success: false, error: 'Path traversal not allowed' };
       }
 
@@ -222,7 +193,7 @@ export function registerWorkspaceHandlers(): void {
     const workspaceDir = getWorkspaceDir();
     const fullPath = resolve(join(workspaceDir, relativePath));
 
-    if (!fullPath.startsWith(resolve(workspaceDir))) {
+    if (!isWithinWorkspace(fullPath, workspaceDir)) {
       return { success: false, error: 'Path traversal not allowed' };
     }
 

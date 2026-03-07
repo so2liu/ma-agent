@@ -1,53 +1,10 @@
-import type { Artifact, ArtifactType } from '@/components/ArtifactPanel';
+import type { Artifact } from '@/components/ArtifactPanel';
 import type { Message, WriteInput } from '@/types/chat';
 
-const HTML_EXTENSIONS = new Set(['html', 'htm', 'svg']);
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'ico']);
-const MARKDOWN_EXTENSIONS = new Set(['md']);
-const CODE_EXTENSIONS = new Set([
-  'js',
-  'jsx',
-  'ts',
-  'tsx',
-  'py',
-  'rb',
-  'go',
-  'rs',
-  'java',
-  'c',
-  'cpp',
-  'h',
-  'hpp',
-  'sh',
-  'bash',
-  'css',
-  'json',
-  'yaml',
-  'yml',
-  'toml',
-  'xml',
-  'sql',
-  'graphql',
-  'vue',
-  'svelte'
-]);
-const TEXT_EXTENSIONS = new Set(['txt', 'csv', 'tsv']);
-
-function getExtension(filePath: string): string {
-  return filePath.split('.').pop()?.toLowerCase() || '';
-}
+import { getArtifactType, getFileExtension } from '../../shared/file-extensions';
 
 function getFileName(filePath: string): string {
   return filePath.split('/').pop() || filePath;
-}
-
-function getArtifactType(ext: string): ArtifactType | null {
-  if (HTML_EXTENSIONS.has(ext)) return 'html';
-  if (IMAGE_EXTENSIONS.has(ext)) return 'image';
-  if (MARKDOWN_EXTENSIONS.has(ext)) return 'markdown';
-  if (CODE_EXTENSIONS.has(ext)) return 'code';
-  if (TEXT_EXTENSIONS.has(ext)) return 'text';
-  return null;
 }
 
 /**
@@ -68,7 +25,7 @@ export function extractArtifacts(messages: Message[]): Artifact[] {
       const input = block.tool.parsedInput as WriteInput | undefined;
       if (!input?.file_path) continue;
 
-      const ext = getExtension(input.file_path);
+      const ext = getFileExtension(input.file_path);
       const type = getArtifactType(ext);
 
       if (!type) continue;

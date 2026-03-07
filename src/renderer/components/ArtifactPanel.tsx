@@ -4,7 +4,9 @@ import { codeToHtml } from 'shiki';
 
 import Markdown from '@/components/Markdown';
 
-export type ArtifactType = 'html' | 'image' | 'markdown' | 'code' | 'text';
+import type { ArtifactType } from '../../shared/file-extensions';
+
+export type { ArtifactType };
 
 export interface Artifact {
   id: string;
