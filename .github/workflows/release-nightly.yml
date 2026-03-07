@@ -88,7 +88,12 @@ jobs:
           # Rewrite version in latest-mac.yml files so electron-updater picks up the nightly
           for f in dist/latest-mac*.yml; do
             if [ -f "$f" ]; then
-              sed -i "s/^version: .*/version: ${{ steps.version.outputs.nightly_version }}/" "$f"
+              node -e "
+                const fs = require('fs');
+                const content = fs.readFileSync('$f', 'utf-8');
+                const updated = content.replace(/^version: .*/m, 'version: ${{ steps.version.outputs.nightly_version }}');
+                fs.writeFileSync('$f', updated);
+              "
             fi
           done
 

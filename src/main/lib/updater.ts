@@ -72,6 +72,22 @@ if (updateFeedUrl) {
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
 let checkInterval: NodeJS.Timeout | null = null;
+let pendingTimeouts: NodeJS.Timeout[] = [];
+
+function scheduleStatusReset(fn: () => void, ms: number): void {
+  const timeout = setTimeout(() => {
+    pendingTimeouts = pendingTimeouts.filter((t) => t !== timeout);
+    fn();
+  }, ms);
+  pendingTimeouts.push(timeout);
+}
+
+function clearPendingTimeouts(): void {
+  for (const t of pendingTimeouts) {
+    clearTimeout(t);
+  }
+  pendingTimeouts = [];
+}
 
 export function initializeUpdater(window: BrowserWindow | null): void {
   mainWindow = window;
@@ -145,7 +161,7 @@ export function initializeUpdater(window: BrowserWindow | null): void {
     };
     notifyStatusChange();
     // Clear the check complete flag after 3 seconds
-    setTimeout(() => {
+    scheduleStatusReset(() => {
       currentStatus = {
         ...currentStatus,
         lastCheckComplete: false
@@ -164,7 +180,7 @@ export function initializeUpdater(window: BrowserWindow | null): void {
     };
     notifyStatusChange();
     // Clear error after 5 seconds
-    setTimeout(() => {
+    scheduleStatusReset(() => {
       currentStatus = {
         ...currentStatus,
         lastCheckComplete: false,
@@ -216,7 +232,7 @@ export function checkForUpdates(): void {
       error: 'Update checks are disabled in development mode'
     };
     notifyStatusChange();
-    setTimeout(() => {
+    scheduleStatusReset(() => {
       currentStatus = {
         ...currentStatus,
         lastCheckComplete: false,
@@ -236,7 +252,7 @@ export function checkForUpdates(): void {
       error: 'Auto-update feed is not configured'
     };
     notifyStatusChange();
-    setTimeout(() => {
+    scheduleStatusReset(() => {
       currentStatus = {
         ...currentStatus,
         lastCheckComplete: false,
@@ -270,7 +286,7 @@ export function checkForUpdates(): void {
     };
     notifyStatusChange();
     // Clear error after 5 seconds
-    setTimeout(() => {
+    scheduleStatusReset(() => {
       currentStatus = {
         ...currentStatus,
         lastCheckComplete: false,
@@ -315,10 +331,14 @@ export function getUpdateStatus(): UpdateStatus {
  * Syncs the allowPrerelease setting and triggers an immediate check.
  */
 export function onUpdateChannelChanged(): void {
+  // If downloading, the state reset below will prevent stale events from taking effect
+  // Clear pending status reset timeouts to avoid stale state writes
+  clearPendingTimeouts();
   syncAllowPrerelease();
   // Reset any existing update state when switching channels
   currentStatus = {
     ...currentStatus,
+    checking: false,
     updateAvailable: false,
     readyToInstall: false,
     downloadProgress: 0,

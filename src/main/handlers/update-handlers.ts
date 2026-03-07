@@ -1,6 +1,5 @@
 import { ipcMain } from 'electron';
 
-import type { UpdateChannel } from '../lib/config';
 import { getUpdateChannel, setUpdateChannel } from '../lib/config';
 import {
   checkForUpdates,
@@ -40,7 +39,10 @@ export function registerUpdateHandlers(): void {
   });
 
   // Set update channel
-  ipcMain.handle('update:set-channel', (_event, channel: UpdateChannel) => {
+  ipcMain.handle('update:set-channel', (_event, channel: unknown) => {
+    if (channel !== 'stable' && channel !== 'nightly') {
+      return { success: false, error: 'Invalid channel. Must be "stable" or "nightly".' };
+    }
     setUpdateChannel(channel);
     onUpdateChannelChanged();
     return { success: true, channel: getUpdateChannel() };
