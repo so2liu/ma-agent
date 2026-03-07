@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import UpdateCheckFeedback from '@/components/UpdateCheckFeedback';
 import UpdateReadyBanner from '@/components/UpdateReadyBanner';
 import Chat from '@/pages/Chat';
+import Schedules from '@/pages/Schedules';
 import Settings from '@/pages/Settings';
 import Skills from '@/pages/Skills';
 
-type View = 'home' | 'settings' | 'skills';
+type View = 'home' | 'settings' | 'skills' | 'schedules';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('home');
@@ -43,10 +44,14 @@ export default function App() {
       <div className={currentView === 'skills' ? 'block' : 'hidden'}>
         <Skills onBack={() => setCurrentView('home')} />
       </div>
+      <div className={currentView === 'schedules' ? 'block' : 'hidden'}>
+        <Schedules onBack={() => setCurrentView('home')} />
+      </div>
       <div className={currentView === 'home' ? 'block' : 'hidden'}>
         <Chat
           onSettingsClick={() => setCurrentView('settings')}
           onSkillsClick={() => setCurrentView('skills')}
+          onSchedulesClick={() => setCurrentView('schedules')}
         />
       </div>
     </>
