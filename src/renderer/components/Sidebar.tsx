@@ -1,4 +1,4 @@
-import { Clock, MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { Clock, MessageSquare, Plus, Settings, Sparkles, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Conversation } from '@/electron';
@@ -16,6 +16,8 @@ interface SidebarProps {
   onNewChat: () => void | Promise<void>;
   onFileSelect: (path: string) => void;
   selectedFilePath: string | null;
+  onSettingsClick?: () => void;
+  onSkillsClick?: () => void;
 }
 
 export default function Sidebar({
@@ -23,7 +25,9 @@ export default function Sidebar({
   currentConversationId,
   onNewChat,
   onFileSelect,
-  selectedFilePath
+  selectedFilePath,
+  onSettingsClick,
+  onSkillsClick
 }: SidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -141,9 +145,22 @@ export default function Sidebar({
 
   return (
     <div className="flex h-full flex-col border-r border-neutral-200/70 bg-neutral-50/80 dark:border-neutral-800 dark:bg-neutral-900/50">
-      {/* Conversation History - top section */}
+      {/* Drag region for macOS traffic lights */}
+      <div className="h-7 shrink-0 [-webkit-app-region:drag]" />
+
+      {/* Brand */}
+      <div className="shrink-0 px-3 pb-2.5">
+        <div className="flex items-center gap-2">
+          <span className="text-xl" role="img" aria-label="horse">🐴</span>
+          <span className="select-none text-base font-bold text-neutral-800 dark:text-neutral-100">
+            小马快跑
+          </span>
+        </div>
+      </div>
+
+      {/* Conversation History */}
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center justify-between px-3 pt-2 pb-1.5">
+        <div className="flex items-center justify-between px-3 pb-1.5">
           <span className="text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500">
             Chats
           </span>
@@ -210,6 +227,25 @@ export default function Sidebar({
         style={{ flex: '0 0 40%' }}
       >
         <FileTree onFileSelect={onFileSelect} selectedPath={selectedFilePath} />
+      </div>
+
+      {/* Bottom bar - Skills & Settings */}
+      <div className="flex shrink-0 items-center justify-between border-t border-neutral-200/70 px-2 py-1.5 dark:border-neutral-800">
+        <button
+          onClick={onSkillsClick}
+          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          title="Skill 精选"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>Skill 精选</span>
+        </button>
+        <button
+          onClick={onSettingsClick}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          title="设置"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );
