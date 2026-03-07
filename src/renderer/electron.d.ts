@@ -303,6 +303,7 @@ export interface ElectronAPI {
       relativePath: string,
       isDirectory: boolean
     ) => Promise<{ success: boolean; error?: string }>;
+    onFilesChanged: (callback: () => void) => () => void;
   };
   app: {
     scan: () => Promise<AppScanResponse>;

@@ -9,7 +9,7 @@ import { registerConversationHandlers } from './handlers/conversation-handlers';
 import { registerShellHandlers } from './handlers/shell-handlers';
 import { registerSkillHandlers } from './handlers/skill-handlers';
 import { registerUpdateHandlers } from './handlers/update-handlers';
-import { registerWorkspaceHandlers } from './handlers/workspace-handlers';
+import { registerWorkspaceHandlers, restartFileWatcher } from './handlers/workspace-handlers';
 import { buildEnhancedPath, ensureWorkspaceDir } from './lib/config';
 import { appManager } from './lib/sandbox/app-manager';
 import { skillDiscovery } from './lib/skill-discovery';
@@ -107,7 +107,7 @@ app.whenReady().then(async () => {
   registerConversationHandlers();
   registerShellHandlers();
   registerUpdateHandlers();
-  registerWorkspaceHandlers();
+  registerWorkspaceHandlers(() => mainWindow);
   registerAppHandlers();
   registerSkillHandlers(() => mainWindow);
 
@@ -121,8 +121,9 @@ app.whenReady().then(async () => {
   const menu = createApplicationMenu(mainWindow);
   Menu.setApplicationMenu(menu);
 
-  // Ensure workspace directory exists and sync skills, then start LAN discovery
+  // Ensure workspace directory exists, then start file watcher and LAN discovery
   ensureWorkspaceDir()
+    .then(() => restartFileWatcher())
     .then(() => skillDiscovery.start())
     .catch((error) => {
       console.error('Failed to ensure workspace directory:', error);

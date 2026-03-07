@@ -35,7 +35,7 @@ interface DevelopingApp {
 function getTemplatePath(): string {
   // In development: resources/app-template relative to project root
   // In production: process.resourcesPath + '/app-template'
-  const devPath = join(__dirname, '../../../../resources/app-template');
+  const devPath = join(__dirname, '../../resources/app-template');
   if (existsSync(devPath)) return devPath;
 
   const prodPath = join(process.resourcesPath ?? '', 'app-template');
@@ -192,74 +192,78 @@ class AppManager {
       throw new Error(`App "${appId}" is not a Vite app (missing src/App.tsx)`);
     }
 
-    // Scaffold if needed
-    if (!isScaffolded(appDir)) {
-      this.appStatuses.set(appId, 'scaffolding');
-      const meta = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
-      scaffoldApp(appDir, meta);
-    }
-
-    // Install deps if needed
-    if (!hasNodeModules(appDir)) {
-      this.appStatuses.set(appId, 'installing');
-      installDeps(appDir);
-    }
-
-    // Initialize data file if missing
-    if (!existsSync(dataPath)) {
-      writeFileSync(dataPath, '[]');
-    }
-
-    // Start sandbox for API routes (if server.js exists)
-    let sandbox: SandboxApp;
-    if (existsSync(serverPath)) {
-      const backendJs = readFileSync(serverPath, 'utf-8');
-      sandbox = await createSandboxApp(backendJs, appId, dataPath);
-    } else {
-      // No backend — create a no-op sandbox
-      sandbox = {
-        handleRequest: async () => ({
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: 'No server.js backend' })
-        }),
-        dispose: () => {}
-      };
-    }
-
-    // Start sandbox HTTP server (for API proxy target)
-    const sandboxServer = await startAppServer('', sandbox);
-
-    // Start Vite dev server with proxy to sandbox
-    this.appStatuses.set(appId, 'developing');
-    let viteServer: ViteDevServer;
     try {
-      viteServer = await startViteDevServer(appDir, sandboxServer.port);
+      // Scaffold if needed
+      if (!isScaffolded(appDir)) {
+        this.appStatuses.set(appId, 'scaffolding');
+        const meta = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
+        scaffoldApp(appDir, meta);
+      }
+
+      // Install deps if needed
+      if (!hasNodeModules(appDir)) {
+        this.appStatuses.set(appId, 'installing');
+        installDeps(appDir);
+      }
+
+      // Initialize data file if missing
+      if (!existsSync(dataPath)) {
+        writeFileSync(dataPath, '[]');
+      }
+
+      // Start sandbox for API routes (if server.js exists)
+      let sandbox: SandboxApp;
+      if (existsSync(serverPath)) {
+        const backendJs = readFileSync(serverPath, 'utf-8');
+        sandbox = await createSandboxApp(backendJs, appId, dataPath);
+      } else {
+        // No backend — create a no-op sandbox
+        sandbox = {
+          handleRequest: async () => ({
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'No server.js backend' })
+          }),
+          dispose: () => {}
+        };
+      }
+
+      // Start sandbox HTTP server (for API proxy target)
+      const sandboxServer = await startAppServer('', sandbox);
+
+      // Start Vite dev server with proxy to sandbox
+      this.appStatuses.set(appId, 'developing');
+      let viteServer: ViteDevServer;
+      try {
+        viteServer = await startViteDevServer(appDir, sandboxServer.port);
+      } catch (err) {
+        // Clean up sandbox on Vite startup failure
+        await sandboxServer.stop();
+        sandbox.dispose();
+        throw err;
+      }
+
+      this.appStatuses.delete(appId);
+      this.developingApps.set(appId, {
+        sandbox,
+        sandboxServer,
+        viteServer,
+        lanUrl: viteServer.lanUrl,
+        localUrl: viteServer.localUrl,
+        port: viteServer.port
+      });
+
+      console.log(`[AppManager] Dev started "${appId}" at ${viteServer.lanUrl}`);
+
+      return {
+        lanUrl: viteServer.lanUrl,
+        localUrl: viteServer.localUrl,
+        port: viteServer.port
+      };
     } catch (err) {
-      // Clean up sandbox on Vite startup failure
-      await sandboxServer.stop();
-      sandbox.dispose();
       this.appStatuses.delete(appId);
       throw err;
     }
-
-    this.appStatuses.delete(appId);
-    this.developingApps.set(appId, {
-      sandbox,
-      sandboxServer,
-      viteServer,
-      lanUrl: viteServer.lanUrl,
-      localUrl: viteServer.localUrl,
-      port: viteServer.port
-    });
-
-    console.log(`[AppManager] Dev started "${appId}" at ${viteServer.lanUrl}`);
-
-    return {
-      lanUrl: viteServer.lanUrl,
-      localUrl: viteServer.localUrl,
-      port: viteServer.port
-    };
   }
 
   /** Stop dev mode for an app */
@@ -303,72 +307,78 @@ class AppManager {
       // Stop dev server if running
       await this.stopDev(appId);
 
-      // Ensure scaffolded and installed
-      if (!isScaffolded(appDir)) {
-        this.appStatuses.set(appId, 'scaffolding');
-        const meta = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
-        scaffoldApp(appDir, meta);
-      }
-      if (!hasNodeModules(appDir)) {
-        this.appStatuses.set(appId, 'installing');
-        installDeps(appDir);
-      }
+      try {
+        // Ensure scaffolded and installed
+        if (!isScaffolded(appDir)) {
+          this.appStatuses.set(appId, 'scaffolding');
+          const meta = JSON.parse(
+            readFileSync(join(appDir, 'app.json'), 'utf-8')
+          ) as AppManifest;
+          scaffoldApp(appDir, meta);
+        }
+        if (!hasNodeModules(appDir)) {
+          this.appStatuses.set(appId, 'installing');
+          installDeps(appDir);
+        }
 
-      // Build for production
-      this.appStatuses.set(appId, 'building');
-      buildApp(appDir);
+        // Build for production
+        this.appStatuses.set(appId, 'building');
+        buildApp(appDir);
 
-      const distDir = join(appDir, 'dist');
-      if (!existsSync(distDir)) {
+        const distDir = join(appDir, 'dist');
+        if (!existsSync(distDir)) {
+          throw new Error(`Build failed: dist/ directory not found for app "${appId}"`);
+        }
+
+        // Initialize data file if missing
+        if (!existsSync(dataPath)) {
+          writeFileSync(dataPath, '[]');
+        }
+
+        // Create sandbox for API routes
+        let sandbox: SandboxApp;
+        if (existsSync(serverPath)) {
+          const backendJs = readFileSync(serverPath, 'utf-8');
+          sandbox = await createSandboxApp(backendJs, appId, dataPath);
+        } else {
+          sandbox = {
+            handleRequest: async () => ({
+              status: 404,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ error: 'No server.js backend' })
+            }),
+            dispose: () => {}
+          };
+        }
+
+        // Start static server serving dist/ with sandbox API
+        const server = await startStaticAppServer(distDir, sandbox);
+
+        // Stop old running instance after new one is ready
+        if (this.runningApps.has(appId)) {
+          await this.stop(appId);
+        }
+
         this.appStatuses.delete(appId);
-        throw new Error(`Build failed: dist/ directory not found for app "${appId}"`);
-      }
+        this.runningApps.set(appId, {
+          sandbox,
+          server,
+          lanUrl: server.lanUrl,
+          localUrl: server.localUrl,
+          port: server.port
+        });
 
-      // Initialize data file if missing
-      if (!existsSync(dataPath)) {
-        writeFileSync(dataPath, '[]');
-      }
+        console.log(`[AppManager] Published Vite app "${appId}" at ${server.lanUrl}`);
 
-      // Create sandbox for API routes
-      let sandbox: SandboxApp;
-      if (existsSync(serverPath)) {
-        const backendJs = readFileSync(serverPath, 'utf-8');
-        sandbox = await createSandboxApp(backendJs, appId, dataPath);
-      } else {
-        sandbox = {
-          handleRequest: async () => ({
-            status: 404,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: 'No server.js backend' })
-          }),
-          dispose: () => {}
+        return {
+          lanUrl: server.lanUrl,
+          localUrl: server.localUrl,
+          port: server.port
         };
+      } catch (err) {
+        this.appStatuses.delete(appId);
+        throw err;
       }
-
-      // Start static server serving dist/ with sandbox API
-      const server = await startStaticAppServer(distDir, sandbox);
-
-      // Stop old running instance after new one is ready
-      if (this.runningApps.has(appId)) {
-        await this.stop(appId);
-      }
-
-      this.appStatuses.delete(appId);
-      this.runningApps.set(appId, {
-        sandbox,
-        server,
-        lanUrl: server.lanUrl,
-        localUrl: server.localUrl,
-        port: server.port
-      });
-
-      console.log(`[AppManager] Published Vite app "${appId}" at ${server.lanUrl}`);
-
-      return {
-        lanUrl: server.lanUrl,
-        localUrl: server.localUrl,
-        port: server.port
-      };
     }
 
     // Legacy app path (raw HTML)
