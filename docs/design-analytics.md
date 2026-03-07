@@ -94,15 +94,15 @@ type AnalyticsEventType =
 interface AnalyticsEvent {
   type: AnalyticsEventType;
   timestamp: number;
-  sessionId: string;           // 必填，启动时生成 UUID 作为会话 ID
-  anonymousId: string;         // 必填，首次启动生成并持久化到 config 中
+  sessionId?: string;          // 可选，SDK session 建立前为空
+  anonymousId: string;         // 必填，首次启动生成并持久化到 config.anonymousId 中
   properties?: Record<string, string | number | boolean>;
 }
 
 /** 消息反馈 */
 interface MessageFeedback {
   messageId: string;
-  conversationId: string;
+  conversationId?: string;     // 可选，首条消息自动保存前可能为空
   rating: 'positive' | 'negative';
   reason?: string;              // 用户选择的原因标签
   comment?: string;             // 用户自由输入的补充
@@ -171,9 +171,10 @@ export function useAnalytics() {
 | `useClaudeChat.ts` → `onMessageError` | `message_error` | 错误 |
 | `ChatInput.tsx` → model selector | `model_switched` | 切换模型，记录 from/to |
 | `ChatInput.tsx` → attachment handler | `attachment_added` | 添加附件，记录类型和大小 |
-| `Sidebar.tsx` → new/delete conversation | `conversation_created/deleted` | 对话管理 |
+| `useClaudeChat.ts` → `onToolUseStart` | `tool_used` | 工具调用开始时记录一次，避免渲染重复计数 |
+| `useClaudeChat.ts` → conversation autosave | `conversation_created` | 对话首次保存时触发，而非 UI 点击时 |
+| `Sidebar.tsx` → delete handler (IPC 完成后) | `conversation_deleted` | 对话删除确认后 |
 | `Message.tsx` → 反馈按钮 | `message_feedback` | 赞/踩 |
-| `ToolUse.tsx` → tool render | `tool_used` | 工具调用，记录工具名 |
 
 ### 4.2 Main 端：事件处理 + AI 脱敏 + 上报
 
@@ -186,9 +187,10 @@ export function registerAnalyticsHandlers(): void {
   });
 
   ipcMain.handle('analytics:submit-feedback', async (_event, feedback: MessageFeedback) => {
-    // 如果用户开启了对话分享，先做 AI 脱敏
-    if (analyticsSettings.shareConversationOnFeedback && feedback.sanitizedUserMessage) {
-      feedback = await sanitizeWithAI(feedback);
+    // 如果用户开启了对话分享，主进程从 conversationId 加载原始消息并做 AI 脱敏
+    // （Renderer 不发送原始对话内容，避免在 IPC 中传输敏感数据）
+    if (analyticsSettings.shareConversationOnFeedback && feedback.conversationId) {
+      feedback = await loadAndSanitizeConversation(feedback);
     }
     await analyticsService.submitFeedback(feedback);
   });
@@ -304,6 +306,17 @@ class AnalyticsTransport {
   constructor() {
     // 定时 flush
     setInterval(() => this.flush(), this.FLUSH_INTERVAL);
+    // 应用退出时同步 flush，确保 app_closed 和最后一批事件不丢失
+    app.on('before-quit', () => {
+      this.flushSync();
+    });
+  }
+
+  /** 同步写入本地队列（用于 before-quit，不做网络请求） */
+  private flushSync(): void {
+    if (this.buffer.length === 0) return;
+    const batch = this.buffer.splice(0);
+    this.persistToLocalQueueSync(batch);
   }
 
   async push(event: AnalyticsEvent): Promise<void> {
@@ -332,9 +345,13 @@ class AnalyticsTransport {
       body: JSON.stringify({ events, appVersion: app.getVersion() }),
     });
 
-    if (!res.ok && retries < this.MAX_RETRIES) {
-      await new Promise(r => setTimeout(r, 2 ** retries * 1000));
-      return this.send(events, retries + 1);
+    if (!res.ok) {
+      if (retries < this.MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, 2 ** retries * 1000));
+        return this.send(events, retries + 1);
+      }
+      // 重试耗尽仍失败，写入本地队列而非丢弃
+      throw new Error(`Analytics send failed after ${this.MAX_RETRIES} retries: ${res.status}`);
     }
   }
 
@@ -432,7 +449,19 @@ class AnalyticsTransport {
 修改文件：
 - `src/renderer/components/Message.tsx` — 在 assistant 消息底部渲染反馈按钮
 
-### Phase 3：AI 脱敏（~1天）
+### Phase 3：Settings UI + 合规（~0.5天）
+
+修改文件：
+- `src/renderer/pages/Settings.tsx` — 新增隐私设置区域
+
+### Phase 4：后端对接 + Dashboard（独立工作）
+
+- 搭建 PostHog 或自建后端
+- 配置事件分析 Dashboard
+- 设置报警规则
+- 实现 analytics API 代理（为 Phase 5 AI 脱敏提供项目内置 API key）
+
+### Phase 5：AI 脱敏（~1天，依赖 Phase 4 后端代理）
 
 新增文件：
 - `src/main/lib/privacy-sanitizer.ts` — 正则 + AI 脱敏
@@ -440,16 +469,9 @@ class AnalyticsTransport {
 修改文件：
 - `src/main/handlers/analytics-handlers.ts` — 接入脱敏流程
 
-### Phase 4：Settings UI + 合规（~0.5天）
-
-修改文件：
-- `src/renderer/pages/Settings.tsx` — 新增隐私设置区域
-
-### Phase 5：后端对接 + Dashboard（独立工作）
-
-- 搭建 PostHog 或自建后端
-- 配置事件分析 Dashboard
-- 设置报警规则
+> 注意：AI 脱敏依赖 Phase 4 搭建的后端代理来提供项目内置 API key，
+> 不能使用用户的 API key。Phase 4 完成前，反馈功能仅收集评分和原因，
+> 不收集对话内容。
 
 ---
 
