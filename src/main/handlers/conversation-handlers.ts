@@ -8,7 +8,8 @@ import {
   getConversation,
   initializeDatabase,
   listConversations,
-  updateConversation
+  setConversationProject,
+  updateConversation,
 } from '../lib/conversation-db';
 
 export function registerConversationHandlers(): void {
@@ -72,6 +73,22 @@ export function registerConversationHandlers(): void {
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error occurred'
+        };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'conversation:set-project',
+    async (_event, conversationId: string, projectId: string | null) => {
+      try {
+        setConversationProject(conversationId, projectId);
+        return { success: true };
+      } catch (error) {
+        console.error('Error setting conversation project:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error occurred',
         };
       }
     }

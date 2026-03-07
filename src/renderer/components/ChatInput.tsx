@@ -247,7 +247,7 @@ export default function ChatInput({
   return (
     <div
       ref={containerRef}
-      className="absolute inset-x-0 bottom-0 z-10 px-4 pb-5 [-webkit-app-region:no-drag]"
+      className="px-4 pt-6 pb-5 [-webkit-app-region:no-drag]"
     >
       {floatingPanel && <div className="mb-2">{floatingPanel}</div>}
       <div className="mx-auto max-w-3xl">

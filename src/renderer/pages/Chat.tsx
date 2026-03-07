@@ -8,6 +8,7 @@ import FloatingTaskPanel from '@/components/FloatingTaskPanel';
 import MessageList from '@/components/MessageList';
 import ResizeHandle from '@/components/ResizeHandle';
 import Sidebar from '@/components/Sidebar';
+import SkillCardGrid from '@/components/SkillCardGrid';
 import DragRegion from '@/components/TitleBar';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
@@ -535,31 +536,66 @@ export default function Chat({ onSettingsClick, onSkillsClick }: ChatProps) {
         {/* Center: chat area */}
         <Panel minSize="300px" className="relative flex flex-col overflow-hidden">
           <DragRegion />
-          <MessageList
-            messages={messages}
-            isLoading={isLoading}
-            containerRef={messagesContainerRef}
-            bottomPadding={messageListBottomPadding}
-          />
 
-          <ChatInput
-            value={inputValue}
-            onChange={setInputValue}
-            onSend={handleSendMessage}
-            isLoading={isLoading}
-            onStopStreaming={handleStopStreaming}
-            autoFocus
-            onHeightChange={setChatInputHeight}
-            attachments={pendingAttachments}
-            onFilesSelected={handleFilesSelected}
-            onRemoveAttachment={handleRemoveAttachment}
-            canSend={Boolean(inputValue.trim()) || pendingAttachments.length > 0}
-            attachmentError={attachmentError}
-            modelPreference={modelPreference}
-            onModelPreferenceChange={handleModelPreferenceChange}
-            isModelPreferenceUpdating={isModelPreferenceUpdating}
-            floatingPanel={<FloatingTaskPanel messages={messages} />}
-          />
+          {messages.length === 0 && !isLoading ? (
+            /* Welcome layout: centered input + skill cards */
+            <div className="flex flex-1 flex-col items-center justify-center gap-5 px-3">
+              <p className="text-[11px] font-semibold tracking-[0.35em] text-neutral-400 uppercase dark:text-neutral-500">
+                小马快跑
+              </p>
+              <div className="w-full max-w-3xl">
+                <ChatInput
+                  value={inputValue}
+                  onChange={setInputValue}
+                  onSend={handleSendMessage}
+                  isLoading={isLoading}
+                  onStopStreaming={handleStopStreaming}
+                  autoFocus
+                  attachments={pendingAttachments}
+                  onFilesSelected={handleFilesSelected}
+                  onRemoveAttachment={handleRemoveAttachment}
+                  canSend={Boolean(inputValue.trim()) || pendingAttachments.length > 0}
+                  attachmentError={attachmentError}
+                  modelPreference={modelPreference}
+                  onModelPreferenceChange={handleModelPreferenceChange}
+                  isModelPreferenceUpdating={isModelPreferenceUpdating}
+                />
+              </div>
+              <SkillCardGrid
+                onSelectSkill={(prompt) => setInputValue(prompt)}
+              />
+            </div>
+          ) : (
+            /* Chat layout: messages + bottom input */
+            <>
+              <MessageList
+                messages={messages}
+                isLoading={isLoading}
+                containerRef={messagesContainerRef}
+                bottomPadding={messageListBottomPadding}
+              />
+              <div className="absolute inset-x-0 bottom-0 z-10">
+                <ChatInput
+                  value={inputValue}
+                  onChange={setInputValue}
+                  onSend={handleSendMessage}
+                  isLoading={isLoading}
+                  onStopStreaming={handleStopStreaming}
+                  autoFocus
+                  onHeightChange={setChatInputHeight}
+                  attachments={pendingAttachments}
+                  onFilesSelected={handleFilesSelected}
+                  onRemoveAttachment={handleRemoveAttachment}
+                  canSend={Boolean(inputValue.trim()) || pendingAttachments.length > 0}
+                  attachmentError={attachmentError}
+                  modelPreference={modelPreference}
+                  onModelPreferenceChange={handleModelPreferenceChange}
+                  isModelPreferenceUpdating={isModelPreferenceUpdating}
+                  floatingPanel={<FloatingTaskPanel messages={messages} />}
+                />
+              </div>
+            </>
+          )}
         </Panel>
 
         {/* Right: artifact preview panel */}

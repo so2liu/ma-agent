@@ -177,6 +177,34 @@ export interface Conversation {
   createdAt: number;
   updatedAt: number;
   sessionId?: string | null;
+  projectId?: string | null;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  order: number;
+  isArchived: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ProjectListResponse {
+  success: boolean;
+  projects?: Project[];
+  error?: string;
+}
+
+export interface ProjectCreateResponse {
+  success: boolean;
+  project?: Project;
+  error?: string;
+}
+
+export interface ProjectUpdateResponse {
+  success: boolean;
+  project?: Project;
+  error?: string;
 }
 
 export interface ConversationListResponse {
@@ -334,6 +362,20 @@ export interface ElectronAPI {
       sessionId?: string | null
     ) => Promise<ConversationUpdateResponse>;
     delete: (id: string) => Promise<ConversationDeleteResponse>;
+    setProject: (
+      conversationId: string,
+      projectId: string | null
+    ) => Promise<ConversationUpdateResponse>;
+  };
+  project: {
+    list: (includeArchived?: boolean) => Promise<ProjectListResponse>;
+    create: (name: string) => Promise<ProjectCreateResponse>;
+    update: (
+      id: string,
+      updates: { name?: string; isArchived?: boolean }
+    ) => Promise<ProjectUpdateResponse>;
+    reorder: (orderedIds: string[]) => Promise<{ success: boolean; error?: string }>;
+    delete: (id: string) => Promise<{ success: boolean; error?: string }>;
   };
   update: {
     getStatus: () => Promise<UpdateStatus>;
