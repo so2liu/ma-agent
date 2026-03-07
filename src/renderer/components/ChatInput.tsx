@@ -1,4 +1,5 @@
 import { ArrowUp, Loader2, Paperclip, Square } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import AttachmentPreviewList from '@/components/AttachmentPreviewList';
@@ -27,6 +28,7 @@ interface ChatInputProps {
   modelPreference: ChatModelPreference;
   onModelPreferenceChange: (preference: ChatModelPreference) => void;
   isModelPreferenceUpdating?: boolean;
+  floatingPanel?: ReactNode;
 }
 
 export default function ChatInput({
@@ -44,7 +46,8 @@ export default function ChatInput({
   attachmentError,
   modelPreference,
   onModelPreferenceChange,
-  isModelPreferenceUpdating = false
+  isModelPreferenceUpdating = false,
+  floatingPanel
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -244,8 +247,9 @@ export default function ChatInput({
   return (
     <div
       ref={containerRef}
-      className="absolute inset-x-0 bottom-0 z-10 px-4 pt-6 pb-5 [-webkit-app-region:no-drag]"
+      className="absolute inset-x-0 bottom-0 z-10 px-4 pb-5 [-webkit-app-region:no-drag]"
     >
+      {floatingPanel && <div className="mb-2">{floatingPanel}</div>}
       <div className="mx-auto max-w-3xl">
         <div
           className={`rounded-3xl bg-white/95 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.15)] backdrop-blur-xl dark:bg-neutral-900/90 dark:shadow-[0_16px_50px_rgba(0,0,0,0.65)] ${
