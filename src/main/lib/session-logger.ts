@@ -1,4 +1,5 @@
-import { appendFileSync, existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
+import { appendFile } from 'fs/promises';
 import { join } from 'path';
 import { app } from 'electron';
 
@@ -20,12 +21,10 @@ export function startSessionLog(sessionId: string): void {
 
 export function logSessionEvent(event: unknown): void {
   if (!currentLogPath) return;
-  try {
-    const line = JSON.stringify({ ts: Date.now(), event }) + '\n';
-    appendFileSync(currentLogPath, line, 'utf-8');
-  } catch {
+  const line = JSON.stringify({ ts: Date.now(), event }) + '\n';
+  appendFile(currentLogPath, line, 'utf-8').catch(() => {
     // Logging should never break the app
-  }
+  });
 }
 
 export function endSessionLog(): void {

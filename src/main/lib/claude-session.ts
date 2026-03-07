@@ -223,7 +223,9 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
       }
     });
 
-    startSessionLog(isResumedSession ? resumeSessionId! : `new-${Date.now()}`);
+    if (getDebugMode()) {
+      startSessionLog(isResumedSession ? resumeSessionId! : `new-${Date.now()}`);
+    }
 
     // Process streaming responses
     for await (const sdkMessage of querySession) {

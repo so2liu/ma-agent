@@ -101,13 +101,12 @@ class AppManager {
     // Create sandbox first (validates backend code before stopping old app)
     const sandbox = await createSandboxApp(backendJs, appId, dataPath);
 
-    // Start new HTTP server before stopping old one
-    const server = await startAppServer(frontendHtml, sandbox, preferredPort);
-
-    // Only stop old app after new one is successfully running
+    // Stop old app before starting new one so preferred port is available
     if (this.runningApps.has(appId)) {
       await this.stop(appId);
     }
+
+    const server = await startAppServer(frontendHtml, sandbox, preferredPort);
 
     this.runningApps.set(appId, {
       sandbox,

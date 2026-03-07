@@ -126,12 +126,16 @@ export async function startAppServer(
 
   const listenPort = await new Promise<number>((resolve, reject) => {
     if (preferredPort) {
-      // Try preferred port first, fall back to random
-      server.once('error', () => {
-        server.listen(0, () => {
-          const addr = server.address();
-          resolve(typeof addr === 'object' && addr ? addr.port : 0);
-        });
+      // Try preferred port first, fall back to random only on EADDRINUSE
+      server.once('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          server.listen(0, () => {
+            const addr = server.address();
+            resolve(typeof addr === 'object' && addr ? addr.port : 0);
+          });
+        } else {
+          reject(err);
+        }
       });
       server.listen(preferredPort, () => resolve(preferredPort));
     } else {
