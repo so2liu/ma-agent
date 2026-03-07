@@ -1,0 +1,11 @@
+{
+  "id": "a1b2c3d4-1002-4000-8000-000000000002",
+  "name": "frontend-design",
+  "version": "1.0.0",
+  "description": "Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when the user asks to build web components, pages, or applications. Generates creative, polished code that avoids generic AI aesthetics.",
+  "license": "Complete terms in LICENSE.txt",
+  "shared": false,
+  "tags": ["frontend", "design", "ui", "web"],
+  "createdAt": "2025-01-01T00:00:00.000Z",
+  "updatedAt": "2025-01-01T00:00:00.000Z"
+}

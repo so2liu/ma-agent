@@ -1,9 +1,11 @@
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
 import { cp, mkdir, rename, rm } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { app } from 'electron';
 
 import type { ChatModelPreference } from '../../shared/types/ipc';
+import type { SkillManifest } from '../../shared/types/skill-manifest';
+import { syncManifest } from './skill-manifest';
 
 export type UpdateChannel = 'stable' | 'nightly';
 
@@ -414,6 +416,74 @@ export function buildClaudeSessionEnv(): Record<string, string> {
   return env;
 }
 
+/**
+ * Read user-customized manifest fields (shared, tags) from workspace skills
+ * before skills are overwritten, so we can restore them after sync.
+ */
+function collectUserManifestSettings(
+  skillsDir: string
+): Map<string, Pick<SkillManifest, 'shared' | 'tags'>> {
+  const settings = new Map<string, Pick<SkillManifest, 'shared' | 'tags'>>();
+  if (!existsSync(skillsDir)) return settings;
+
+  try {
+    const entries = readdirSync(skillsDir).filter((name) => {
+      const fullPath = join(skillsDir, name);
+      return statSync(fullPath).isDirectory();
+    });
+
+    for (const skillName of entries) {
+      const manifestPath = join(skillsDir, skillName, 'manifest.json');
+      if (!existsSync(manifestPath)) continue;
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillManifest;
+        settings.set(manifest.id, { shared: manifest.shared, tags: manifest.tags });
+      } catch {
+        // Skip invalid manifest files
+      }
+    }
+  } catch {
+    // Skip if we can't read the directory
+  }
+
+  return settings;
+}
+
+/**
+ * Restore user-customized manifest fields after workspace sync.
+ */
+function restoreUserManifestSettings(
+  skillsDir: string,
+  settings: Map<string, Pick<SkillManifest, 'shared' | 'tags'>>
+): void {
+  if (settings.size === 0 || !existsSync(skillsDir)) return;
+
+  try {
+    const entries = readdirSync(skillsDir).filter((name) => {
+      const fullPath = join(skillsDir, name);
+      return statSync(fullPath).isDirectory();
+    });
+
+    for (const skillName of entries) {
+      const manifestPath = join(skillsDir, skillName, 'manifest.json');
+      if (!existsSync(manifestPath)) continue;
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillManifest;
+        const saved = settings.get(manifest.id);
+        if (saved) {
+          manifest.shared = saved.shared;
+          manifest.tags = saved.tags;
+          writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+        }
+      } catch {
+        // Skip invalid manifest files
+      }
+    }
+  } catch {
+    // Skip if we can't read the directory
+  }
+}
+
 export function getUpdateChannel(): UpdateChannel {
   const config = loadConfig();
   return config.updateChannel === 'nightly' ? 'nightly' : 'stable';
@@ -462,6 +532,9 @@ export async function ensureWorkspaceDir(): Promise<void> {
       const destSkillsDir = join(destClaudeDir, 'skills');
       await mkdir(destSkillsDir, { recursive: true });
 
+      // Preserve user manifest settings before overwriting built-in skills
+      const userSettings = collectUserManifestSettings(destSkillsDir);
+
       const sourceSkills = readdirSync(sourceSkillsDir, { withFileTypes: true })
         .filter((entry) => entry.isDirectory())
         .filter((entry) => existsSync(join(sourceSkillsDir, entry.name, '.builtin')));
@@ -495,6 +568,21 @@ export async function ensureWorkspaceDir(): Promise<void> {
         } catch (skillError) {
           console.error(`  Failed to sync skill "${skill.name}":`, skillError);
         }
+      }
+
+      // Restore user manifest settings after overwriting
+      restoreUserManifestSettings(destSkillsDir, userSettings);
+
+      // Sync manifests for all skills (generate if missing, update if SKILL.md changed)
+      try {
+        const allSkillDirs = readdirSync(destSkillsDir).filter((name) =>
+          statSync(join(destSkillsDir, name)).isDirectory()
+        );
+        for (const skillName of allSkillDirs) {
+          syncManifest(join(destSkillsDir, skillName), skillName);
+        }
+      } catch (err) {
+        console.warn('Failed to sync skill manifests:', err);
       }
 
       // Clean up stale built-in skills that are no longer shipped

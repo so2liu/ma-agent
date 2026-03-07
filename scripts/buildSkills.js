@@ -1,5 +1,6 @@
 import { spawnSync } from 'child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
+import { createHash, randomUUID } from 'crypto';
 import { dirname, join, relative } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -15,6 +16,40 @@ const sourceClaudeRoot = join(projectRoot, '.claude');
 const sourceSkillsRoot = join(sourceClaudeRoot, 'skills');
 const targetClaudeRoot = join(projectRoot, 'out', '.claude');
 const targetSkillsRoot = join(targetClaudeRoot, 'skills');
+
+/** Parse simple key: value frontmatter from SKILL.md */
+function parseFrontmatterSimple(content) {
+  const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (!match) return {};
+  const result = {};
+  for (const line of match[1].split('\n')) {
+    const kv = line.match(/^(\w+):\s*(.+)$/);
+    if (!kv) continue;
+    const value = kv[2].replace(/^['"](.*)['"]$/, '$1').trim();
+    if (['name', 'description', 'license', 'compatibility', 'version'].includes(kv[1])) {
+      result[kv[1]] = value;
+    }
+  }
+  return result;
+}
+
+/** Write a brand new manifest.json */
+function writeNewManifest(manifestPath, skillMdContent, skillName, hash) {
+  const fm = parseFrontmatterSimple(skillMdContent);
+  const now = new Date().toISOString();
+  const manifest = {
+    id: randomUUID(),
+    name: fm.name || skillName,
+    version: fm.version || '1.0.0',
+    description: fm.description || '',
+    license: fm.license,
+    shared: false,
+    createdAt: now,
+    updatedAt: now,
+    skillMdHash: hash
+  };
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+}
 
 console.log('Building Claude skills with root toolchain...');
 console.log('  Source:', sourceSkillsRoot);
@@ -72,6 +107,38 @@ for (const skillName of skills) {
       console.log(`  Copied ${entry.name}`);
     } catch (error) {
       console.warn(`  Warning: Failed to copy ${entry.name}:`, error.message);
+    }
+  }
+
+  // Ensure manifest.json exists (generate if missing, sync if SKILL.md changed)
+  const manifestPath = join(targetSkillDir, 'manifest.json');
+  const skillMdPath = join(targetSkillDir, 'SKILL.md');
+  if (existsSync(skillMdPath)) {
+    const skillMdContent = readFileSync(skillMdPath, 'utf-8');
+    const currentHash = createHash('sha256').update(skillMdContent).digest('hex');
+
+    if (existsSync(manifestPath)) {
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+        if (manifest.skillMdHash !== currentHash) {
+          // SKILL.md changed -- update content fields, preserve identity
+          const fm = parseFrontmatterSimple(skillMdContent);
+          manifest.name = fm.name || manifest.name;
+          manifest.description = fm.description || manifest.description;
+          manifest.license = fm.license ?? manifest.license;
+          manifest.version = fm.version || manifest.version;
+          manifest.updatedAt = new Date().toISOString();
+          manifest.skillMdHash = currentHash;
+          writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+          console.log(`  Updated manifest.json (SKILL.md changed)`);
+        }
+      } catch {
+        console.warn(`  Warning: Invalid manifest.json, regenerating`);
+        writeNewManifest(manifestPath, skillMdContent, skillName, currentHash);
+      }
+    } else {
+      console.warn(`  Warning: No manifest.json found, generating`);
+      writeNewManifest(manifestPath, skillMdContent, skillName, currentHash);
     }
   }
 
