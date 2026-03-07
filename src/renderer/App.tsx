@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
 import UpdateCheckFeedback from '@/components/UpdateCheckFeedback';
-import UpdateNotification from '@/components/UpdateNotification';
 import UpdateReadyBanner from '@/components/UpdateReadyBanner';
 import Chat from '@/pages/Chat';
 import Settings from '@/pages/Settings';
@@ -37,7 +36,6 @@ export default function App() {
   return (
     <>
       <UpdateCheckFeedback />
-      <UpdateNotification />
       <UpdateReadyBanner />
       <div className={currentView === 'settings' ? 'block' : 'hidden'}>
         <Settings onBack={() => setCurrentView('home')} />

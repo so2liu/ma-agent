@@ -42,7 +42,7 @@ let currentStatus: UpdateStatus = {
 };
 
 // Configure autoUpdater
-autoUpdater.autoDownload = false; // Don't auto-download, let user decide
+autoUpdater.autoDownload = true; // Auto-download in background
 autoUpdater.autoInstallOnAppQuit = true; // Auto-install on quit after download
 
 // Allow prereleases based on update channel setting
@@ -176,11 +176,14 @@ export function initializeUpdater(window: BrowserWindow | null): void {
   });
 
   autoUpdater.on('error', (error) => {
+    if (activeGeneration !== updateGeneration) return;
+    // Only mark lastCheckComplete if the error happened during check phase, not download
+    const wasChecking = currentStatus.checking;
     currentStatus = {
       ...currentStatus,
       checking: false,
       downloading: false,
-      lastCheckComplete: true,
+      lastCheckComplete: wasChecking,
       error: error.message || 'Unknown error occurred'
     };
     notifyStatusChange();
@@ -302,22 +305,6 @@ export function checkForUpdates(): void {
       };
       notifyStatusChange();
     }, 5000);
-  });
-}
-
-export function downloadUpdate(): void {
-  if (!currentStatus.updateAvailable || currentStatus.downloading) {
-    return;
-  }
-
-  autoUpdater.downloadUpdate().catch((error) => {
-    console.error('Failed to download update:', error);
-    currentStatus = {
-      ...currentStatus,
-      downloading: false,
-      error: error.message || 'Failed to download update'
-    };
-    notifyStatusChange();
   });
 }
 
