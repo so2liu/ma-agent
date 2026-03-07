@@ -9,6 +9,7 @@ export interface Conversation {
   createdAt: number; // Unix timestamp
   updatedAt: number; // Unix timestamp
   sessionId?: string | null;
+  projectId?: string | null;
 }
 
 interface ConversationFile {
@@ -18,6 +19,7 @@ interface ConversationFile {
   createdAt: number;
   updatedAt: number;
   sessionId?: string | null;
+  projectId?: string | null;
 }
 
 let conversationsDir: string | null = null;
@@ -139,7 +141,8 @@ export function getConversation(id: string): Conversation | null {
     messages: JSON.stringify(conversationFile.messages),
     createdAt: conversationFile.createdAt,
     updatedAt: conversationFile.updatedAt,
-    sessionId: conversationFile.sessionId ?? null
+    sessionId: conversationFile.sessionId ?? null,
+    projectId: conversationFile.projectId ?? null,
   };
 }
 
@@ -172,7 +175,8 @@ export function listConversations(limit: number = 100): Conversation[] {
     messages: JSON.stringify(conversationFile.messages),
     createdAt: conversationFile.createdAt,
     updatedAt: conversationFile.updatedAt,
-    sessionId: conversationFile.sessionId ?? null
+    sessionId: conversationFile.sessionId ?? null,
+    projectId: conversationFile.projectId ?? null,
   }));
 }
 
@@ -181,6 +185,13 @@ export function deleteConversation(id: string): void {
   if (existsSync(filePath)) {
     unlinkSync(filePath);
   }
+}
+
+export function setConversationProject(id: string, projectId: string | null): void {
+  const existing = readConversationFile(id);
+  if (!existing) throw new Error(`Conversation ${id} not found`);
+  existing.projectId = projectId;
+  writeConversationFile(existing);
 }
 
 export function generateTitleFromMessages(messages: unknown[]): string {

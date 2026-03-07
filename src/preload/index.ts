@@ -147,7 +147,17 @@ contextBridge.exposeInMainWorld('electron', {
     get: (id: string) => ipcRenderer.invoke('conversation:get', id),
     update: (id: string, title?: string, messages?: unknown[], sessionId?: string | null) =>
       ipcRenderer.invoke('conversation:update', id, title, messages, sessionId),
-    delete: (id: string) => ipcRenderer.invoke('conversation:delete', id)
+    delete: (id: string) => ipcRenderer.invoke('conversation:delete', id),
+    setProject: (conversationId: string, projectId: string | null) =>
+      ipcRenderer.invoke('conversation:set-project', conversationId, projectId),
+  },
+  project: {
+    list: (includeArchived?: boolean) => ipcRenderer.invoke('project:list', includeArchived),
+    create: (name: string) => ipcRenderer.invoke('project:create', name),
+    update: (id: string, updates: { name?: string; isArchived?: boolean }) =>
+      ipcRenderer.invoke('project:update', id, updates),
+    reorder: (orderedIds: string[]) => ipcRenderer.invoke('project:reorder', orderedIds),
+    delete: (id: string) => ipcRenderer.invoke('project:delete', id),
   },
   workspace: {
     listFiles: () => ipcRenderer.invoke('workspace:list-files'),

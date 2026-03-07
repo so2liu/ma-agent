@@ -6,6 +6,7 @@ import { registerAppHandlers } from './handlers/app-handlers';
 import { registerChatHandlers } from './handlers/chat-handlers';
 import { registerConfigHandlers } from './handlers/config-handlers';
 import { registerConversationHandlers } from './handlers/conversation-handlers';
+import { registerProjectHandlers } from './handlers/project-handlers';
 import { registerShellHandlers } from './handlers/shell-handlers';
 import { registerUpdateHandlers } from './handlers/update-handlers';
 import { registerWorkspaceHandlers } from './handlers/workspace-handlers';
@@ -103,6 +104,7 @@ app.whenReady().then(async () => {
   registerConfigHandlers();
   registerChatHandlers(() => mainWindow);
   registerConversationHandlers();
+  registerProjectHandlers();
   registerShellHandlers();
   registerUpdateHandlers();
   registerWorkspaceHandlers();
