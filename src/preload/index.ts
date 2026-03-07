@@ -194,7 +194,6 @@ contextBridge.exposeInMainWorld('electron', {
   update: {
     getStatus: () => ipcRenderer.invoke('update:get-status'),
     check: () => ipcRenderer.invoke('update:check'),
-    download: () => ipcRenderer.invoke('update:download'),
     install: () => ipcRenderer.invoke('update:install'),
     getChannel: () => ipcRenderer.invoke('update:get-channel'),
     setChannel: (channel: 'stable' | 'nightly') =>

@@ -380,7 +380,6 @@ export interface ElectronAPI {
   update: {
     getStatus: () => Promise<UpdateStatus>;
     check: () => Promise<{ success: boolean }>;
-    download: () => Promise<{ success: boolean }>;
     install: () => Promise<{ success: boolean }>;
     getChannel: () => Promise<{ channel: UpdateChannel }>;
     setChannel: (channel: UpdateChannel) => Promise<{ success: boolean; channel: UpdateChannel }>;

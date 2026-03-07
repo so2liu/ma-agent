@@ -3,7 +3,6 @@ import { ipcMain } from 'electron';
 import { getUpdateChannel, setUpdateChannel } from '../lib/config';
 import {
   checkForUpdates,
-  downloadUpdate,
   getUpdateStatus,
   installUpdate,
   onUpdateChannelChanged
@@ -18,12 +17,6 @@ export function registerUpdateHandlers(): void {
   // Check for updates manually
   ipcMain.handle('update:check', () => {
     checkForUpdates();
-    return { success: true };
-  });
-
-  // Download available update
-  ipcMain.handle('update:download', () => {
-    downloadUpdate();
     return { success: true };
   });
 
