@@ -106,6 +106,31 @@ export interface WorkspaceReadFileResponse {
   error?: string;
 }
 
+export interface AppInfo {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  status: 'running' | 'stopped';
+  lanUrl: string | null;
+  localUrl: string | null;
+  port: number | null;
+}
+
+export interface AppScanResponse {
+  success: boolean;
+  apps: AppInfo[];
+  error?: string;
+}
+
+export interface AppPublishResponse {
+  success: boolean;
+  lanUrl?: string;
+  localUrl?: string;
+  port?: number;
+  error?: string;
+}
+
 export interface UpdateInfo {
   version: string;
   releaseDate: string;
@@ -229,6 +254,11 @@ export interface ElectronAPI {
     listFiles: () => Promise<WorkspaceListResponse>;
     readFile: (relativePath: string) => Promise<WorkspaceReadFileResponse>;
     openFile: (relativePath: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  app: {
+    scan: () => Promise<AppScanResponse>;
+    publish: (appId: string) => Promise<AppPublishResponse>;
+    stop: (appId: string) => Promise<{ success: boolean; error?: string }>;
   };
   conversation: {
     list: () => Promise<ConversationListResponse>;
