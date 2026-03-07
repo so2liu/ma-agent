@@ -40,7 +40,7 @@ export default function App() {
         <Settings onBack={() => setCurrentView('home')} />
       </div>
       <div className={currentView === 'home' ? 'block' : 'hidden'}>
-        <Chat />
+        <Chat onSettingsClick={() => setCurrentView('settings')} />
       </div>
     </>
   );
