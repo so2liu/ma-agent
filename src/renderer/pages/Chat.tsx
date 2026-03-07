@@ -4,6 +4,7 @@ import { Group, Panel } from 'react-resizable-panels';
 import type { Artifact } from '@/components/ArtifactPanel';
 import ArtifactPanel from '@/components/ArtifactPanel';
 import ChatInput from '@/components/ChatInput';
+import FloatingTaskPanel from '@/components/FloatingTaskPanel';
 import MessageList from '@/components/MessageList';
 import ResizeHandle from '@/components/ResizeHandle';
 import Sidebar from '@/components/Sidebar';
@@ -557,6 +558,7 @@ export default function Chat({ onSettingsClick, onSkillsClick }: ChatProps) {
             modelPreference={modelPreference}
             onModelPreferenceChange={handleModelPreferenceChange}
             isModelPreferenceUpdating={isModelPreferenceUpdating}
+            floatingPanel={<FloatingTaskPanel messages={messages} />}
           />
         </Panel>
 
