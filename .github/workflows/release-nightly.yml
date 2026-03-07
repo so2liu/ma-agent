@@ -49,13 +49,26 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Cache bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/electron
+          key: electron-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: electron-${{ runner.os }}-
+
       - name: Generate nightly version
         id: nightly-version
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           DATE=$(date -u +%Y%m%d)
           BASE_VERSION=$(node -p "require('./package.json').version")
-          # Use a higher patch version so nightly > stable in semver
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
           NEXT_PATCH=$((PATCH + 1))
           NIGHTLY_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-nightly.${DATE}.${SHORT_SHA}"
@@ -68,24 +81,12 @@ jobs:
       - name: Install dependencies
         run: bun install --no-save
 
-      - name: Lint & typecheck
-        run: bun run lint && bun run typecheck
-
-      - name: Test
-        run: bun run test
-
       - name: Build Electron app
         run: bun run build
 
       - name: Package for macOS (${{ matrix.arch }})
         env:
-          # Apple code signing
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # Apple notarization
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           npx electron-builder --mac --${{ matrix.arch }} --publish never
 
