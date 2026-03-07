@@ -16,6 +16,7 @@ import {
   setApiBaseUrl,
   setApiKey
 } from '../lib/config';
+import { restartFileWatcher } from './workspace-handlers';
 
 const requireModule = createRequire(import.meta.url);
 
@@ -60,8 +61,9 @@ export function registerConfigHandlers(): void {
     config.workspaceDir = trimmedPath;
     saveConfig(config);
 
-    // Create the new workspace directory
+    // Create the new workspace directory and restart file watcher
     await ensureWorkspaceDir();
+    restartFileWatcher();
 
     return { success: true };
   });
