@@ -263,6 +263,10 @@ export interface ElectronAPI {
     listFiles: () => Promise<WorkspaceListResponse>;
     readFile: (relativePath: string) => Promise<WorkspaceReadFileResponse>;
     openFile: (relativePath: string) => Promise<{ success: boolean; error?: string }>;
+    deleteFile: (
+      relativePath: string,
+      isDirectory: boolean
+    ) => Promise<{ success: boolean; error?: string }>;
   };
   app: {
     scan: () => Promise<AppScanResponse>;

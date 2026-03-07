@@ -1,12 +1,7 @@
 import type { Artifact } from '@/components/ArtifactPanel';
 import type { Message, WriteInput } from '@/types/chat';
 
-const HTML_EXTENSIONS = new Set(['html', 'htm', 'svg']);
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'ico']);
-
-function getExtension(filePath: string): string {
-  return filePath.split('.').pop()?.toLowerCase() || '';
-}
+import { getArtifactType, getFileExtension } from '../../shared/file-extensions';
 
 function getFileName(filePath: string): string {
   return filePath.split('/').pop() || filePath;
@@ -14,7 +9,7 @@ function getFileName(filePath: string): string {
 
 /**
  * Extract previewable artifacts from chat messages.
- * Looks at Write tool blocks with HTML/image file paths.
+ * Looks at Write tool blocks with supported file paths.
  */
 export function extractArtifacts(messages: Message[]): Artifact[] {
   const artifacts: Artifact[] = [];
@@ -30,20 +25,16 @@ export function extractArtifacts(messages: Message[]): Artifact[] {
       const input = block.tool.parsedInput as WriteInput | undefined;
       if (!input?.file_path) continue;
 
-      const ext = getExtension(input.file_path);
-      let type: 'html' | 'image' | null = null;
-
-      if (HTML_EXTENSIONS.has(ext)) {
-        type = 'html';
-      } else if (IMAGE_EXTENSIONS.has(ext)) {
-        type = 'image';
-      }
+      const ext = getFileExtension(input.file_path);
+      const type = getArtifactType(ext);
 
       if (!type) continue;
 
+      // Only inline content for HTML types (rendered in iframe)
+      const inlineContent = type === 'html' ? input.content : undefined;
+
       // Use file path as dedup key; later writes overwrite earlier ones
       if (seen.has(input.file_path)) {
-        // Replace existing artifact with updated content
         const existingIndex = artifacts.findIndex((a) => a.filePath === input.file_path);
         if (existingIndex !== -1) {
           artifacts[existingIndex] = {
@@ -51,7 +42,7 @@ export function extractArtifacts(messages: Message[]): Artifact[] {
             filePath: input.file_path,
             fileName: getFileName(input.file_path),
             type,
-            content: type === 'html' ? input.content : undefined
+            content: inlineContent
           };
         }
       } else {
@@ -61,7 +52,7 @@ export function extractArtifacts(messages: Message[]): Artifact[] {
           filePath: input.file_path,
           fileName: getFileName(input.file_path),
           type,
-          content: type === 'html' ? input.content : undefined
+          content: inlineContent
         });
       }
     }

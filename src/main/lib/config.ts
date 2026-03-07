@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { cp, mkdir, rename, rm } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { app } from 'electron';
@@ -587,8 +587,9 @@ export async function ensureWorkspaceDir(): Promise<void> {
 
       // Clean up stale built-in skills that are no longer shipped
       if (existsSync(destSkillsDir)) {
-        const destSkills = readdirSync(destSkillsDir, { withFileTypes: true })
-          .filter((entry) => entry.isDirectory());
+        const destSkills = readdirSync(destSkillsDir, { withFileTypes: true }).filter((entry) =>
+          entry.isDirectory()
+        );
         for (const skill of destSkills) {
           if (
             existsSync(join(destSkillsDir, skill.name, '.builtin')) &&

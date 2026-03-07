@@ -14,6 +14,7 @@ import type { Message, MessageAttachment } from '@/types/chat';
 import { extractArtifacts } from '@/utils/artifacts';
 
 import { MAX_ATTACHMENT_BYTES } from '../../shared/constants';
+import { getArtifactType, getFileExtension } from '../../shared/file-extensions';
 import type { ChatModelPreference, SerializedAttachmentPayload } from '../../shared/types/ipc';
 
 interface PendingAttachment {
@@ -451,14 +452,8 @@ export default function Chat({ onSettingsClick }: ChatProps) {
 
   const handleFileSelect = (filePath: string) => {
     const fileName = filePath.split('/').pop() || filePath;
-    const ext = filePath.split('.').pop()?.toLowerCase() || '';
-
-    const htmlExts = new Set(['html', 'htm', 'svg']);
-    const imageExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'ico']);
-
-    let type: 'html' | 'image' | null = null;
-    if (htmlExts.has(ext)) type = 'html';
-    else if (imageExts.has(ext)) type = 'image';
+    const ext = getFileExtension(filePath);
+    const type = getArtifactType(ext);
 
     if (type) {
       setSelectedArtifact({
@@ -466,8 +461,22 @@ export default function Chat({ onSettingsClick }: ChatProps) {
         filePath,
         fileName,
         type
-        // No content -- will be loaded from disk by ArtifactPanel
       });
+    }
+  };
+
+  const handleFileDeleted = (deletedPath: string, isDirectory: boolean) => {
+    if (!selectedArtifact) return;
+    if (isDirectory) {
+      // If deleted directory is a prefix of the selected file path, clear preview
+      if (
+        selectedArtifact.filePath === deletedPath ||
+        selectedArtifact.filePath.startsWith(deletedPath + '/')
+      ) {
+        setSelectedArtifact(null);
+      }
+    } else if (selectedArtifact.filePath === deletedPath) {
+      setSelectedArtifact(null);
     }
   };
 
@@ -513,6 +522,7 @@ export default function Chat({ onSettingsClick }: ChatProps) {
             onNewChat={handleNewChat}
             onFileSelect={handleFileSelect}
             selectedFilePath={selectedArtifact?.filePath ?? null}
+            onFileDeleted={handleFileDeleted}
             onSettingsClick={onSettingsClick}
           />
         </Panel>

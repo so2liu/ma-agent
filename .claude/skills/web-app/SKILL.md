@@ -122,7 +122,11 @@ function handleRequest(req) {
     // ... more routes
   }
 
-  return { status: 404, headers: { 'Content-Type': 'application/json' }, body: '{"error":"Not Found"}' };
+  return {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
+    body: '{"error":"Not Found"}'
+  };
 }
 ```
 

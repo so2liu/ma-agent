@@ -134,7 +134,7 @@ export default function BlockGroup({
 
   return (
     <div className="mt-1.5 mb-4">
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-col items-start gap-1.5">
         {blocks.map((block, index) => {
           if (block.type === 'thinking') {
             return (
