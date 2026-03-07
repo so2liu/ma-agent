@@ -47,7 +47,11 @@ export default function UpdateNotification() {
 
   const handleViewReleaseNotes = async () => {
     const version = status?.updateInfo?.version;
-    const url = version ? `${RELEASES_URL}/tag/v${version}` : RELEASES_URL;
+    const isNightly = version?.includes('-nightly.');
+    const url =
+      isNightly ? `${RELEASES_URL}/tag/nightly`
+      : version ? `${RELEASES_URL}/tag/v${version}`
+      : RELEASES_URL;
     await window.electron.shell.openExternal(url);
   };
 

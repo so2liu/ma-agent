@@ -106,11 +106,38 @@ export interface WorkspaceReadFileResponse {
   error?: string;
 }
 
+export interface AppInfo {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  status: 'running' | 'stopped';
+  lanUrl: string | null;
+  localUrl: string | null;
+  port: number | null;
+}
+
+export interface AppScanResponse {
+  success: boolean;
+  apps: AppInfo[];
+  error?: string;
+}
+
+export interface AppPublishResponse {
+  success: boolean;
+  lanUrl?: string;
+  localUrl?: string;
+  port?: number;
+  error?: string;
+}
+
 export interface UpdateInfo {
   version: string;
   releaseDate: string;
   releaseNotes?: string;
 }
+
+export type UpdateChannel = 'stable' | 'nightly';
 
 export interface UpdateStatus {
   checking: boolean;
@@ -121,6 +148,7 @@ export interface UpdateStatus {
   error: string | null;
   updateInfo: UpdateInfo | null;
   lastCheckComplete: boolean;
+  updateChannel: UpdateChannel;
 }
 
 export interface ThinkingStart {
@@ -227,6 +255,11 @@ export interface ElectronAPI {
     readFile: (relativePath: string) => Promise<WorkspaceReadFileResponse>;
     openFile: (relativePath: string) => Promise<{ success: boolean; error?: string }>;
   };
+  app: {
+    scan: () => Promise<AppScanResponse>;
+    publish: (appId: string) => Promise<AppPublishResponse>;
+    stop: (appId: string) => Promise<{ success: boolean; error?: string }>;
+  };
   conversation: {
     list: () => Promise<ConversationListResponse>;
     create: (messages: unknown[], sessionId?: string | null) => Promise<ConversationCreateResponse>;
@@ -244,6 +277,8 @@ export interface ElectronAPI {
     check: () => Promise<{ success: boolean }>;
     download: () => Promise<{ success: boolean }>;
     install: () => Promise<{ success: boolean }>;
+    getChannel: () => Promise<{ channel: UpdateChannel }>;
+    setChannel: (channel: UpdateChannel) => Promise<{ success: boolean; channel: UpdateChannel }>;
     onStatusChanged: (callback: (status: UpdateStatus) => void) => () => void;
   };
 }

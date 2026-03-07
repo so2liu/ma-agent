@@ -154,11 +154,19 @@ contextBridge.exposeInMainWorld('electron', {
     readFile: (relativePath: string) => ipcRenderer.invoke('workspace:read-file', relativePath),
     openFile: (relativePath: string) => ipcRenderer.invoke('workspace:open-file', relativePath)
   },
+  app: {
+    scan: () => ipcRenderer.invoke('app:scan'),
+    publish: (appId: string) => ipcRenderer.invoke('app:publish', appId),
+    stop: (appId: string) => ipcRenderer.invoke('app:stop', appId)
+  },
   update: {
     getStatus: () => ipcRenderer.invoke('update:get-status'),
     check: () => ipcRenderer.invoke('update:check'),
     download: () => ipcRenderer.invoke('update:download'),
     install: () => ipcRenderer.invoke('update:install'),
+    getChannel: () => ipcRenderer.invoke('update:get-channel'),
+    setChannel: (channel: 'stable' | 'nightly') =>
+      ipcRenderer.invoke('update:set-channel', channel),
     onStatusChanged: (
       callback: (status: {
         checking: boolean;
@@ -173,6 +181,7 @@ contextBridge.exposeInMainWorld('electron', {
           releaseNotes?: string;
         } | null;
         lastCheckComplete: boolean;
+        updateChannel: 'stable' | 'nightly';
       }) => void
     ) => {
       const listener = (
@@ -190,6 +199,7 @@ contextBridge.exposeInMainWorld('electron', {
             releaseNotes?: string;
           } | null;
           lastCheckComplete: boolean;
+          updateChannel: 'stable' | 'nightly';
         }
       ) => callback(status);
       ipcRenderer.on('update:status-changed', listener);

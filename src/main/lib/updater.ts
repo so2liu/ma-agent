@@ -1,6 +1,9 @@
 import { app, BrowserWindow } from 'electron';
 import electronUpdater from 'electron-updater';
 
+import type { UpdateChannel } from './config';
+import { getUpdateChannel } from './config';
+
 const { autoUpdater } = electronUpdater;
 
 let mainWindow: BrowserWindow | null = null;
@@ -23,6 +26,7 @@ export interface UpdateStatus {
   error: string | null;
   updateInfo: UpdateInfo | null;
   lastCheckComplete: boolean; // True when a manual check just completed
+  updateChannel: UpdateChannel;
 }
 
 let currentStatus: UpdateStatus = {
@@ -33,12 +37,23 @@ let currentStatus: UpdateStatus = {
   readyToInstall: false,
   error: null,
   updateInfo: null,
-  lastCheckComplete: false
+  lastCheckComplete: false,
+  updateChannel: getUpdateChannel()
 };
 
 // Configure autoUpdater
 autoUpdater.autoDownload = false; // Don't auto-download, let user decide
 autoUpdater.autoInstallOnAppQuit = true; // Auto-install on quit after download
+
+// Allow prereleases based on update channel setting
+function syncAllowPrerelease(): void {
+  const channel = getUpdateChannel();
+  autoUpdater.allowPrerelease = channel === 'nightly';
+  currentStatus = { ...currentStatus, updateChannel: channel };
+}
+
+// Initialize prerelease setting
+syncAllowPrerelease();
 
 // Configure update feed if provided
 if (updateFeedUrl) {
@@ -57,6 +72,25 @@ if (updateFeedUrl) {
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
 let checkInterval: NodeJS.Timeout | null = null;
+let pendingTimeouts: NodeJS.Timeout[] = [];
+// Incremented on channel switch to discard stale autoUpdater events
+let updateGeneration = 0;
+let activeGeneration = 0;
+
+function scheduleStatusReset(fn: () => void, ms: number): void {
+  const timeout = setTimeout(() => {
+    pendingTimeouts = pendingTimeouts.filter((t) => t !== timeout);
+    fn();
+  }, ms);
+  pendingTimeouts.push(timeout);
+}
+
+function clearPendingTimeouts(): void {
+  for (const t of pendingTimeouts) {
+    clearTimeout(t);
+  }
+  pendingTimeouts = [];
+}
 
 export function initializeUpdater(window: BrowserWindow | null): void {
   mainWindow = window;
@@ -72,6 +106,7 @@ export function initializeUpdater(window: BrowserWindow | null): void {
   });
 
   autoUpdater.on('update-available', (info) => {
+    if (activeGeneration !== updateGeneration) return;
     let releaseDate: string;
     try {
       const releaseDateValue = info.releaseDate as Date | string | undefined;
@@ -121,6 +156,7 @@ export function initializeUpdater(window: BrowserWindow | null): void {
   });
 
   autoUpdater.on('update-not-available', () => {
+    if (activeGeneration !== updateGeneration) return;
     currentStatus = {
       ...currentStatus,
       checking: false,
@@ -130,7 +166,7 @@ export function initializeUpdater(window: BrowserWindow | null): void {
     };
     notifyStatusChange();
     // Clear the check complete flag after 3 seconds
-    setTimeout(() => {
+    scheduleStatusReset(() => {
       currentStatus = {
         ...currentStatus,
         lastCheckComplete: false
@@ -149,7 +185,7 @@ export function initializeUpdater(window: BrowserWindow | null): void {
     };
     notifyStatusChange();
     // Clear error after 5 seconds
-    setTimeout(() => {
+    scheduleStatusReset(() => {
       currentStatus = {
         ...currentStatus,
         lastCheckComplete: false,
@@ -160,6 +196,7 @@ export function initializeUpdater(window: BrowserWindow | null): void {
   });
 
   autoUpdater.on('download-progress', (progress) => {
+    if (activeGeneration !== updateGeneration) return;
     currentStatus = {
       ...currentStatus,
       downloading: true,
@@ -169,6 +206,7 @@ export function initializeUpdater(window: BrowserWindow | null): void {
   });
 
   autoUpdater.on('update-downloaded', () => {
+    if (activeGeneration !== updateGeneration) return;
     currentStatus = {
       ...currentStatus,
       downloading: false,
@@ -188,6 +226,9 @@ function notifyStatusChange(): void {
 export function checkForUpdates(): void {
   const isDev = process.env.ELECTRON_RENDERER_URL !== undefined;
 
+  // Sync prerelease setting before checking
+  syncAllowPrerelease();
+
   // Only check in production (not in dev mode)
   if (isDev && !hasCustomFeed) {
     console.log('Skipping update check in development mode');
@@ -198,7 +239,7 @@ export function checkForUpdates(): void {
       error: 'Update checks are disabled in development mode'
     };
     notifyStatusChange();
-    setTimeout(() => {
+    scheduleStatusReset(() => {
       currentStatus = {
         ...currentStatus,
         lastCheckComplete: false,
@@ -218,7 +259,7 @@ export function checkForUpdates(): void {
       error: 'Auto-update feed is not configured'
     };
     notifyStatusChange();
-    setTimeout(() => {
+    scheduleStatusReset(() => {
       currentStatus = {
         ...currentStatus,
         lastCheckComplete: false,
@@ -235,6 +276,7 @@ export function checkForUpdates(): void {
   }
 
   // Reset check complete flag
+  activeGeneration = updateGeneration;
   currentStatus = {
     ...currentStatus,
     lastCheckComplete: false,
@@ -252,7 +294,7 @@ export function checkForUpdates(): void {
     };
     notifyStatusChange();
     // Clear error after 5 seconds
-    setTimeout(() => {
+    scheduleStatusReset(() => {
       currentStatus = {
         ...currentStatus,
         lastCheckComplete: false,
@@ -290,6 +332,31 @@ export function installUpdate(): void {
 
 export function getUpdateStatus(): UpdateStatus {
   return { ...currentStatus };
+}
+
+/**
+ * Called when the user changes the update channel.
+ * Syncs the allowPrerelease setting and triggers an immediate check.
+ */
+export function onUpdateChannelChanged(): void {
+  // Increment generation to discard stale autoUpdater events from previous channel
+  updateGeneration++;
+  clearPendingTimeouts();
+  syncAllowPrerelease();
+  // Reset any existing update state when switching channels
+  currentStatus = {
+    ...currentStatus,
+    checking: false,
+    updateAvailable: false,
+    readyToInstall: false,
+    downloadProgress: 0,
+    downloading: false,
+    updateInfo: null,
+    error: null
+  };
+  notifyStatusChange();
+  // Check for updates immediately with new channel setting
+  checkForUpdates();
 }
 
 export function startPeriodicUpdateCheck(): void {

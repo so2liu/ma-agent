@@ -1,6 +1,8 @@
 import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import type { UpdateChannel } from '@/electron';
+
 interface SettingsProps {
   onBack: () => void;
 }
@@ -63,6 +65,10 @@ function Settings({ onBack }: SettingsProps) {
   const [isSavingBaseUrl, setIsSavingBaseUrl] = useState(false);
   const [baseUrlSaveState, setBaseUrlSaveState] = useState<'idle' | 'success' | 'error'>('idle');
 
+  const [updateChannel, setUpdateChannel] = useState<UpdateChannel>('stable');
+  const [isLoadingChannel, setIsLoadingChannel] = useState(true);
+  const [isSavingChannel, setIsSavingChannel] = useState(false);
+
   useEffect(() => {
     // Load current workspace directory
     window.electron.config
@@ -105,6 +111,17 @@ function Settings({ onBack }: SettingsProps) {
       })
       .catch(() => {
         setIsLoadingBaseUrl(false);
+      });
+
+    // Load update channel
+    window.electron.update
+      .getChannel()
+      .then((response) => {
+        setUpdateChannel(response.channel);
+        setIsLoadingChannel(false);
+      })
+      .catch(() => {
+        setIsLoadingChannel(false);
       });
   }, []);
 
@@ -265,7 +282,20 @@ function Settings({ onBack }: SettingsProps) {
     }
   };
 
-  const isFormLoading = isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl;
+  const handleToggleUpdateChannel = async () => {
+    setIsSavingChannel(true);
+    const newChannel: UpdateChannel = updateChannel === 'stable' ? 'nightly' : 'stable';
+    try {
+      const response = await window.electron.update.setChannel(newChannel);
+      setUpdateChannel(response.channel);
+    } catch {
+      // Revert on error
+    } finally {
+      setIsSavingChannel(false);
+    }
+  };
+
+  const isFormLoading = isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl || isLoadingChannel;
   const apiKeyPlaceholder = apiKeyStatus.lastFour ? `...${apiKeyStatus.lastFour}` : 'sk-ant-...';
 
   return (
@@ -462,6 +492,51 @@ function Settings({ onBack }: SettingsProps) {
                         Failed to update workspace directory
                       </p>
                     )}
+                  </section>
+
+                  <div className="border-t border-neutral-200/80 dark:border-neutral-800" />
+
+                  {/* Update Channel */}
+                  <section className="space-y-4">
+                    <div>
+                      <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-50">
+                        Update Channel
+                      </h2>
+                      <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                        Choose between stable releases or nightly builds. Nightly builds may be
+                        unstable.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-neutral-200/80 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/50">
+                      <div>
+                        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                          {updateChannel === 'nightly' ? 'Nightly' : 'Stable'}
+                        </p>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                          {updateChannel === 'nightly'
+                            ? 'Receiving nightly builds from main branch.'
+                            : 'Receiving stable releases only.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleToggleUpdateChannel}
+                        disabled={isSavingChannel}
+                        className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer items-center rounded-full border border-transparent px-0.5 transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-neutral-900/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
+                          updateChannel === 'nightly'
+                            ? 'bg-neutral-900 dark:bg-neutral-100'
+                            : 'bg-neutral-200 dark:bg-neutral-700'
+                        }`}
+                        role="switch"
+                        aria-checked={updateChannel === 'nightly'}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            updateChannel === 'nightly' ? 'translate-x-7' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </section>
 
                   <div className="border-t border-neutral-200/80 dark:border-neutral-800" />
