@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import AttachmentPreviewList from '@/components/AttachmentPreviewList';
+import SlashCommandMenu from '@/components/SlashCommandMenu';
+import { useSlashCommand } from '@/hooks/useSlashCommand';
 
 import type { ChatModelPreference, CustomModelIds } from '../../shared/types/ipc';
 import { DEFAULT_MODEL_NAMES, MODEL_LABELS, MODEL_TOOLTIPS } from '../../shared/types/ipc';
@@ -63,6 +65,7 @@ export default function ChatInput({
   const dragCounterRef = useRef(0);
   const [isDragActive, setIsDragActive] = useState(false);
   const computedCanSend = canSend ?? Boolean(value.trim());
+  const slash = useSlashCommand(value);
 
   const MODEL_OPTIONS: ChatModelPreference[] = ['fast', 'smart-sonnet', 'smart-opus'];
   const [hoveredModel, setHoveredModel] = useState<ChatModelPreference | null>(null);
@@ -108,7 +111,48 @@ export default function ChatInput({
     }
   }, [autoFocus]);
 
+  const handleSlashSelect = useCallback(
+    (item: Parameters<typeof SlashCommandMenu>[0]['items'][number]) => {
+      if (item.prefillPrompt) {
+        onChange(item.prefillPrompt);
+      } else {
+        onChange(`/${item.name} `);
+      }
+      textareaRef.current?.focus();
+    },
+    [onChange],
+  );
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Skip during IME composition (e.g. pinyin input)
+    if (e.nativeEvent.isComposing) return;
+
+    if (slash.isOpen) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        slash.dismiss();
+        return;
+      }
+      if (slash.items.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          slash.moveSelection(1);
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          slash.moveSelection(-1);
+          return;
+        }
+        if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+          e.preventDefault();
+          const selected = slash.getSelectedItem();
+          if (selected) handleSlashSelect(selected);
+          return;
+        }
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (!isLoading && computedCanSend) {
@@ -273,6 +317,17 @@ export default function ChatInput({
 
           {attachmentError && (
             <p className="px-3 pb-2 text-xs text-red-600 dark:text-red-400">{attachmentError}</p>
+          )}
+
+          {slash.isOpen && (
+            <div className="px-1 pb-1">
+              <SlashCommandMenu
+                items={slash.items}
+                selectedIndex={slash.selectedIndex}
+                onSelect={handleSlashSelect}
+                onHover={slash.setSelectedIndex}
+              />
+            </div>
           )}
 
           <textarea

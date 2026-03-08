@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { Switch } from '@/components/ui/switch';
@@ -6,10 +6,6 @@ import type { UpdateChannel } from '@/electron';
 
 import type { ChatModelPreference, CustomModelIds } from '../../shared/types/ipc';
 import { DEFAULT_MODEL_NAMES, MODEL_LABELS, MODEL_TOOLTIPS } from '../../shared/types/ipc';
-
-interface SettingsProps {
-  onBack: () => void;
-}
 
 type ApiKeyStatus = {
   configured: boolean;
@@ -22,7 +18,7 @@ type TestResult = {
   message?: string;
 };
 
-function Settings({ onBack }: SettingsProps) {
+function Settings() {
   const [workspaceDir, setWorkspaceDir] = useState('');
   const [currentWorkspaceDir, setCurrentWorkspaceDir] = useState('');
   const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
@@ -189,13 +185,6 @@ function Settings({ onBack }: SettingsProps) {
     }
   }, [isDebugExpanded, pathInfo, envVars, diagnosticMetadata]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onBack();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onBack]);
 
   const handleSaveWorkspace = async () => {
     setIsSavingWorkspace(true);
@@ -365,7 +354,7 @@ function Settings({ onBack }: SettingsProps) {
     'rounded-lg border border-red-200 px-4 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20';
 
   return (
-    <div className="flex h-screen flex-col bg-white dark:bg-neutral-900">
+    <div className="flex h-full flex-col" style={{ background: 'var(--color-content-bg)' }}>
       {/* Titlebar drag region */}
       <div
         className="shrink-0 [-webkit-app-region:drag]"
@@ -374,12 +363,6 @@ function Settings({ onBack }: SettingsProps) {
 
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-        <button
-          onClick={onBack}
-          className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
         <h1 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">设置</h1>
       </div>
 
