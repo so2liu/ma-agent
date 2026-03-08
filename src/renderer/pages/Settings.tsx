@@ -31,6 +31,11 @@ function Settings() {
   const [isLoadingDebugMode, setIsLoadingDebugMode] = useState(true);
   const [isSavingDebugMode, setIsSavingDebugMode] = useState(false);
 
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
+  const [analyticsShareConversation, setAnalyticsShareConversation] = useState(false);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(true);
+  const [isSavingAnalytics, setIsSavingAnalytics] = useState(false);
+
   const [isDebugExpanded, setIsDebugExpanded] = useState(false);
   const [pathInfo, setPathInfo] = useState<{
     platform: string;
@@ -139,6 +144,15 @@ function Settings() {
         setIsLoadingChannel(false);
       })
       .catch(() => setIsLoadingChannel(false));
+
+    window.electron.analytics
+      .getSettings()
+      .then((settings) => {
+        setAnalyticsEnabled(settings.enabled);
+        setAnalyticsShareConversation(settings.shareConversationOnFeedback);
+        setIsLoadingAnalytics(false);
+      })
+      .catch(() => setIsLoadingAnalytics(false));
   }, []);
 
   const loadPathInfo = async () => {
@@ -339,8 +353,36 @@ function Settings() {
     }
   };
 
+  const handleToggleAnalytics = async () => {
+    setIsSavingAnalytics(true);
+    const newValue = !analyticsEnabled;
+    try {
+      const settings = await window.electron.analytics.setSettings({ enabled: newValue });
+      setAnalyticsEnabled(settings.enabled);
+    } catch {
+      setAnalyticsEnabled(!newValue);
+    } finally {
+      setIsSavingAnalytics(false);
+    }
+  };
+
+  const handleToggleShareConversation = async () => {
+    setIsSavingAnalytics(true);
+    const newValue = !analyticsShareConversation;
+    try {
+      const settings = await window.electron.analytics.setSettings({
+        shareConversationOnFeedback: newValue
+      });
+      setAnalyticsShareConversation(settings.shareConversationOnFeedback);
+    } catch {
+      setAnalyticsShareConversation(!newValue);
+    } finally {
+      setIsSavingAnalytics(false);
+    }
+  };
+
   const isFormLoading =
-    isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl || isLoadingChannel;
+    isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl || isLoadingChannel || isLoadingAnalytics;
   const apiKeyPlaceholder = apiKeyStatus.lastFour ? `...${apiKeyStatus.lastFour}` : 'sk-ant-...';
 
   // Shared styles
@@ -641,6 +683,50 @@ function Settings() {
                   checked={updateChannel === 'stable'}
                   onCheckedChange={() => handleToggleUpdateChannel()}
                   disabled={isSavingChannel}
+                />
+              </div>
+            </section>
+
+            <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+            {/* Analytics & Privacy */}
+            <section className="space-y-3">
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                  数据与隐私
+                </h2>
+                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                  控制匿名使用统计和反馈数据的收集
+                </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                    发送匿名使用统计
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
+                    帮助我们改进产品，仅收集功能使用频率
+                  </p>
+                </div>
+                <Switch
+                  checked={analyticsEnabled}
+                  onCheckedChange={() => handleToggleAnalytics()}
+                  disabled={isSavingAnalytics}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                    反馈时分享脱敏后的对话内容
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
+                    点踩时，AI 会先去除隐私信息再上报对话内容（即将推出）
+                  </p>
+                </div>
+                <Switch
+                  checked={analyticsShareConversation}
+                  onCheckedChange={() => handleToggleShareConversation()}
+                  disabled={isSavingAnalytics || !analyticsEnabled}
                 />
               </div>
             </section>

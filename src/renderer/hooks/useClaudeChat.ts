@@ -162,6 +162,11 @@ export function useClaudeChat(): {
 
     // Listen for tool use start
     const unsubscribeToolUseStart = window.electron.chat.onToolUseStart((tool: ToolUse) => {
+      window.electron.analytics.trackEvent({
+        type: 'tool_used',
+        timestamp: Date.now(),
+        properties: { toolName: tool.name }
+      });
       setMessages((prev) => {
         const lastMessage = prev[prev.length - 1];
         const toolBlock = {
@@ -477,6 +482,7 @@ export function useClaudeChat(): {
     const unsubscribeMessageComplete = window.electron.chat.onMessageComplete(() => {
       isStreamingRef.current = false;
       setIsLoading(false);
+      window.electron.analytics.trackEvent({ type: 'message_completed', timestamp: Date.now() });
 
       // Append all accumulated debug messages when response completes
       if (debugMessagesRef.current.length > 0) {
@@ -532,6 +538,7 @@ export function useClaudeChat(): {
     const unsubscribeMessageStopped = window.electron.chat.onMessageStopped(() => {
       isStreamingRef.current = false;
       setIsLoading(false);
+      window.electron.analytics.trackEvent({ type: 'message_stopped', timestamp: Date.now() });
 
       // Get accumulated debug messages
       const accumulatedDebug =
@@ -601,6 +608,7 @@ export function useClaudeChat(): {
     // Listen for errors
     const unsubscribeMessageError = window.electron.chat.onMessageError((error: string) => {
       isStreamingRef.current = false;
+      window.electron.analytics.trackEvent({ type: 'message_error', timestamp: Date.now() });
 
       // Append all accumulated debug messages when error occurs
       if (debugMessagesRef.current.length > 0) {

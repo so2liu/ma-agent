@@ -11,6 +11,7 @@ interface MessageListProps {
   containerRef: RefObject<HTMLDivElement | null>;
   bottomPadding?: number;
   onDeliverablePreview?: (deliverable: Deliverable) => void;
+  conversationId?: string | null;
 }
 
 export default function MessageList({
@@ -18,7 +19,8 @@ export default function MessageList({
   isLoading,
   containerRef,
   bottomPadding,
-  onDeliverablePreview
+  onDeliverablePreview,
+  conversationId
 }: MessageListProps) {
   const containerStyle: CSSProperties | undefined =
     bottomPadding ? { paddingBottom: bottomPadding } : undefined;
@@ -36,6 +38,7 @@ export default function MessageList({
             message={message}
             isLoading={isLoading && index === messages.length - 1}
             onDeliverablePreview={onDeliverablePreview}
+            conversationId={conversationId}
           />
         ))}
         {isLoading && (

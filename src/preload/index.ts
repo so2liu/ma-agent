@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type { ChatModelPreference, CustomModelIds, SendMessagePayload } from '../shared/types/ipc';
+import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -230,6 +231,15 @@ contextBridge.exposeInMainWorld('electron', {
     ) => ipcRenderer.invoke('schedule:update', id, updates),
     delete: (id: string) => ipcRenderer.invoke('schedule:delete', id),
     runNow: (id: string) => ipcRenderer.invoke('schedule:run-now', id),
+  },
+  analytics: {
+    trackEvent: (event: AnalyticsEvent) => ipcRenderer.invoke('analytics:track-event', event),
+    submitFeedback: (feedback: MessageFeedback) =>
+      ipcRenderer.invoke('analytics:submit-feedback', feedback),
+    getSettings: () =>
+      ipcRenderer.invoke('analytics:get-settings') as Promise<AnalyticsSettings>,
+    setSettings: (settings: Partial<AnalyticsSettings>) =>
+      ipcRenderer.invoke('analytics:set-settings', settings) as Promise<AnalyticsSettings>
   },
   update: {
     getStatus: () => ipcRenderer.invoke('update:get-status'),

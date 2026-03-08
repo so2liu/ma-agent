@@ -11,6 +11,7 @@ import MessageList from '@/components/MessageList';
 import ResizeHandle from '@/components/ResizeHandle';
 import SkillCardGrid from '@/components/SkillCardGrid';
 import DragRegion from '@/components/TitleBar';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
 import type { AppInfo } from '@/electron';
@@ -187,6 +188,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversati
   const [apps, setApps] = useState<AppInfo[]>([]);
   const projectIdForNewChatRef = useRef<string | null>(null);
   const { messages, setMessages, isLoading, setIsLoading } = useClaudeChat();
+  const { track } = useAnalytics();
   const messagesContainerRef = useAutoScroll(isLoading, messages);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef(true);
@@ -300,7 +302,10 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversati
         accepted.push({ id: crypto.randomUUID(), file, previewUrl, previewIsBlobUrl, isImage });
       }
 
-      if (accepted.length > 0) setPendingAttachments((prev) => [...prev, ...accepted]);
+      if (accepted.length > 0) {
+        setPendingAttachments((prev) => [...prev, ...accepted]);
+        track('attachment_added', { count: accepted.length });
+      }
       if (rejectionMessage) setAttachmentError(rejectionMessage);
       else if (accepted.length > 0) setAttachmentError(null);
     };
@@ -351,6 +356,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversati
           );
           if (response.success && response.conversation) {
             setCurrentConversationId(response.conversation.id);
+            track('conversation_created');
             const projectId = projectIdForNewChatRef.current;
             if (projectId) {
               await window.electron.conversation.setProject(
@@ -368,7 +374,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversati
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [messages, currentConversationId, currentSessionId, setCurrentConversationId]);
+  }, [messages, currentConversationId, currentSessionId, setCurrentConversationId, track]);
 
   useEffect(() => {
     const unsubscribe = window.electron.chat.onSessionUpdated(({ sessionId }) => {
@@ -459,6 +465,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversati
     const hasSendableContent = trimmedMessage.length > 0 || pendingAttachments.length > 0;
     if (!hasSendableContent || isLoading) return;
 
+    const hasAttachments = pendingAttachments.length > 0;
     const attachmentsToSend = pendingAttachments;
     if (attachmentsToSend.length > 0) setPendingAttachments([]);
     setAttachmentError(null);
@@ -513,6 +520,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversati
         text: trimmedMessage,
         attachments: serializedAttachments.length > 0 ? serializedAttachments : undefined
       });
+      track('message_sent', { model: modelPreference, hasAttachments });
       if (!response.success && response.error) {
         const errorMessage = {
           id: (Date.now() + 1).toString(),
@@ -614,8 +622,11 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversati
       if (!response.success) {
         console.error('Error updating model preference:', response.error);
         setModelPreference(response.preference ?? previousPreference);
-      } else if (response.preference) {
-        setModelPreference(response.preference);
+      } else {
+        track('model_switched', { from: previousPreference, to: preference });
+        if (response.preference) {
+          setModelPreference(response.preference);
+        }
       }
     } catch (error) {
       console.error('Error updating model preference:', error);
@@ -727,6 +738,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversati
                 isLoading={isLoading}
                 containerRef={messagesContainerRef}
                 bottomPadding={messageListBottomPadding}
+                conversationId={currentConversationId}
                 onDeliverablePreview={(d) =>
                   setSelectedArtifact({
                     id: d.id,
