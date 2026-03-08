@@ -3,12 +3,13 @@ import { createRequire } from 'module';
 import { query, type Query } from '@anthropic-ai/claude-agent-sdk';
 import type { BrowserWindow } from 'electron';
 
-import type { ChatModelPreference } from '../../shared/types/ipc';
+import { DEFAULT_MODEL_IDS, type ChatModelPreference } from '../../shared/types/ipc';
 import {
   buildClaudeSessionEnv,
   getApiKey,
   getChatModelPreferenceSetting,
   getCustomModelId,
+  getCustomModelIds,
   getDebugMode,
   getWorkspaceDir,
   setChatModelPreferenceSetting
@@ -26,15 +27,7 @@ import { endSessionLog, logSessionEvent, startSessionLog } from './session-logge
 
 const requireModule = createRequire(import.meta.url);
 
-const FAST_MODEL_ID = 'claude-haiku-4-5-20251001';
-const SMART_SONNET_MODEL_ID = 'claude-sonnet-4-5-20250929';
-const SMART_OPUS_MODEL_ID = 'claude-opus-4-5-20251101';
-
-export const MODEL_BY_PREFERENCE: Record<ChatModelPreference, string> = {
-  fast: FAST_MODEL_ID,
-  'smart-sonnet': SMART_SONNET_MODEL_ID,
-  'smart-opus': SMART_OPUS_MODEL_ID
-};
+export const MODEL_BY_PREFERENCE = DEFAULT_MODEL_IDS;
 
 let currentModelPreference: ChatModelPreference = getChatModelPreferenceSetting();
 
@@ -88,12 +81,19 @@ let isInterruptingResponse = false;
 const streamIndexToToolId: Map<number, string> = new Map();
 let pendingResumeSessionId: string | null = null;
 
-function getModelIdForPreference(preference: ChatModelPreference = currentModelPreference): string {
+export function getModelIdForPreference(preference: ChatModelPreference = currentModelPreference): string {
+  // Per-tier custom model ID (set in Settings > 模型配置)
+  const customModelIds = getCustomModelIds();
+  const perTierCustom = customModelIds[preference]?.trim();
+  if (perTierCustom) {
+    return perTierCustom;
+  }
+  // Legacy single custom model override (developer info, kept for backward compat)
   const customModelId = getCustomModelId();
   if (customModelId) {
     return customModelId;
   }
-  return MODEL_BY_PREFERENCE[preference] ?? FAST_MODEL_ID;
+  return MODEL_BY_PREFERENCE[preference] ?? DEFAULT_MODEL_IDS.fast;
 }
 
 export function getCurrentModelPreference(): ChatModelPreference {

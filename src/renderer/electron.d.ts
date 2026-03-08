@@ -1,5 +1,6 @@
 import type {
   ChatModelPreference,
+  CustomModelIds,
   GetChatModelPreferenceResponse,
   SendMessagePayload,
   SendMessageResponse,
@@ -374,6 +375,11 @@ export interface ElectronAPI {
     setCustomModelId: (modelId?: string | null) => Promise<{
       success: boolean;
       customModelId: string | null;
+    }>;
+    getCustomModelIds: () => Promise<{ customModelIds: CustomModelIds }>;
+    setCustomModelIds: (ids: CustomModelIds) => Promise<{
+      success: boolean;
+      customModelIds: CustomModelIds;
     }>;
     testApi: (params?: {
       apiKey?: string;

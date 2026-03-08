@@ -17,6 +17,40 @@ export const MODEL_LABELS: Record<ChatModelPreference, string> = {
   'smart-opus': '强力'
 };
 
+/** Default model IDs — single source of truth for both runtime and UI */
+export const DEFAULT_MODEL_IDS: Record<ChatModelPreference, string> = {
+  fast: 'claude-haiku-4-5-20251001',
+  'smart-sonnet': 'claude-sonnet-4-5-20250929',
+  'smart-opus': 'claude-opus-4-5-20251101'
+};
+
+/** Friendly display names for the default models */
+export const DEFAULT_MODEL_NAMES: Record<ChatModelPreference, string> = {
+  fast: 'Claude Haiku 4.5',
+  'smart-sonnet': 'Claude Sonnet 4.5',
+  'smart-opus': 'Claude Opus 4.5'
+};
+
+export const MODEL_TOOLTIPS: Record<
+  ChatModelPreference,
+  { description: string; suggestions: string[] }
+> = {
+  fast: {
+    description: '响应速度最快，适合简单的翻译、问答、格式转换等任务',
+    suggestions: [DEFAULT_MODEL_IDS.fast, DEFAULT_MODEL_IDS['smart-sonnet']]
+  },
+  'smart-sonnet': {
+    description: '速度和质量兼顾，适合日常办公使用（推荐）',
+    suggestions: [DEFAULT_MODEL_IDS['smart-sonnet'], DEFAULT_MODEL_IDS['smart-opus']]
+  },
+  'smart-opus': {
+    description: '最强大的分析能力，适合复杂数据分析、长文写作',
+    suggestions: [DEFAULT_MODEL_IDS['smart-opus'], DEFAULT_MODEL_IDS['smart-sonnet']]
+  }
+};
+
+export type CustomModelIds = Partial<Record<ChatModelPreference, string>>;
+
 export interface SerializedAttachmentPayload {
   name: string;
   mimeType: string;

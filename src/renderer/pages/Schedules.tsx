@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Clock,
   Pause,
   Play,
@@ -12,10 +11,6 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { ScheduledTask } from '@/electron';
 import { MODEL_LABELS, type ChatModelPreference } from '../../shared/types/ipc';
-
-interface SchedulesProps {
-  onBack: () => void;
-}
 
 const CRON_PRESETS = [
   { label: '每 15 分钟', value: '*/15 * * * *' },
@@ -42,7 +37,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
   skipped: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', label: '已跳过' },
 };
 
-export default function Schedules({ onBack }: SchedulesProps) {
+export default function Schedules() {
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -181,16 +176,10 @@ export default function Schedules({ onBack }: SchedulesProps) {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-white dark:bg-neutral-900">
+    <div className="flex h-full flex-col" style={{ background: 'var(--color-content-bg)' }}>
       {/* Header */}
       <div className="shrink-0 [-webkit-app-region:drag]" style={{ height: 'var(--titlebar-height)' }} />
       <div className="flex shrink-0 items-center gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-        <button
-          onClick={onBack}
-          className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
         <h1 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
           定时任务
         </h1>

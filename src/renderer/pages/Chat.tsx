@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Group, Panel } from 'react-resizable-panels';
 
 import type { Artifact } from '@/components/ArtifactPanel';
@@ -9,7 +9,6 @@ import FileTree from '@/components/FileTree';
 import FloatingTaskPanel from '@/components/FloatingTaskPanel';
 import MessageList from '@/components/MessageList';
 import ResizeHandle from '@/components/ResizeHandle';
-import Sidebar from '@/components/Sidebar';
 import SkillCardGrid from '@/components/SkillCardGrid';
 import DragRegion from '@/components/TitleBar';
 import { useAnalytics } from '@/hooks/useAnalytics';
@@ -23,7 +22,7 @@ import { friendlyError } from '@/utils/friendlyError';
 
 import { MAX_ATTACHMENT_BYTES } from '../../shared/constants';
 import { getArtifactType, getFileExtension } from '../../shared/file-extensions';
-import type { ChatModelPreference, SerializedAttachmentPayload } from '../../shared/types/ipc';
+import type { ChatModelPreference, CustomModelIds, SerializedAttachmentPayload } from '../../shared/types/ipc';
 
 import { FolderOpen, Globe } from 'lucide-react';
 
@@ -109,12 +108,19 @@ function serializeMessagesForStorage(messages: Message[]): PersistedMessage[] {
   }));
 }
 
+export interface ChatHandle {
+  loadConversation: (id: string) => Promise<void>;
+  newChat: () => Promise<void>;
+  isLoading: () => boolean;
+}
+
 interface ChatProps {
-  onSettingsClick?: () => void;
-  onSkillsClick?: () => void;
-  onSchedulesClick?: () => void;
+  currentConversationId: string | null;
+  setCurrentConversationId: (id: string | null) => void;
+  selectedProjectId: string | null;
+  setSelectedProjectId: (id: string | null) => void;
   onOpenDbViewer?: (appId: string, appName: string) => void;
-  onOnboardingClick?: () => void;
+  onSkillsClick?: () => void;
 }
 
 function TopBarDropdown({
@@ -165,9 +171,8 @@ function TopBarDropdown({
   );
 }
 
-export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick, onOpenDbViewer, onOnboardingClick }: ChatProps) {
+const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversationId, setCurrentConversationId, selectedProjectId, setSelectedProjectId, onOpenDbViewer, onSkillsClick }, ref) {
   const [inputValue, setInputValue] = useState('');
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [chatInputHeight, setChatInputHeight] = useState(0);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
@@ -176,11 +181,11 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
   const [modelPreference, setModelPreference] = useState<ChatModelPreference>('fast');
   const [isModelPreferenceUpdating, setIsModelPreferenceUpdating] = useState(false);
   const [customModelActive, setCustomModelActive] = useState(false);
+  const [customModelIds, setCustomModelIds] = useState<CustomModelIds>({});
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [showFilesDropdown, setShowFilesDropdown] = useState(false);
   const [showAppsDropdown, setShowAppsDropdown] = useState(false);
   const [apps, setApps] = useState<AppInfo[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const projectIdForNewChatRef = useRef<string | null>(null);
   const { messages, setMessages, isLoading, setIsLoading } = useClaudeChat();
   const { track } = useAnalytics();
@@ -226,6 +231,12 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
       .getCustomModelId()
       .then(({ customModelId }) => {
         if (isMounted) setCustomModelActive(Boolean(customModelId?.trim()));
+      })
+      .catch(() => {});
+    window.electron.config
+      .getCustomModelIds()
+      .then(({ customModelIds: ids }) => {
+        if (isMounted) setCustomModelIds(ids || {});
       })
       .catch(() => {});
     return () => {
@@ -363,7 +374,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [messages, currentConversationId, currentSessionId, track]);
+  }, [messages, currentConversationId, currentSessionId, setCurrentConversationId, track]);
 
   useEffect(() => {
     const unsubscribe = window.electron.chat.onSessionUpdated(({ sessionId }) => {
@@ -589,6 +600,12 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
     }
   };
 
+  useImperativeHandle(ref, () => ({
+    loadConversation: handleLoadConversation,
+    newChat: handleNewChat,
+    isLoading: () => isLoading,
+  }));
+
   const INPUT_BOTTOM_OFFSET = 48;
   const DEFAULT_BOTTOM_PADDING = 160;
   const messageListBottomPadding = chatInputHeight > 0 ? chatInputHeight + INPUT_BOTTOM_OFFSET : DEFAULT_BOTTOM_PADDING;
@@ -620,33 +637,9 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
   };
 
   return (
-    <div className="flex h-screen bg-transparent">
-      {/* Three-column layout */}
-      <Group className="flex-1 overflow-hidden">
-        {/* Left sidebar */}
-        <Panel
-          defaultSize="220px"
-          minSize="160px"
-          maxSize="400px"
-          className="[-webkit-app-region:no-drag]"
-        >
-          <Sidebar
-            onLoadConversation={handleLoadConversation}
-            currentConversationId={currentConversationId}
-            onNewChat={handleNewChat}
-            onSettingsClick={onSettingsClick}
-            onSkillsClick={onSkillsClick}
-            onSchedulesClick={onSchedulesClick}
-            onOnboardingClick={onOnboardingClick}
-            selectedProjectId={selectedProjectId}
-            onSelectProject={setSelectedProjectId}
-          />
-        </Panel>
-
-        <ResizeHandle />
-
-        {/* Center: chat area */}
-        <Panel minSize="300px" className="relative flex flex-col overflow-hidden" style={{ background: 'var(--color-content-bg)' }}>
+    <Group className="flex h-full overflow-hidden">
+      {/* Chat area */}
+      <Panel minSize="300px" className="relative flex flex-col overflow-hidden">
           {/* Top bar with drag region and dropdown buttons */}
           <div className="relative shrink-0" style={{ height: 'var(--titlebar-height)' }}>
             <DragRegion />
@@ -728,6 +721,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
                   onModelPreferenceChange={handleModelPreferenceChange}
                   isModelPreferenceUpdating={isModelPreferenceUpdating}
                   customModelActive={customModelActive}
+                  customModelIds={customModelIds}
                 />
               </div>
               <SkillCardGrid
@@ -772,6 +766,8 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
                   modelPreference={modelPreference}
                   onModelPreferenceChange={handleModelPreferenceChange}
                   isModelPreferenceUpdating={isModelPreferenceUpdating}
+                  customModelActive={customModelActive}
+                  customModelIds={customModelIds}
                   floatingPanel={<FloatingTaskPanel messages={messages} />}
                 />
               </div>
@@ -791,7 +787,8 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
             </Panel>
           </>
         )}
-      </Group>
-    </div>
+    </Group>
   );
-}
+});
+
+export default Chat;
