@@ -189,8 +189,8 @@ export default function Schedules({ onBack }: SchedulesProps) {
   return (
     <div className="flex h-screen flex-col bg-white dark:bg-neutral-900">
       {/* Header */}
+      <div className="shrink-0 [-webkit-app-region:drag]" style={{ height: 'var(--titlebar-height)' }} />
       <div className="flex shrink-0 items-center gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-        <div className="h-7 [-webkit-app-region:drag]" />
         <button
           onClick={onBack}
           className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"

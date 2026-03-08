@@ -375,7 +375,7 @@ export default function Sidebar({
   return (
     <div className="flex h-full flex-col border-r border-neutral-200/70 bg-neutral-50/80 dark:border-neutral-800 dark:bg-neutral-900/50">
       {/* Drag region for macOS traffic lights */}
-      <div className="h-7 shrink-0 [-webkit-app-region:drag]" />
+      <div className="shrink-0 [-webkit-app-region:drag]" style={{ height: 'var(--titlebar-height)' }} />
 
       {/* Brand */}
       <div className="shrink-0 px-3 pb-2.5">

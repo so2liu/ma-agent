@@ -129,8 +129,9 @@ export default function Skills({ onBack }: SkillsProps) {
   return (
     <div className="flex h-screen flex-col bg-white dark:bg-neutral-950">
       {/* Header with drag region */}
-      <div className="shrink-0 [-webkit-app-region:drag]">
-        <div className="flex items-center gap-3 px-4 pt-8 pb-3 [-webkit-app-region:no-drag]">
+      <div className="shrink-0 [-webkit-app-region:drag]" style={{ height: 'var(--titlebar-height)' }} />
+      <div className="shrink-0">
+        <div className="flex items-center gap-3 px-4 py-3 [-webkit-app-region:no-drag]">
           <button
             onClick={onBack}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
