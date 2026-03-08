@@ -637,7 +637,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
         {/* Center: chat area */}
         <Panel minSize="300px" className="relative flex flex-col overflow-hidden" style={{ background: 'var(--color-content-bg)' }}>
           {/* Top bar with drag region and dropdown buttons */}
-          <div className="relative shrink-0">
+          <div className="relative shrink-0" style={{ height: 'var(--titlebar-height)' }}>
             <DragRegion />
             {/* Right-side dropdown buttons */}
             <div className="absolute top-1/2 right-3 z-10 flex -translate-y-1/2 items-center gap-1">
@@ -721,6 +721,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
               </div>
               <SkillCardGrid
                 onSelectSkill={(prompt) => setInputValue(prompt)}
+                onMoreClick={onSkillsClick}
                 currentInput={inputValue}
               />
             </div>
