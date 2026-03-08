@@ -66,7 +66,7 @@
   },
   "build": {
     "appId": "com.pheuter.claude-agent-desktop",
-    "productName": "Claude Agent Desktop",
+    "productName": "ma-agent",
     "icon": "static/icon.png",
     "beforeBuild": "scripts/beforeBuild.js",
     "afterPack": "scripts/afterPack.js",
@@ -94,7 +94,6 @@
     ],
     "mac": {
       "target": [
-        "dmg",
         "zip"
       ],
       "category": "public.app-category.developer-tools",
@@ -108,9 +107,9 @@
       "entitlements": "resources/entitlements.mac.plist",
       "entitlementsInherit": "resources/entitlements.mac.inherit.plist",
       "extendInfo": {
-        "NSDesktopFolderUsageDescription": "Claude Agent Desktop needs access to your Desktop folder to create and manage workspace files.",
-        "NSDocumentsFolderUsageDescription": "Claude Agent Desktop needs access to your Documents folder to read and write files.",
-        "NSDownloadsFolderUsageDescription": "Claude Agent Desktop needs access to your Downloads folder to read and write files."
+        "NSDesktopFolderUsageDescription": "ma-agent needs access to your Desktop folder to create and manage workspace files.",
+        "NSDocumentsFolderUsageDescription": "ma-agent needs access to your Documents folder to read and write files.",
+        "NSDownloadsFolderUsageDescription": "ma-agent needs access to your Downloads folder to read and write files."
       },
       "extraResources": [
         {

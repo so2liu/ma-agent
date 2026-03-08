@@ -91,15 +91,18 @@ jobs:
         run: |
           npx electron-builder --mac --${{ matrix.arch }} -c.mac.notarize=false --publish never
 
+      - name: Generate checksums
+        run: |
+          cd dist
+          shasum -a 256 *.zip > checksums.txt
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.arch }}
           path: |
             dist/*.zip
-            dist/*.dmg
-            dist/*.blockmap
-            dist/latest-mac*.yml
+            dist/checksums.txt
           retention-days: 7
 
   publish-nightly:
@@ -140,7 +143,7 @@ jobs:
 
           > This is a pre-release build and may be unstable. Enable the nightly update channel in Settings to receive these updates automatically." \
             --prerelease \
-            dist/*
+            dist/*.zip dist/checksums.txt
 
           # Delete old nightly release if it exists
           gh release delete nightly --yes --cleanup-tag 2>/dev/null || true

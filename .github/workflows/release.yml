@@ -56,15 +56,18 @@ jobs:
         run: |
           npx electron-builder --mac --${{ matrix.arch }} --publish never
 
+      - name: Generate checksums
+        run: |
+          cd dist
+          shasum -a 256 *.zip > checksums.txt
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.arch }}
           path: |
             dist/*.zip
-            dist/*.dmg
-            dist/*.blockmap
-            dist/latest-mac*.yml
+            dist/checksums.txt
 
   publish-release:
     needs: build-macos
@@ -98,4 +101,4 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "Release ${{ steps.version.outputs.version }}" \
             --generate-notes \
-            dist/*
+            dist/*.zip dist/checksums.txt
