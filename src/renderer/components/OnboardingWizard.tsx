@@ -48,7 +48,7 @@ function OnboardingContent({ onComplete }: { onComplete: (apiKeySaved: boolean) 
             欢迎使用小马快跑
           </h1>
           <p className="mb-8 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-            小马快跑是你的 AI 工作助手，能帮你写代码、分析文件、处理文档等。
+            小马快跑是你的 AI 工作助手，能帮你分析数据、处理文档、撰写文案等。
             <br />
             只需简单设置，就可以开始使用。
           </p>

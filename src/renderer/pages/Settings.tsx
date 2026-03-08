@@ -516,7 +516,7 @@ function Settings({ onBack }: SettingsProps) {
                   工作目录
                 </h2>
                 <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                  文件读写的工作目录，默认: Desktop/claude-agent
+                  文件读写的工作目录，默认: Desktop/ma-agent
                 </p>
               </div>
               {currentWorkspaceDir && (

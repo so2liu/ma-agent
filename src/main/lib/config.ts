@@ -136,8 +136,8 @@ export function getWorkspaceDir(): string {
   if (config.workspaceDir) {
     return config.workspaceDir;
   }
-  // Default to Desktop/claude-agent
-  return join(app.getPath('desktop'), 'claude-agent');
+  // Default to Desktop/ma-agent
+  return join(app.getPath('desktop'), 'ma-agent');
 }
 
 export function getDebugMode(): boolean {
@@ -479,8 +479,16 @@ export function setUpdateChannel(channel: UpdateChannel): void {
 
 export async function ensureWorkspaceDir(): Promise<void> {
   const workspaceDir = getWorkspaceDir();
+
+  // Migrate from old default workspace (claude-agent) to new default (ma-agent)
   if (!existsSync(workspaceDir)) {
-    await mkdir(workspaceDir, { recursive: true });
+    const oldDefault = join(app.getPath('desktop'), 'claude-agent');
+    if (workspaceDir === join(app.getPath('desktop'), 'ma-agent') && existsSync(oldDefault)) {
+      await rename(oldDefault, workspaceDir);
+      console.log(`Migrated workspace from ${oldDefault} to ${workspaceDir}`);
+    } else {
+      await mkdir(workspaceDir, { recursive: true });
+    }
   }
 
   // Sync .claude directory to workspace, preserving user-installed skills

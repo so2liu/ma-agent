@@ -106,12 +106,12 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  // Set app name to match productName in package.json
-  app.name = 'Claude Agent Desktop';
+  // Set app display name (overrides productName from package.json)
+  app.name = '小马快跑';
 
   // Set About panel options
   app.setAboutPanelOptions({
-    copyright: 'Copyright © 2025 Claude Agent Desktop'
+    copyright: 'Copyright © 2025 小马快跑'
   });
 
   // Register all IPC handlers
