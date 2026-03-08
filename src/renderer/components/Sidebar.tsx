@@ -34,7 +34,10 @@ const truncateText = (text: string, maxLength: number = 60) => {
   return `${text.slice(0, maxLength).trim()}...`;
 };
 
+type View = 'home' | 'settings' | 'skills' | 'schedules' | 'db-viewer';
+
 interface SidebarProps {
+  currentView: View;
   onLoadConversation: (conversationId: string) => void;
   currentConversationId: string | null;
   onNewChat: () => void | Promise<void>;
@@ -47,6 +50,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({
+  currentView,
   onLoadConversation,
   currentConversationId,
   onNewChat,
@@ -481,14 +485,22 @@ export default function Sidebar({
       <div className="shrink-0 space-y-0.5 px-3 pb-3">
         <button
           onClick={onSkillsClick}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-neutral-600 transition-colors hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors ${
+            currentView === 'skills'
+              ? 'bg-white font-medium text-neutral-800 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
+              : 'text-neutral-600 hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800'
+          }`}
         >
           <Sparkles className="h-4 w-4" />
           Skill 精选
         </button>
         <button
           onClick={onSchedulesClick}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-neutral-600 transition-colors hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors ${
+            currentView === 'schedules'
+              ? 'bg-white font-medium text-neutral-800 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
+              : 'text-neutral-600 hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800'
+          }`}
         >
           <Timer className="h-4 w-4" />
           定时任务
@@ -860,7 +872,11 @@ export default function Sidebar({
       <div className="flex shrink-0 items-center justify-end border-t px-3 py-1.5" style={{ borderColor: 'var(--color-sidebar-border)' }}>
         <button
           onClick={onSettingsClick}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+          className={`flex h-7 w-7 items-center justify-center rounded-lg transition ${
+            currentView === 'settings'
+              ? 'bg-white text-neutral-700 shadow-sm dark:bg-neutral-800 dark:text-neutral-200'
+              : 'text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
+          }`}
           title="设置"
         >
           <Settings className="h-4 w-4" />
