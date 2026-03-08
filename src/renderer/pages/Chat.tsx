@@ -15,6 +15,8 @@ import { useClaudeChat } from '@/hooks/useClaudeChat';
 import type { Message, MessageAttachment } from '@/types/chat';
 import { extractArtifacts } from '@/utils/artifacts';
 
+import { friendlyError } from '@/utils/friendlyError';
+
 import { MAX_ATTACHMENT_BYTES } from '../../shared/constants';
 import { getArtifactType, getFileExtension } from '../../shared/file-extensions';
 import type { ChatModelPreference, SerializedAttachmentPayload } from '../../shared/types/ipc';
@@ -390,7 +392,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
       const errorMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant' as const,
-        content: `Error preparing attachments: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+        content: friendlyError(error instanceof Error ? error.message : 'preparing attachments'),
         timestamp: new Date()
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -409,7 +411,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
         const errorMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant' as const,
-          content: `Error: ${response.error}`,
+          content: friendlyError(response.error),
           timestamp: new Date()
         };
         setMessages((prev) => [...prev, errorMessage]);
@@ -435,7 +437,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
       const errorMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant' as const,
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+        content: friendlyError(error instanceof Error ? error.message : 'Unknown error'),
         timestamp: new Date()
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -544,9 +546,20 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
           {messages.length === 0 && !isLoading ? (
             /* Welcome layout: centered input + skill cards */
             <div className="flex flex-1 flex-col items-center justify-center gap-5 px-3">
-              <p className="text-[11px] font-semibold tracking-[0.35em] text-neutral-400 uppercase dark:text-neutral-500">
-                小马快跑
-              </p>
+              <div className="text-center">
+                <p className="mb-1 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+                  {(() => {
+                    const hour = new Date().getHours();
+                    if (hour < 6) return '夜深了，还在忙吗?';
+                    if (hour < 12) return '早上好，今天想做什么?';
+                    if (hour < 18) return '下午好，需要帮忙吗?';
+                    return '晚上好，有什么可以帮你?';
+                  })()}
+                </p>
+                <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                  选择下方场景快速开始，或直接输入你的需求
+                </p>
+              </div>
               <div className="w-full max-w-3xl">
                 <ChatInput
                   value={inputValue}
@@ -577,6 +590,15 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
                 isLoading={isLoading}
                 containerRef={messagesContainerRef}
                 bottomPadding={messageListBottomPadding}
+                onDeliverablePreview={(d) =>
+                  setSelectedArtifact({
+                    id: d.id,
+                    filePath: d.filePath,
+                    fileName: d.fileName,
+                    type: d.type,
+                    content: d.content
+                  })
+                }
               />
               <div className="absolute inset-x-0 bottom-0 z-10">
                 <ChatInput

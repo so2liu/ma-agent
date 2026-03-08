@@ -1,14 +1,44 @@
 import AttachmentPreviewList from '@/components/AttachmentPreviewList';
 import BlockGroup from '@/components/BlockGroup';
+import DeliverableCard from '@/components/DeliverableCard';
+import type { Deliverable } from '@/components/DeliverableCard';
 import Markdown from '@/components/Markdown';
-import type { ContentBlock, Message as MessageType } from '@/types/chat';
+import type { ContentBlock, Message as MessageType, WriteInput } from '@/types/chat';
+
+import { getArtifactType, getFileExtension } from '../../shared/file-extensions';
 
 interface MessageProps {
   message: MessageType;
   isLoading?: boolean;
+  onDeliverablePreview?: (deliverable: Deliverable) => void;
 }
 
-export default function Message({ message, isLoading = false }: MessageProps) {
+function extractDeliverables(blocks: ContentBlock[]): Deliverable[] {
+  const deliverables: Deliverable[] = [];
+  for (const block of blocks) {
+    if (block.type !== 'tool_use' || !block.tool) continue;
+    if (block.tool.name !== 'Write' || block.tool.isError || !block.tool.result) continue;
+
+    const input = block.tool.parsedInput as WriteInput | undefined;
+    if (!input?.file_path) continue;
+
+    const ext = getFileExtension(input.file_path);
+    const type = getArtifactType(ext);
+    // Only show cards for user-facing file types (not code)
+    if (!type || type === 'code') continue;
+
+    deliverables.push({
+      id: block.tool.id,
+      filePath: input.file_path,
+      fileName: input.file_path.split('/').pop() || input.file_path,
+      type,
+      content: type === 'html' ? input.content : undefined
+    });
+  }
+  return deliverables;
+}
+
+export default function Message({ message, isLoading = false, onDeliverablePreview }: MessageProps) {
   if (message.role === 'user') {
     const userContent = typeof message.content === 'string' ? message.content : '';
     const hasText = userContent.trim().length > 0;
@@ -125,14 +155,24 @@ export default function Message({ message, isLoading = false }: MessageProps) {
                 .slice(index + 1)
                 .some((nextItem) => !Array.isArray(nextItem) && nextItem.type === 'text');
 
+            const deliverables = extractDeliverables(item);
+
             return (
-              <BlockGroup
-                key={`group-${index}`}
-                blocks={item}
-                isLatestActiveSection={isLatestActiveSection}
-                isStreaming={isStreaming}
-                hasTextAfter={hasTextAfter}
-              />
+              <div key={`group-${index}`} className="space-y-2">
+                <BlockGroup
+                  blocks={item}
+                  isLatestActiveSection={isLatestActiveSection}
+                  isStreaming={isStreaming}
+                  hasTextAfter={hasTextAfter}
+                />
+                {deliverables.map((d) => (
+                  <DeliverableCard
+                    key={d.id}
+                    deliverable={d}
+                    onPreview={onDeliverablePreview}
+                  />
+                ))}
+              </div>
             );
           })}
         </div>

@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react';
 import type { CSSProperties, RefObject } from 'react';
 
+import type { Deliverable } from '@/components/DeliverableCard';
 import Message from '@/components/Message';
 import type { Message as MessageType } from '@/types/chat';
 
@@ -9,13 +10,15 @@ interface MessageListProps {
   isLoading: boolean;
   containerRef: RefObject<HTMLDivElement | null>;
   bottomPadding?: number;
+  onDeliverablePreview?: (deliverable: Deliverable) => void;
 }
 
 export default function MessageList({
   messages,
   isLoading,
   containerRef,
-  bottomPadding
+  bottomPadding,
+  onDeliverablePreview
 }: MessageListProps) {
   const containerStyle: CSSProperties | undefined =
     bottomPadding ? { paddingBottom: bottomPadding } : undefined;
@@ -32,6 +35,7 @@ export default function MessageList({
             key={message.id}
             message={message}
             isLoading={isLoading && index === messages.length - 1}
+            onDeliverablePreview={onDeliverablePreview}
           />
         ))}
         {isLoading && (

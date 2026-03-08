@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import type { ToolUse } from '@/electron';
 import type { Message, ToolInput } from '@/types/chat';
+import { friendlyError } from '@/utils/friendlyError';
 import { parsePartialJson } from '@/utils/parsePartialJson';
 
 export function useClaudeChat(): {
@@ -645,7 +646,7 @@ export function useClaudeChat(): {
         {
           id: Date.now().toString(),
           role: 'assistant',
-          content: `Error: ${error}`,
+          content: friendlyError(error),
           timestamp: new Date()
         }
       ]);
