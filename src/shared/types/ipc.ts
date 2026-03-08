@@ -10,7 +10,12 @@ export interface SuccessResponse {
 }
 
 export type ChatModelPreference = 'fast' | 'smart-sonnet' | 'smart-opus';
-export type SmartModelVariant = 'sonnet' | 'opus';
+
+export const MODEL_LABELS: Record<ChatModelPreference, string> = {
+  fast: '快速',
+  'smart-sonnet': '均衡',
+  'smart-opus': '强力'
+};
 
 export interface SerializedAttachmentPayload {
   name: string;
