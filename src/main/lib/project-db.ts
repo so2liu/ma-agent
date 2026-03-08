@@ -7,9 +7,12 @@ export interface Project {
   name: string;
   order: number;
   isArchived: boolean;
+  isDefault?: boolean;
   createdAt: number;
   updatedAt: number;
 }
+
+const DEFAULT_PROJECT_NAME = '日常任务';
 
 let projectsFilePath: string | null = null;
 
@@ -35,8 +38,28 @@ function writeProjects(projects: Project[]): void {
   writeFileSync(getProjectsFilePath(), JSON.stringify(projects, null, 2), 'utf-8');
 }
 
+function ensureDefaultProject(projects: Project[]): Project[] {
+  const hasDefault = projects.some((p) => p.isDefault);
+  if (hasDefault) return projects;
+
+  const now = Date.now();
+  const defaultProject: Project = {
+    id: crypto.randomUUID(),
+    name: DEFAULT_PROJECT_NAME,
+    order: -1,
+    isArchived: false,
+    isDefault: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+  projects.unshift(defaultProject);
+  writeProjects(projects);
+  return projects;
+}
+
 export function listProjects(includeArchived = false): Project[] {
-  const projects = readProjects();
+  let projects = readProjects();
+  projects = ensureDefaultProject(projects);
   const filtered = includeArchived ? projects : projects.filter((p) => !p.isArchived);
   return filtered.sort((a, b) => a.order - b.order);
 }
@@ -67,6 +90,11 @@ export function updateProject(
   if (index === -1) throw new Error(`Project ${id} not found`);
 
   const project = projects[index];
+
+  if (project.isDefault) {
+    throw new Error('Cannot modify the default project');
+  }
+
   if (updates.name !== undefined) project.name = updates.name;
   if (updates.isArchived !== undefined) project.isArchived = updates.isArchived;
   project.updatedAt = Date.now();
@@ -86,6 +114,16 @@ export function reorderProjects(orderedIds: string[]): void {
 }
 
 export function deleteProject(id: string): void {
-  const projects = readProjects().filter((p) => p.id !== id);
-  writeProjects(projects);
+  const projects = readProjects();
+  const target = projects.find((p) => p.id === id);
+  if (target?.isDefault) {
+    throw new Error('Cannot delete the default project');
+  }
+  writeProjects(projects.filter((p) => p.id !== id));
+}
+
+export function getDefaultProject(): Project {
+  let projects = readProjects();
+  projects = ensureDefaultProject(projects);
+  return projects.find((p) => p.isDefault)!;
 }

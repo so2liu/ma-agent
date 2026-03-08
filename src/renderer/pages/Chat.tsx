@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Group, Panel } from 'react-resizable-panels';
 
 import type { Artifact } from '@/components/ArtifactPanel';
 import ArtifactPanel from '@/components/ArtifactPanel';
+import AppPanel from '@/components/AppPanel';
 import ChatInput from '@/components/ChatInput';
+import FileTree from '@/components/FileTree';
 import FloatingTaskPanel from '@/components/FloatingTaskPanel';
 import MessageList from '@/components/MessageList';
 import ResizeHandle from '@/components/ResizeHandle';
@@ -12,6 +14,7 @@ import SkillCardGrid from '@/components/SkillCardGrid';
 import DragRegion from '@/components/TitleBar';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
+import type { AppInfo } from '@/electron';
 import type { Message, MessageAttachment } from '@/types/chat';
 import { extractArtifacts } from '@/utils/artifacts';
 
@@ -20,6 +23,8 @@ import { friendlyError } from '@/utils/friendlyError';
 import { MAX_ATTACHMENT_BYTES } from '../../shared/constants';
 import { getArtifactType, getFileExtension } from '../../shared/file-extensions';
 import type { ChatModelPreference, SerializedAttachmentPayload } from '../../shared/types/ipc';
+
+import { FolderOpen, Globe } from 'lucide-react';
 
 interface PendingAttachment {
   id: string;
@@ -111,6 +116,54 @@ interface ChatProps {
   onOnboardingClick?: () => void;
 }
 
+function TopBarDropdown({
+  isOpen,
+  onToggle,
+  icon,
+  title,
+  children,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onToggle();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isOpen, onToggle]);
+
+  return (
+    <div ref={ref} className="relative [-webkit-app-region:no-drag]">
+      <button
+        onClick={onToggle}
+        className={`flex h-7 w-7 items-center justify-center rounded-lg transition ${
+          isOpen
+            ? 'bg-neutral-200/80 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200'
+            : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
+        }`}
+        title={title}
+      >
+        {icon}
+      </button>
+      {isOpen && (
+        <div className="absolute top-full right-0 z-50 mt-1 w-72 rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick, onOpenDbViewer, onOnboardingClick }: ChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
@@ -122,6 +175,11 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
   const [modelPreference, setModelPreference] = useState<ChatModelPreference>('fast');
   const [isModelPreferenceUpdating, setIsModelPreferenceUpdating] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
+  const [showFilesDropdown, setShowFilesDropdown] = useState(false);
+  const [showAppsDropdown, setShowAppsDropdown] = useState(false);
+  const [apps, setApps] = useState<AppInfo[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const projectIdForNewChatRef = useRef<string | null>(null);
   const { messages, setMessages, isLoading, setIsLoading } = useClaudeChat();
   const messagesContainerRef = useAutoScroll(isLoading, messages);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -173,6 +231,24 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
   useEffect(() => {
     return () => releaseAttachmentPreviews(pendingAttachmentsRef.current);
   }, []);
+
+  // Poll apps for the top-right dropdown
+  const refreshApps = useCallback(async () => {
+    try {
+      const response = await window.electron.app.scan();
+      if (response.success) {
+        setApps(response.apps);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshApps();
+    const timer = setInterval(refreshApps, 3000);
+    return () => clearInterval(timer);
+  }, [refreshApps]);
 
   const handleFilesSelected = (fileList: FileList | File[]) => {
     const files = Array.from(fileList || []);
@@ -257,6 +333,13 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
           );
           if (response.success && response.conversation) {
             setCurrentConversationId(response.conversation.id);
+            const projectId = projectIdForNewChatRef.current;
+            if (projectId) {
+              await window.electron.conversation.setProject(
+                response.conversation.id,
+                projectId
+              );
+            }
           }
         }
       } catch (error) {
@@ -303,6 +386,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
       setSelectedArtifact(null);
       prevArtifactCountRef.current = 0;
       isInitialLoadRef.current = true;
+      projectIdForNewChatRef.current = selectedProjectId;
     } catch (error) {
       console.error('Error starting new chat:', error);
     }
@@ -343,6 +427,9 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
         setSelectedArtifact(null);
         prevArtifactCountRef.current = 0;
         isInitialLoadRef.current = true;
+        if (response.conversation.projectId) {
+          setSelectedProjectId(response.conversation.projectId);
+        }
       }
     } catch (error) {
       console.error('Error loading conversation:', error);
@@ -476,7 +563,6 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
   const handleFileDeleted = (deletedPath: string, isDirectory: boolean) => {
     if (!selectedArtifact) return;
     if (isDirectory) {
-      // If deleted directory is a prefix of the selected file path, clear preview
       if (
         selectedArtifact.filePath === deletedPath ||
         selectedArtifact.filePath.startsWith(deletedPath + '/')
@@ -528,14 +614,12 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
             onLoadConversation={handleLoadConversation}
             currentConversationId={currentConversationId}
             onNewChat={handleNewChat}
-            onFileSelect={handleFileSelect}
-            selectedFilePath={selectedArtifact?.filePath ?? null}
-            onFileDeleted={handleFileDeleted}
             onSettingsClick={onSettingsClick}
             onSkillsClick={onSkillsClick}
             onSchedulesClick={onSchedulesClick}
-            onOpenDbViewer={onOpenDbViewer}
             onOnboardingClick={onOnboardingClick}
+            selectedProjectId={selectedProjectId}
+            onSelectProject={setSelectedProjectId}
           />
         </Panel>
 
@@ -543,7 +627,52 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
 
         {/* Center: chat area */}
         <Panel minSize="300px" className="relative flex flex-col overflow-hidden">
-          <DragRegion />
+          {/* Top bar with drag region and dropdown buttons */}
+          <div className="relative shrink-0">
+            <DragRegion />
+            {/* Right-side dropdown buttons */}
+            <div className="absolute top-1/2 right-3 z-10 flex -translate-y-1/2 items-center gap-1">
+              <TopBarDropdown
+                isOpen={showFilesDropdown}
+                onToggle={() => {
+                  setShowFilesDropdown((p) => !p);
+                  setShowAppsDropdown(false);
+                }}
+                icon={<FolderOpen className="h-4 w-4" />}
+                title="工作区"
+              >
+                <div className="max-h-80 overflow-y-auto">
+                  <FileTree
+                    onFileSelect={(path) => {
+                      handleFileSelect(path);
+                      setShowFilesDropdown(false);
+                    }}
+                    selectedPath={selectedArtifact?.filePath ?? null}
+                    onFileDeleted={handleFileDeleted}
+                  />
+                </div>
+              </TopBarDropdown>
+              {apps.length > 0 && (
+                <TopBarDropdown
+                  isOpen={showAppsDropdown}
+                  onToggle={() => {
+                    setShowAppsDropdown((p) => !p);
+                    setShowFilesDropdown(false);
+                  }}
+                  icon={<Globe className="h-4 w-4" />}
+                  title="应用"
+                >
+                  <div className="max-h-80 overflow-y-auto p-1">
+                    <AppPanel
+                      onOpenDbViewer={onOpenDbViewer}
+                      apps={apps}
+                      onAppsChanged={refreshApps}
+                    />
+                  </div>
+                </TopBarDropdown>
+              )}
+            </div>
+          </div>
 
           {messages.length === 0 && !isLoading ? (
             /* Welcome layout: centered input + skill cards */

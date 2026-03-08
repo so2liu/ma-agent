@@ -9,7 +9,7 @@ import Schedules from '@/pages/Schedules';
 import Settings from '@/pages/Settings';
 import Skills from '@/pages/Skills';
 
-type View = 'home' | 'settings' | 'skills' | 'schedules' | 'db-viewer' | 'onboarding';
+type View = 'home' | 'settings' | 'skills' | 'schedules' | 'db-viewer';
 
 interface DbViewerState {
   appId: string;
@@ -19,6 +19,7 @@ interface DbViewerState {
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('home');
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+  const [showOnboardingDialog, setShowOnboardingDialog] = useState(false);
   const currentViewRef = useRef<View>('home');
   const [dbViewerState, setDbViewerState] = useState<DbViewerState | null>(null);
 
@@ -40,14 +41,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Update ref whenever currentView changes
     currentViewRef.current = currentView;
   }, [currentView]);
 
   useEffect(() => {
-    // Listen for navigation events from main process
     const unsubscribeNavigate = window.electron.onNavigate((view: string) => {
-      // If navigating to same view, toggle back to home
       if (view === currentViewRef.current) {
         setCurrentView('home');
       } else {
@@ -72,8 +70,8 @@ export default function App() {
     <>
       <UpdateCheckFeedback />
       <UpdateReadyBanner />
-      {currentView === 'onboarding' && (
-        <OnboardingWizard onComplete={() => setCurrentView('home')} />
+      {showOnboardingDialog && (
+        <OnboardingWizard onComplete={() => setShowOnboardingDialog(false)} mode="dialog" />
       )}
       <div className={currentView === 'settings' ? 'block' : 'hidden'}>
         <Settings onBack={() => setCurrentView('home')} />
@@ -99,7 +97,7 @@ export default function App() {
           onSkillsClick={() => setCurrentView('skills')}
           onSchedulesClick={() => setCurrentView('schedules')}
           onOpenDbViewer={openDbViewer}
-          onOnboardingClick={() => setCurrentView('onboarding')}
+          onOnboardingClick={() => setShowOnboardingDialog(true)}
         />
       </div>
     </>
