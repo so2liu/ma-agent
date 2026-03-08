@@ -4,8 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 import AttachmentPreviewList from '@/components/AttachmentPreviewList';
 
-import type { ChatModelPreference } from '../../shared/types/ipc';
-import { MODEL_LABELS } from '../../shared/types/ipc';
+import type { ChatModelPreference, CustomModelIds } from '../../shared/types/ipc';
+import { DEFAULT_MODEL_NAMES, MODEL_LABELS, MODEL_TOOLTIPS } from '../../shared/types/ipc';
 
 interface ChatInputProps {
   value: string;
@@ -30,6 +30,7 @@ interface ChatInputProps {
   onModelPreferenceChange: (preference: ChatModelPreference) => void;
   isModelPreferenceUpdating?: boolean;
   customModelActive?: boolean;
+  customModelIds?: CustomModelIds;
   floatingPanel?: ReactNode;
 }
 
@@ -50,6 +51,7 @@ export default function ChatInput({
   onModelPreferenceChange,
   isModelPreferenceUpdating = false,
   customModelActive = false,
+  customModelIds = {},
   floatingPanel
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -62,11 +64,8 @@ export default function ChatInput({
   const [isDragActive, setIsDragActive] = useState(false);
   const computedCanSend = canSend ?? Boolean(value.trim());
 
-  const MODEL_OPTIONS: { value: ChatModelPreference; label: string; tooltip: string }[] = [
-    { value: 'fast', label: MODEL_LABELS.fast, tooltip: '响应最快，适合简单问题' },
-    { value: 'smart-sonnet', label: MODEL_LABELS['smart-sonnet'], tooltip: '速度与质量兼顾，推荐日常使用' },
-    { value: 'smart-opus', label: MODEL_LABELS['smart-opus'], tooltip: '最强能力，适合复杂分析' }
-  ];
+  const MODEL_OPTIONS: ChatModelPreference[] = ['fast', 'smart-sonnet', 'smart-opus'];
+  const [hoveredModel, setHoveredModel] = useState<ChatModelPreference | null>(null);
 
   const isDisabled = isModelPreferenceUpdating || customModelActive;
 
@@ -301,30 +300,54 @@ export default function ChatInput({
               >
                 <Paperclip className="h-4 w-4" />
               </button>
-              <div
-                role="radiogroup"
-                aria-label="选择模型"
-                className="flex h-10 items-center gap-1 rounded-full border border-neutral-200/80 bg-neutral-100 px-1.5 py-1 transition dark:border-neutral-700/70 dark:bg-neutral-800"
-                title={customModelActive ? '已启用自定义模型，前往设置 > 开发者信息修改' : undefined}
-              >
-                {customModelActive ?
-                  <span className="px-2.5 py-1 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-                    自定义模型
-                  </span>
-                : MODEL_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      aria-pressed={modelPreference === option.value}
-                      onClick={() => handleModelPreferenceSelect(option.value)}
-                      disabled={isDisabled}
-                      className={modelPillClass(modelPreference === option.value)}
-                      title={option.tooltip}
-                    >
-                      {option.label}
-                    </button>
-                  ))
-                }
+              <div className="relative">
+                <div
+                  role="radiogroup"
+                  aria-label="选择模型"
+                  className="flex h-10 items-center gap-1 rounded-full border border-neutral-200/80 bg-neutral-100 px-1.5 py-1 transition dark:border-neutral-700/70 dark:bg-neutral-800"
+                  title={customModelActive ? '已启用自定义模型，前往设置 > 开发者信息修改' : undefined}
+                >
+                  {customModelActive ?
+                    <span className="px-2.5 py-1 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                      自定义模型
+                    </span>
+                  : MODEL_OPTIONS.map((pref) => (
+                      <button
+                        key={pref}
+                        type="button"
+                        aria-pressed={modelPreference === pref}
+                        onClick={() => handleModelPreferenceSelect(pref)}
+                        disabled={isDisabled}
+                        className={modelPillClass(modelPreference === pref)}
+                        onMouseEnter={() => setHoveredModel(pref)}
+                        onMouseLeave={() => setHoveredModel(null)}
+                      >
+                        {MODEL_LABELS[pref]}
+                      </button>
+                    ))
+                  }
+                </div>
+                {hoveredModel && !customModelActive && (
+                  <div className="absolute bottom-full left-0 z-50 mb-2 w-56 rounded-xl border border-neutral-200/80 bg-white/95 p-3 shadow-lg backdrop-blur-xl dark:border-neutral-700/70 dark:bg-neutral-800/95">
+                    <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-100">
+                      {MODEL_LABELS[hoveredModel]}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+                      {MODEL_TOOLTIPS[hoveredModel].description}
+                    </p>
+                    <div className="mt-2 border-t border-neutral-100 pt-2 dark:border-neutral-700">
+                      <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                        当前模型：{customModelIds[hoveredModel] || DEFAULT_MODEL_NAMES[hoveredModel]}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-neutral-400 dark:text-neutral-500">
+                        推荐：{MODEL_TOOLTIPS[hoveredModel].suggestions.join('、')}
+                      </p>
+                    </div>
+                    <p className="mt-1.5 text-[10px] text-neutral-400 dark:text-neutral-500">
+                      可在设置中更换模型
+                    </p>
+                  </div>
+                )}
               </div>
               {isModelPreferenceUpdating && (
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-neutral-400 dark:text-neutral-300" />

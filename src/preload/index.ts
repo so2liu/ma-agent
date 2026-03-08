@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { ChatModelPreference, SendMessagePayload } from '../shared/types/ipc';
+import type { ChatModelPreference, CustomModelIds, SendMessagePayload } from '../shared/types/ipc';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -139,6 +139,9 @@ contextBridge.exposeInMainWorld('electron', {
     getCustomModelId: () => ipcRenderer.invoke('config:get-custom-model-id'),
     setCustomModelId: (modelId?: string | null) =>
       ipcRenderer.invoke('config:set-custom-model-id', modelId),
+    getCustomModelIds: () => ipcRenderer.invoke('config:get-custom-model-ids'),
+    setCustomModelIds: (ids: CustomModelIds) =>
+      ipcRenderer.invoke('config:set-custom-model-ids', ids),
     testApi: (params?: { apiKey?: string; baseUrl?: string; modelId?: string }) =>
       ipcRenderer.invoke('config:test-api', params)
   },

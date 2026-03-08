@@ -22,7 +22,7 @@ import { friendlyError } from '@/utils/friendlyError';
 
 import { MAX_ATTACHMENT_BYTES } from '../../shared/constants';
 import { getArtifactType, getFileExtension } from '../../shared/file-extensions';
-import type { ChatModelPreference, SerializedAttachmentPayload } from '../../shared/types/ipc';
+import type { ChatModelPreference, CustomModelIds, SerializedAttachmentPayload } from '../../shared/types/ipc';
 
 import { FolderOpen, Globe } from 'lucide-react';
 
@@ -175,6 +175,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
   const [modelPreference, setModelPreference] = useState<ChatModelPreference>('fast');
   const [isModelPreferenceUpdating, setIsModelPreferenceUpdating] = useState(false);
   const [customModelActive, setCustomModelActive] = useState(false);
+  const [customModelIds, setCustomModelIds] = useState<CustomModelIds>({});
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [showFilesDropdown, setShowFilesDropdown] = useState(false);
   const [showAppsDropdown, setShowAppsDropdown] = useState(false);
@@ -224,6 +225,12 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
       .getCustomModelId()
       .then(({ customModelId }) => {
         if (isMounted) setCustomModelActive(Boolean(customModelId?.trim()));
+      })
+      .catch(() => {});
+    window.electron.config
+      .getCustomModelIds()
+      .then(({ customModelIds: ids }) => {
+        if (isMounted) setCustomModelIds(ids || {});
       })
       .catch(() => {});
     return () => {
@@ -717,6 +724,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
                   onModelPreferenceChange={handleModelPreferenceChange}
                   isModelPreferenceUpdating={isModelPreferenceUpdating}
                   customModelActive={customModelActive}
+                  customModelIds={customModelIds}
                 />
               </div>
               <SkillCardGrid
@@ -759,6 +767,8 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
                   modelPreference={modelPreference}
                   onModelPreferenceChange={handleModelPreferenceChange}
                   isModelPreferenceUpdating={isModelPreferenceUpdating}
+                  customModelActive={customModelActive}
+                  customModelIds={customModelIds}
                   floatingPanel={<FloatingTaskPanel messages={messages} />}
                 />
               </div>

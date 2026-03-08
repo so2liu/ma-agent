@@ -3,7 +3,7 @@ import { cp, mkdir, rename, rm } from 'fs/promises';
 import { join, resolve } from 'path';
 import { app } from 'electron';
 
-import type { ChatModelPreference } from '../../shared/types/ipc';
+import type { ChatModelPreference, CustomModelIds } from '../../shared/types/ipc';
 import type { SkillManifest } from '../../shared/types/skill-manifest';
 import { syncManifest } from './skill-manifest';
 
@@ -16,7 +16,8 @@ export interface AppConfig {
   apiKey?: string;
   apiBaseUrl?: string;
   updateChannel?: UpdateChannel;
-  customModelId?: string;
+  customModelId?: string; // Legacy single override — migrated to customModelIds
+  customModelIds?: CustomModelIds;
 }
 
 const DEFAULT_MODEL_PREFERENCE: ChatModelPreference = 'fast';
@@ -462,6 +463,29 @@ export function setCustomModelId(modelId: string | null): void {
     config.customModelId = modelId.trim();
   } else {
     delete config.customModelId;
+  }
+  saveConfig(config);
+}
+
+export function getCustomModelIds(): CustomModelIds {
+  const config = loadConfig();
+  return config.customModelIds ?? {};
+}
+
+export function setCustomModelIds(ids: CustomModelIds): void {
+  const config = loadConfig();
+  // Clean empty strings
+  const cleaned: CustomModelIds = {};
+  for (const [key, value] of Object.entries(ids)) {
+    const trimmed = value?.trim();
+    if (trimmed) {
+      cleaned[key as ChatModelPreference] = trimmed;
+    }
+  }
+  if (Object.keys(cleaned).length > 0) {
+    config.customModelIds = cleaned;
+  } else {
+    delete config.customModelIds;
   }
   saveConfig(config);
 }
