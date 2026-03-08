@@ -4,7 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 import AttachmentPreviewList from '@/components/AttachmentPreviewList';
 
-import type { ChatModelPreference, SmartModelVariant } from '../../shared/types/ipc';
+import type { ChatModelPreference } from '../../shared/types/ipc';
+import { MODEL_LABELS } from '../../shared/types/ipc';
 
 interface ChatInputProps {
   value: string;
@@ -28,6 +29,7 @@ interface ChatInputProps {
   modelPreference: ChatModelPreference;
   onModelPreferenceChange: (preference: ChatModelPreference) => void;
   isModelPreferenceUpdating?: boolean;
+  customModelActive?: boolean;
   floatingPanel?: ReactNode;
 }
 
@@ -47,6 +49,7 @@ export default function ChatInput({
   modelPreference,
   onModelPreferenceChange,
   isModelPreferenceUpdating = false,
+  customModelActive = false,
   floatingPanel
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -56,38 +59,28 @@ export default function ChatInput({
   const MAX_TEXTAREA_HEIGHT = 200;
   const lastReportedHeightRef = useRef<number | null>(null);
   const dragCounterRef = useRef(0);
-  const lastSmartPreferenceRef = useRef<ChatModelPreference>('smart-sonnet');
   const [isDragActive, setIsDragActive] = useState(false);
   const computedCanSend = canSend ?? Boolean(value.trim());
-  const isSmartMode = modelPreference !== 'fast';
-  const smartVariant = modelPreference === 'smart-opus' ? 'opus' : 'sonnet';
 
-  const modelPillClass = (isActive: boolean, size: 'default' | 'compact' = 'default') =>
-    `rounded-full ${size === 'compact' ? 'px-2.5 py-1' : 'px-3 py-1'} text-xs font-semibold transition ${
+  const MODEL_OPTIONS: { value: ChatModelPreference; label: string; tooltip: string }[] = [
+    { value: 'fast', label: MODEL_LABELS.fast, tooltip: '响应最快，适合简单问题' },
+    { value: 'smart-sonnet', label: MODEL_LABELS['smart-sonnet'], tooltip: '速度与质量兼顾，推荐日常使用' },
+    { value: 'smart-opus', label: MODEL_LABELS['smart-opus'], tooltip: '最强能力，适合复杂分析' }
+  ];
+
+  const isDisabled = isModelPreferenceUpdating || customModelActive;
+
+  const modelPillClass = (isActive: boolean) =>
+    `rounded-full px-2.5 py-1 text-xs font-semibold transition ${
       isActive ?
         'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100'
       : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white'
-    } ${isModelPreferenceUpdating ? 'opacity-70' : ''}`;
+    } ${isDisabled ? 'opacity-70' : ''}`;
 
   const handleModelPreferenceSelect = (preference: ChatModelPreference) => {
     if (preference === modelPreference) return;
-    if (isModelPreferenceUpdating) return;
+    if (isDisabled) return;
     onModelPreferenceChange(preference);
-  };
-
-  const handlePrimaryModelToggle = (mode: 'fast' | 'smart') => {
-    if (mode === 'fast') {
-      handleModelPreferenceSelect('fast');
-      return;
-    }
-
-    const nextPreference = isSmartMode ? modelPreference : lastSmartPreferenceRef.current;
-    handleModelPreferenceSelect(nextPreference);
-  };
-
-  const handleSmartModelToggle = (variant: SmartModelVariant) => {
-    const nextPreference: ChatModelPreference = variant === 'opus' ? 'smart-opus' : 'smart-sonnet';
-    handleModelPreferenceSelect(nextPreference);
   };
 
   const reportHeight = useCallback(
@@ -217,12 +210,6 @@ export default function ChatInput({
     adjustTextareaHeight();
   }, [value]);
 
-  useEffect(() => {
-    if (isSmartMode) {
-      lastSmartPreferenceRef.current = modelPreference;
-    }
-  }, [isSmartMode, modelPreference]);
-
   useLayoutEffect(() => {
     const element = containerRef.current;
     if (!element) return;
@@ -314,65 +301,28 @@ export default function ChatInput({
               >
                 <Paperclip className="h-4 w-4" />
               </button>
-              <div className="flex h-10 items-center gap-2 rounded-full border border-neutral-200/80 bg-neutral-100 px-2 py-1 transition dark:border-neutral-700/70 dark:bg-neutral-800">
-                <button
-                  type="button"
-                  aria-pressed={!isSmartMode}
-                  onClick={() => handlePrimaryModelToggle('fast')}
-                  disabled={isModelPreferenceUpdating}
-                  className={modelPillClass(!isSmartMode)}
-                >
-                  快速
-                </button>
-                <div className="relative flex items-center overflow-hidden">
-                  <div
-                    className={`transition-[max-width,opacity,transform] duration-200 ease-out ${
-                      isSmartMode ?
-                        'pointer-events-none max-w-0 scale-95 opacity-0'
-                      : 'max-w-[96px] scale-100 opacity-100'
-                    }`}
-                    aria-hidden={isSmartMode}
-                  >
+              <div
+                className="flex h-10 items-center gap-1 rounded-full border border-neutral-200/80 bg-neutral-100 px-1.5 py-1 transition dark:border-neutral-700/70 dark:bg-neutral-800"
+                title={customModelActive ? '已启用自定义模型，前往设置 > 开发者信息修改' : undefined}
+              >
+                {customModelActive ?
+                  <span className="px-2.5 py-1 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                    自定义模型
+                  </span>
+                : MODEL_OPTIONS.map((option) => (
                     <button
+                      key={option.value}
                       type="button"
-                      aria-pressed={isSmartMode}
-                      onClick={() => handlePrimaryModelToggle('smart')}
-                      disabled={isModelPreferenceUpdating}
-                      className={modelPillClass(isSmartMode)}
+                      aria-pressed={modelPreference === option.value}
+                      onClick={() => handleModelPreferenceSelect(option.value)}
+                      disabled={isDisabled}
+                      className={modelPillClass(modelPreference === option.value)}
+                      title={option.tooltip}
                     >
-                      深度
+                      {option.label}
                     </button>
-                  </div>
-                  <div
-                    className={`flex items-center gap-1.5 transition-[max-width,opacity,transform] duration-200 ease-out ${
-                      isSmartMode ?
-                        'max-w-[210px] scale-100 opacity-100'
-                      : 'pointer-events-none max-w-0 scale-95 opacity-0'
-                    }`}
-                    aria-hidden={!isSmartMode}
-                  >
-                    <button
-                      type="button"
-                      aria-pressed={smartVariant === 'sonnet'}
-                      onClick={() => handleSmartModelToggle('sonnet')}
-                      disabled={!isSmartMode || isModelPreferenceUpdating}
-                      className={modelPillClass(smartVariant === 'sonnet', 'compact')}
-                      title="claude-sonnet-4-5-20250929"
-                    >
-                      均衡
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={smartVariant === 'opus'}
-                      onClick={() => handleSmartModelToggle('opus')}
-                      disabled={!isSmartMode || isModelPreferenceUpdating}
-                      className={modelPillClass(smartVariant === 'opus', 'compact')}
-                      title="claude-opus-4-5-20251101"
-                    >
-                      强力
-                    </button>
-                  </div>
-                </div>
+                  ))
+                }
               </div>
               {isModelPreferenceUpdating && (
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-neutral-400 dark:text-neutral-300" />

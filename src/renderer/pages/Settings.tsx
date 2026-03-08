@@ -72,7 +72,7 @@ function Settings({ onBack }: SettingsProps) {
   const [baseUrlSaveState, setBaseUrlSaveState] = useState<'idle' | 'success' | 'error'>('idle');
 
   const [customModelId, setCustomModelId] = useState<string>('');
-  const [isLoadingModelId, setIsLoadingModelId] = useState(true);
+  const [_isLoadingModelId, setIsLoadingModelId] = useState(true);
   const [isSavingModelId, setIsSavingModelId] = useState(false);
   const [modelIdSaveState, setModelIdSaveState] = useState<'idle' | 'success' | 'error'>('idle');
 
@@ -319,7 +319,7 @@ function Settings({ onBack }: SettingsProps) {
   };
 
   const isFormLoading =
-    isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl || isLoadingChannel || isLoadingModelId;
+    isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl || isLoadingChannel;
   const apiKeyPlaceholder = apiKeyStatus.lastFour ? `...${apiKeyStatus.lastFour}` : 'sk-ant-...';
 
   // Shared styles
@@ -462,47 +462,6 @@ function Settings({ onBack }: SettingsProps) {
                   <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
                 )}
                 {baseUrlSaveState === 'error' && (
-                  <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
-                )}
-              </div>
-            </section>
-
-            <div className="border-t border-neutral-100 dark:border-neutral-800" />
-
-            {/* Custom Model ID */}
-            <section className="space-y-3">
-              <div>
-                <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                  模型 ID
-                </h2>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                  自定义模型 ID（如 MiniMax-2.5、k2.5、GLM-5 等），留空使用默认 Anthropic 模型
-                </p>
-                {customModelId.trim() && (
-                  <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
-                    * 设置后将覆盖聊天页面的模型选择器（Fast/Sonnet/Opus）
-                  </p>
-                )}
-              </div>
-              <input
-                type="text"
-                value={customModelId}
-                onChange={(e) => setCustomModelId(e.target.value)}
-                placeholder="留空使用默认模型"
-                className={inputClass}
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSaveModelId}
-                  disabled={isSavingModelId}
-                  className={primaryBtnClass}
-                >
-                  {isSavingModelId ? '保存中...' : '保存'}
-                </button>
-                {modelIdSaveState === 'success' && (
-                  <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
-                )}
-                {modelIdSaveState === 'error' && (
                   <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
                 )}
               </div>
@@ -658,6 +617,41 @@ function Settings({ onBack }: SettingsProps) {
               </button>
               {isDebugExpanded && (
                 <div className="mt-2 space-y-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-800/50">
+                  {/* Custom Model ID */}
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold tracking-widest text-neutral-400 uppercase dark:text-neutral-500">
+                      自定义模型
+                    </p>
+                    <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                      填写后将替换聊天页面的快速/均衡/强力三档选择
+                    </p>
+                    <input
+                      type="text"
+                      value={customModelId}
+                      onChange={(e) => setCustomModelId(e.target.value)}
+                      placeholder={_isLoadingModelId ? '加载中...' : '留空使用默认模型'}
+                      disabled={_isLoadingModelId}
+                      className={inputClass}
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveModelId}
+                        disabled={isSavingModelId || _isLoadingModelId}
+                        className={primaryBtnClass}
+                      >
+                        {isSavingModelId ? '保存中...' : '保存'}
+                      </button>
+                      {modelIdSaveState === 'success' && (
+                        <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
+                      )}
+                      {modelIdSaveState === 'error' && (
+                        <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-neutral-200 dark:border-neutral-700" />
+
                   {/* App Information */}
                   <div className="space-y-2">
                     <p className="text-[10px] font-semibold tracking-widest text-neutral-400 uppercase dark:text-neutral-500">

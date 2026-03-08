@@ -11,7 +11,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 
 import type { ScheduledTask } from '@/electron';
-import type { ChatModelPreference } from '../../shared/types/ipc';
+import { MODEL_LABELS, type ChatModelPreference } from '../../shared/types/ipc';
 
 interface SchedulesProps {
   onBack: () => void;
@@ -35,12 +35,6 @@ const CRON_DESCRIPTIONS: Record<string, string> = Object.fromEntries(
 function describeCron(expr: string): string {
   return CRON_DESCRIPTIONS[expr.trim()] ?? expr;
 }
-
-const MODEL_LABELS: Record<ChatModelPreference, string> = {
-  fast: 'Haiku (Fast)',
-  'smart-sonnet': 'Sonnet (Smart)',
-  'smart-opus': 'Opus (Smart)',
-};
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   success: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', label: '成功' },
@@ -392,9 +386,9 @@ export default function Schedules({ onBack }: SchedulesProps) {
                   onChange={(e) => setFormModel(e.target.value as ChatModelPreference)}
                   className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-200"
                 >
-                  <option value="fast">Haiku (Fast)</option>
-                  <option value="smart-sonnet">Sonnet (Smart)</option>
-                  <option value="smart-opus">Opus (Smart)</option>
+                  <option value="fast">{MODEL_LABELS.fast}</option>
+                  <option value="smart-sonnet">{MODEL_LABELS['smart-sonnet']}</option>
+                  <option value="smart-opus">{MODEL_LABELS['smart-opus']}</option>
                 </select>
               </div>
             </div>

@@ -428,7 +428,7 @@ export default function Sidebar({
   };
 
   return (
-    <div className="flex h-full flex-col border-r border-neutral-200/70 bg-neutral-50/80 dark:border-neutral-800 dark:bg-neutral-900/50">
+    <div className="flex h-full flex-col border-r" style={{ borderColor: 'var(--color-sidebar-border)', background: 'var(--color-sidebar-bg)', backdropFilter: 'saturate(180%) blur(20px)', WebkitBackdropFilter: 'saturate(180%) blur(20px)' }}>
       {/* Drag region for macOS traffic lights */}
       <div className="shrink-0 [-webkit-app-region:drag]" style={{ height: 'var(--titlebar-height)' }} />
 
@@ -841,7 +841,7 @@ export default function Sidebar({
       </AlertDialog>
 
       {/* Bottom bar - Settings only */}
-      <div className="flex shrink-0 items-center justify-end border-t border-neutral-200/70 px-3 py-1.5 dark:border-neutral-800">
+      <div className="flex shrink-0 items-center justify-end border-t px-3 py-1.5" style={{ borderColor: 'var(--color-sidebar-border)' }}>
         <button
           onClick={onSettingsClick}
           className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
