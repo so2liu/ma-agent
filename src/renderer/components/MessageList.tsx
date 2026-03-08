@@ -26,8 +26,8 @@ export default function MessageList({
   return (
     <div
       ref={containerRef}
-      className="relative flex-1 overflow-y-auto bg-white px-3 pt-14 pb-3 dark:bg-neutral-900"
-      style={containerStyle}
+      className="relative flex-1 overflow-y-auto px-3 pt-14 pb-3"
+      style={{ background: 'var(--color-content-bg)', ...containerStyle }}
     >
       <div className="mx-auto max-w-3xl space-y-1.5">
         {messages.map((message, index) => (
