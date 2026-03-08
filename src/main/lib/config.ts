@@ -16,6 +16,7 @@ export interface AppConfig {
   apiKey?: string;
   apiBaseUrl?: string;
   updateChannel?: UpdateChannel;
+  customModelId?: string;
 }
 
 const DEFAULT_MODEL_PREFERENCE: ChatModelPreference = 'fast';
@@ -482,6 +483,21 @@ function restoreUserManifestSettings(
   } catch {
     // Skip if we can't read the directory
   }
+}
+
+export function getCustomModelId(): string | null {
+  const config = loadConfig();
+  return config.customModelId?.trim() || null;
+}
+
+export function setCustomModelId(modelId: string | null): void {
+  const config = loadConfig();
+  if (modelId && modelId.trim()) {
+    config.customModelId = modelId.trim();
+  } else {
+    delete config.customModelId;
+  }
+  saveConfig(config);
 }
 
 export function getUpdateChannel(): UpdateChannel {

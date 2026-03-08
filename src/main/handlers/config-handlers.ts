@@ -3,19 +3,32 @@ import { createRequire } from 'module';
 import { release, type, version } from 'os';
 import { app, ipcMain } from 'electron';
 
+import Anthropic, {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  AuthenticationError,
+  NotFoundError,
+  PermissionDeniedError,
+  RateLimitError
+} from '@anthropic-ai/sdk';
+
 import {
   buildClaudeSessionEnv,
   buildEnhancedPath,
   ensureWorkspaceDir,
   getApiBaseUrl,
+  getApiKey,
   getApiKeyStatus,
+  getCustomModelId,
   getDebugMode,
   getWorkspaceDir,
   loadConfig,
   saveConfig,
   setApiBaseUrl,
-  setApiKey
+  setApiKey,
+  setCustomModelId
 } from '../lib/config';
+import { getCurrentModelPreference, MODEL_BY_PREFERENCE } from '../lib/claude-session';
 import { restartFileWatcher } from './workspace-handlers';
 
 const requireModule = createRequire(import.meta.url);
@@ -168,6 +181,99 @@ export function registerConfigHandlers(): void {
 
     return { envVars, count: envVars.length };
   });
+
+  // Get custom model ID
+  ipcMain.handle('config:get-custom-model-id', () => {
+    return { customModelId: getCustomModelId() };
+  });
+
+  // Set custom model ID
+  ipcMain.handle('config:set-custom-model-id', (_event, modelId?: string | null) => {
+    const normalized = modelId?.trim() || null;
+    setCustomModelId(normalized);
+    return { success: true, customModelId: getCustomModelId() };
+  });
+
+  // Test API connection using form values (not persisted config)
+  ipcMain.handle(
+    'config:test-api',
+    async (
+      _event,
+      params?: { apiKey?: string; baseUrl?: string; modelId?: string }
+    ) => {
+      // Use form values if provided, fall back to persisted config
+      const apiKey = params?.apiKey?.trim() || getApiKey();
+      if (!apiKey) {
+        return { success: false, error: '请先配置 API Key' };
+      }
+
+      const baseURL = params?.baseUrl?.trim() || getApiBaseUrl();
+      const modelId =
+        params?.modelId?.trim() ||
+        getCustomModelId() ||
+        MODEL_BY_PREFERENCE[getCurrentModelPreference()] ||
+        'claude-haiku-4-5-20251001';
+
+      try {
+        const client = new Anthropic({
+          apiKey,
+          ...(baseURL ? { baseURL } : {})
+        });
+
+        const response = await client.messages.create({
+          model: modelId,
+          max_tokens: 16,
+          messages: [{ role: 'user', content: 'Hi' }]
+        });
+
+        return {
+          success: true,
+          model: response.model,
+          message: `连接成功 -- 模型: ${response.model}`
+        };
+      } catch (err: unknown) {
+        // Use SDK error classes for reliable detection
+        if (err instanceof AuthenticationError) {
+          return { success: false, error: 'API Key 无效或已过期，请检查后重试' };
+        }
+        if (err instanceof PermissionDeniedError) {
+          return { success: false, error: '没有访问权限，请检查 API Key 的权限设置' };
+        }
+        if (err instanceof NotFoundError) {
+          return {
+            success: false,
+            error: `找不到模型 "${modelId}"，请检查模型 ID 或 API 地址是否正确`
+          };
+        }
+        if (err instanceof RateLimitError) {
+          return { success: false, error: '请求过于频繁，请稍后再试' };
+        }
+        if (err instanceof APIConnectionTimeoutError) {
+          return {
+            success: false,
+            error: `连接超时${baseURL ? ` (${baseURL})` : ''}，请检查网络连接或 API 地址`
+          };
+        }
+        if (err instanceof APIConnectionError) {
+          return {
+            success: false,
+            error: `无法连接到 API 服务器${baseURL ? ` (${baseURL})` : ''}，请检查网络连接或 API 地址`
+          };
+        }
+
+        // Fallback: check status code for Anthropic API errors
+        if (err instanceof Anthropic.APIError) {
+          const status = err.status;
+          if (status >= 500) {
+            return { success: false, error: 'API 服务暂时不可用，请稍后再试' };
+          }
+        }
+
+        const message = err instanceof Error ? err.message : String(err);
+        return { success: false, error: `连接失败: ${message}` };
+      }
+    }
+  );
 
   // Get app diagnostic metadata (versions, platform info, etc.)
   ipcMain.handle('config:get-diagnostic-metadata', () => {

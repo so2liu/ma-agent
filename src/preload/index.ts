@@ -135,7 +135,12 @@ contextBridge.exposeInMainWorld('electron', {
     getApiKeyStatus: () => ipcRenderer.invoke('config:get-api-key-status'),
     setApiKey: (apiKey?: string | null) => ipcRenderer.invoke('config:set-api-key', apiKey),
     getApiBaseUrl: () => ipcRenderer.invoke('config:get-api-base-url'),
-    setApiBaseUrl: (url?: string | null) => ipcRenderer.invoke('config:set-api-base-url', url)
+    setApiBaseUrl: (url?: string | null) => ipcRenderer.invoke('config:set-api-base-url', url),
+    getCustomModelId: () => ipcRenderer.invoke('config:get-custom-model-id'),
+    setCustomModelId: (modelId?: string | null) =>
+      ipcRenderer.invoke('config:set-custom-model-id', modelId),
+    testApi: (params?: { apiKey?: string; baseUrl?: string; modelId?: string }) =>
+      ipcRenderer.invoke('config:test-api', params)
   },
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)
