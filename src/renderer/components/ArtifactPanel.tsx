@@ -254,9 +254,9 @@ export default function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps)
   };
 
   return (
-    <div className="flex h-full flex-col border-l border-neutral-200/70 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="flex h-full flex-col border-l" style={{ borderColor: 'var(--color-sidebar-border)', background: 'var(--color-content-bg)' }}>
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-neutral-200/70 px-3 py-2 dark:border-neutral-800">
+      <div className="flex items-center justify-between border-b px-3 py-2" style={{ borderColor: 'var(--color-sidebar-border)' }}>
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-xs font-medium text-neutral-700 dark:text-neutral-300">
             {artifact.fileName}
@@ -284,7 +284,7 @@ export default function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps)
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden bg-white dark:bg-neutral-950">
+      <div className="flex-1 overflow-hidden" style={{ background: 'var(--color-content-secondary)' }}>
         {display.loading && (
           <div className="flex h-full items-center justify-center text-xs text-neutral-400">
             Loading...

@@ -54,12 +54,22 @@ function createWindow() {
     }
   };
 
-  // Only set titleBarStyle on macOS
+  // macOS: hidden title bar + native sidebar vibrancy for translucent effect
   if (process.platform === 'darwin') {
     windowOptions.titleBarStyle = 'hidden';
+    windowOptions.vibrancy = 'sidebar';
+    windowOptions.backgroundColor = '#00000000';
+    windowOptions.show = false;
   }
 
   mainWindow = new BrowserWindow(windowOptions);
+
+  // Prevent transparent flash on macOS by waiting for renderer to paint
+  if (process.platform === 'darwin') {
+    mainWindow.once('ready-to-show', () => {
+      mainWindow?.show();
+    });
+  }
 
   // electron-vite provides ELECTRON_RENDERER_URL in dev mode
   if (isDev && process.env.ELECTRON_RENDERER_URL) {

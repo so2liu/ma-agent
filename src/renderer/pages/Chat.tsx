@@ -514,7 +514,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
   };
 
   return (
-    <div className="flex h-screen bg-white dark:bg-neutral-900">
+    <div className="flex h-screen bg-transparent">
       {/* Three-column layout */}
       <Group className="flex-1 overflow-hidden">
         {/* Left sidebar */}
@@ -542,7 +542,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
         <ResizeHandle />
 
         {/* Center: chat area */}
-        <Panel minSize="300px" className="relative flex flex-col overflow-hidden">
+        <Panel minSize="300px" className="relative flex flex-col overflow-hidden" style={{ background: 'var(--color-content-bg)' }}>
           <DragRegion />
 
           {messages.length === 0 && !isLoading ? (
