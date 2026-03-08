@@ -119,6 +119,7 @@ interface ChatProps {
   selectedProjectId: string | null;
   setSelectedProjectId: (id: string | null) => void;
   onOpenDbViewer?: (appId: string, appName: string) => void;
+  onSkillsClick?: () => void;
 }
 
 function TopBarDropdown({
@@ -169,7 +170,7 @@ function TopBarDropdown({
   );
 }
 
-const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversationId, setCurrentConversationId, selectedProjectId, setSelectedProjectId, onOpenDbViewer }, ref) {
+const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversationId, setCurrentConversationId, selectedProjectId, setSelectedProjectId, onOpenDbViewer, onSkillsClick }, ref) {
   const [inputValue, setInputValue] = useState('');
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [chatInputHeight, setChatInputHeight] = useState(0);

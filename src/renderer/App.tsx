@@ -141,6 +141,7 @@ export default function App() {
                 selectedProjectId={selectedProjectId}
                 setSelectedProjectId={setSelectedProjectId}
                 onOpenDbViewer={openDbViewer}
+                onSkillsClick={() => navigate('skills')}
               />
             </div>
             <div className={currentView === 'settings' ? 'block h-full' : 'hidden'}>
