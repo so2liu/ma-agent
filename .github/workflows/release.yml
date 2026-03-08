@@ -45,7 +45,7 @@ jobs:
         run: bun run build
 
       - name: Package for macOS (${{ matrix.arch }})
-        timeout-minutes: 30
+        timeout-minutes: 90
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
