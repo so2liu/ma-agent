@@ -136,8 +136,8 @@ export function getWorkspaceDir(): string {
   if (config.workspaceDir) {
     return config.workspaceDir;
   }
-  // Default to Desktop/claude-agent
-  return join(app.getPath('desktop'), 'claude-agent');
+  // Default to Desktop/ma-agent
+  return join(app.getPath('desktop'), 'ma-agent');
 }
 
 export function getDebugMode(): boolean {

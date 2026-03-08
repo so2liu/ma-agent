@@ -55,7 +55,7 @@ export default function UpdateReadyBanner() {
               Update ready: {status.updateInfo?.version}
             </p>
             <p className="text-xs text-green-700 dark:text-green-300">
-              Restart Claude Agent Desktop to finish installing.
+              重启小马快跑以完成安装。
             </p>
           </div>
         </div>

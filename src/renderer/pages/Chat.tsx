@@ -30,7 +30,7 @@ interface PendingAttachment {
 }
 
 const MAX_ATTACHMENT_SIZE_MB = Math.floor(MAX_ATTACHMENT_BYTES / (1024 * 1024));
-const WORKSPACE_FALLBACK_LABEL = 'the configured claude-agent workspace directory';
+const WORKSPACE_FALLBACK_LABEL = '已配置的 ma-agent 工作目录';
 const IMAGE_FILE_EXTENSIONS = new Set([
   'png',
   'apng',
@@ -186,8 +186,8 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
         if (file.size > MAX_ATTACHMENT_BYTES) {
           const workspaceLabel = workspaceDir ?? WORKSPACE_FALLBACK_LABEL;
           rejectionMessage =
-            `"${file.name}" is larger than ${MAX_ATTACHMENT_SIZE_MB} MB. ` +
-            `Please drop it directly into the Claude Agent workspace at ${workspaceLabel}.`;
+            `"${file.name}" 超过 ${MAX_ATTACHMENT_SIZE_MB} MB 大小限制，` +
+            `请将文件直接放到工作目录 ${workspaceLabel} 中。`;
           continue;
         }
 
