@@ -3,6 +3,7 @@ import BlockGroup from '@/components/BlockGroup';
 import DeliverableCard from '@/components/DeliverableCard';
 import type { Deliverable } from '@/components/DeliverableCard';
 import Markdown from '@/components/Markdown';
+import MessageFeedbackComponent from '@/components/MessageFeedback';
 import type { ContentBlock, Message as MessageType, WriteInput } from '@/types/chat';
 
 import { getArtifactType, getFileExtension } from '../../shared/file-extensions';
@@ -11,6 +12,7 @@ interface MessageProps {
   message: MessageType;
   isLoading?: boolean;
   onDeliverablePreview?: (deliverable: Deliverable) => void;
+  conversationId?: string | null;
 }
 
 function extractDeliverables(blocks: ContentBlock[]): Deliverable[] {
@@ -38,7 +40,7 @@ function extractDeliverables(blocks: ContentBlock[]): Deliverable[] {
   return deliverables;
 }
 
-export default function Message({ message, isLoading = false, onDeliverablePreview }: MessageProps) {
+export default function Message({ message, isLoading = false, onDeliverablePreview, conversationId }: MessageProps) {
   if (message.role === 'user') {
     const userContent = typeof message.content === 'string' ? message.content : '';
     const hasText = userContent.trim().length > 0;
@@ -81,6 +83,9 @@ export default function Message({ message, isLoading = false, onDeliverablePrevi
           <div className="prose prose-base max-w-none text-base leading-relaxed prose-neutral dark:prose-invert">
             <Markdown>{message.content}</Markdown>
           </div>
+          {!isLoading && (
+            <MessageFeedbackComponent messageId={message.id} conversationId={conversationId} />
+          )}
         </article>
       </div>
     );
@@ -176,6 +181,9 @@ export default function Message({ message, isLoading = false, onDeliverablePrevi
             );
           })}
         </div>
+        {!isLoading && (
+          <MessageFeedbackComponent messageId={message.id} conversationId={conversationId} />
+        )}
       </article>
     </div>
   );

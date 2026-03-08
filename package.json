@@ -23,6 +23,7 @@
     "@anthropic-ai/sdk": "^0.78.0",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^12.6.2",
+    "posthog-node": "^5.28.0",
     "quickjs-emscripten": "^0.32.0"
   },
   "devDependencies": {

@@ -12,6 +12,7 @@ import ResizeHandle from '@/components/ResizeHandle';
 import Sidebar from '@/components/Sidebar';
 import SkillCardGrid from '@/components/SkillCardGrid';
 import DragRegion from '@/components/TitleBar';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
 import type { AppInfo } from '@/electron';
@@ -182,6 +183,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const projectIdForNewChatRef = useRef<string | null>(null);
   const { messages, setMessages, isLoading, setIsLoading } = useClaudeChat();
+  const { track } = useAnalytics();
   const messagesContainerRef = useAutoScroll(isLoading, messages);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef(true);
@@ -289,7 +291,10 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
         accepted.push({ id: crypto.randomUUID(), file, previewUrl, previewIsBlobUrl, isImage });
       }
 
-      if (accepted.length > 0) setPendingAttachments((prev) => [...prev, ...accepted]);
+      if (accepted.length > 0) {
+        setPendingAttachments((prev) => [...prev, ...accepted]);
+        track('attachment_added', { count: accepted.length });
+      }
       if (rejectionMessage) setAttachmentError(rejectionMessage);
       else if (accepted.length > 0) setAttachmentError(null);
     };
@@ -340,6 +345,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
           );
           if (response.success && response.conversation) {
             setCurrentConversationId(response.conversation.id);
+            track('conversation_created');
             const projectId = projectIdForNewChatRef.current;
             if (projectId) {
               await window.electron.conversation.setProject(
@@ -357,7 +363,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [messages, currentConversationId, currentSessionId]);
+  }, [messages, currentConversationId, currentSessionId, track]);
 
   useEffect(() => {
     const unsubscribe = window.electron.chat.onSessionUpdated(({ sessionId }) => {
@@ -448,6 +454,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
     const hasSendableContent = trimmedMessage.length > 0 || pendingAttachments.length > 0;
     if (!hasSendableContent || isLoading) return;
 
+    const hasAttachments = pendingAttachments.length > 0;
     const attachmentsToSend = pendingAttachments;
     if (attachmentsToSend.length > 0) setPendingAttachments([]);
     setAttachmentError(null);
@@ -502,6 +509,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
         text: trimmedMessage,
         attachments: serializedAttachments.length > 0 ? serializedAttachments : undefined
       });
+      track('message_sent', { model: modelPreference, hasAttachments });
       if (!response.success && response.error) {
         const errorMessage = {
           id: (Date.now() + 1).toString(),
@@ -597,8 +605,11 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
       if (!response.success) {
         console.error('Error updating model preference:', response.error);
         setModelPreference(response.preference ?? previousPreference);
-      } else if (response.preference) {
-        setModelPreference(response.preference);
+      } else {
+        track('model_switched', { from: previousPreference, to: preference });
+        if (response.preference) {
+          setModelPreference(response.preference);
+        }
       }
     } catch (error) {
       console.error('Error updating model preference:', error);
@@ -733,6 +744,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
                 isLoading={isLoading}
                 containerRef={messagesContainerRef}
                 bottomPadding={messageListBottomPadding}
+                conversationId={currentConversationId}
                 onDeliverablePreview={(d) =>
                   setSelectedArtifact({
                     id: d.id,

@@ -6,6 +6,7 @@ import type {
   SetChatModelPreferenceResponse
 } from '../shared/types/ipc';
 import type { SkillManifest } from '../shared/types/skill-manifest';
+import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
 
 export type ChatResponse = SendMessageResponse;
 
@@ -485,6 +486,12 @@ export interface ElectronAPI {
     ) => Promise<ScheduleTaskResponse>;
     delete: (id: string) => Promise<{ success: boolean; error?: string }>;
     runNow: (id: string) => Promise<ScheduleRunResponse>;
+  };
+  analytics: {
+    trackEvent: (event: AnalyticsEvent) => Promise<void>;
+    submitFeedback: (feedback: MessageFeedback) => Promise<void>;
+    getSettings: () => Promise<AnalyticsSettings>;
+    setSettings: (settings: Partial<AnalyticsSettings>) => Promise<AnalyticsSettings>;
   };
   update: {
     getStatus: () => Promise<UpdateStatus>;

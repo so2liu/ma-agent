@@ -13,6 +13,8 @@ import { registerShellHandlers } from './handlers/shell-handlers';
 import { registerSkillHandlers } from './handlers/skill-handlers';
 import { registerUpdateHandlers } from './handlers/update-handlers';
 import { registerWorkspaceHandlers, restartFileWatcher } from './handlers/workspace-handlers';
+import { registerAnalyticsHandlers } from './handlers/analytics-handlers';
+import { shutdownAnalytics, trackEvent } from './lib/analytics-service';
 import { buildEnhancedPath, ensureWorkspaceDir } from './lib/config';
 import { appManager } from './lib/sandbox/app-manager';
 import { skillDiscovery } from './lib/skill-discovery';
@@ -126,6 +128,7 @@ app.whenReady().then(async () => {
   registerDbHandlers();
   registerSkillHandlers(() => mainWindow);
   registerScheduleHandlers();
+  registerAnalyticsHandlers();
 
   createWindow();
 
@@ -136,6 +139,9 @@ app.whenReady().then(async () => {
   // Create and set application menu AFTER window is created
   const menu = createApplicationMenu(mainWindow);
   Menu.setApplicationMenu(menu);
+
+  // Track app launch
+  trackEvent({ type: 'app_launched', timestamp: Date.now() });
 
   // Ensure workspace directory exists, then start file watcher, LAN discovery, and scheduler
   ensureWorkspaceDir()
@@ -166,6 +172,10 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  trackEvent({ type: 'app_closed', timestamp: Date.now() });
+  shutdownAnalytics().catch((error) => {
+    console.error('Error shutting down analytics:', error);
+  });
   stopScheduler();
   skillDiscovery.stop().catch((error) => {
     console.error('Error stopping skill discovery on quit:', error);

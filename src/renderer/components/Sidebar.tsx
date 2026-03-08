@@ -168,6 +168,7 @@ export default function Sidebar({
     try {
       const response = await window.electron.conversation.delete(conversationId);
       if (response.success) {
+        window.electron.analytics.trackEvent({ type: 'conversation_deleted', timestamp: Date.now() });
         await loadData();
         if (conversationId === currentConversationId) await onNewChat();
       }
