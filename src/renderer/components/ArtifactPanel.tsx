@@ -269,14 +269,14 @@ export default function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps)
           <button
             onClick={handleOpenExternal}
             className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-            title="Open in browser"
+            title="在浏览器中打开"
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={onClose}
             className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-            title="Close preview"
+            title="关闭预览"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -287,7 +287,7 @@ export default function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps)
       <div className="flex-1 overflow-hidden" style={{ background: 'var(--color-content-secondary)' }}>
         {display.loading && (
           <div className="flex h-full items-center justify-center text-xs text-neutral-400">
-            Loading...
+            加载中...
           </div>
         )}
 

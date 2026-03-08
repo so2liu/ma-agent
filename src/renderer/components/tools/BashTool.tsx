@@ -24,7 +24,7 @@ export default function BashTool({ tool }: BashToolProps) {
       <ToolHeader tool={tool} toolName={tool.name} />
       {input.run_in_background && (
         <span className="rounded border border-blue-200/50 bg-blue-50/50 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-blue-600 uppercase dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
-          background
+          后台
         </span>
       )}
     </div>

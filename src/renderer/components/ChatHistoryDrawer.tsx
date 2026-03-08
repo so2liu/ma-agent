@@ -57,7 +57,7 @@ export default function ChatHistoryDrawer({
 
   const handleDelete = async (e: React.MouseEvent, conversationId: string) => {
     e.stopPropagation();
-    if (confirm('Are you sure you want to delete this conversation?')) {
+    if (confirm('确定要删除此对话吗？此操作无法撤销。')) {
       try {
         const response = await window.electron.conversation.delete(conversationId);
         if (response.success) {
@@ -174,16 +174,16 @@ export default function ChatHistoryDrawer({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
-                  Resume a thread
+                  继续对话
                 </h2>
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                  Pick up where you left off or start fresh
+                  接着之前的任务继续，或开始新的
                 </p>
               </div>
               <button
                 onClick={onClose}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white/80 text-neutral-600 transition-colors duration-200 hover:border-black/15 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-neutral-400 dark:hover:border-white/20 dark:hover:bg-white/10 dark:hover:text-neutral-50"
-                aria-label="Close drawer"
+                aria-label="关闭"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -195,13 +195,13 @@ export default function ChatHistoryDrawer({
             >
               <div className="absolute inset-0 bg-gradient-to-r from-black/[0.02] via-transparent to-transparent opacity-70 transition-opacity duration-200 group-hover:opacity-90 dark:from-white/5 dark:via-transparent dark:to-transparent" />
               <Plus className="relative h-4 w-4" />
-              <span className="relative">Start new chat</span>
+              <span className="relative">新建任务</span>
             </button>
 
             <div className="flex-1 overflow-y-auto">
               {isLoading ?
                 <div className="flex h-full items-center justify-center">
-                  <div className="text-sm text-neutral-500 dark:text-neutral-400">Loading...</div>
+                  <div className="text-sm text-neutral-500 dark:text-neutral-400">加载中...</div>
                 </div>
               : conversations.length === 0 ?
                 <div className="flex h-full flex-col items-center justify-center gap-2 px-4 py-6 text-center">
@@ -209,10 +209,10 @@ export default function ChatHistoryDrawer({
                     <MessageSquare className="h-5 w-5" />
                   </div>
                   <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                    No conversations yet
+                    暂无对话
                   </p>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Start a new chat to see it here
+                    新建任务后会显示在这里
                   </p>
                 </div>
               : <div className="space-y-2">
@@ -247,7 +247,7 @@ export default function ChatHistoryDrawer({
                           <button
                             onClick={(e) => handleDelete(e, conversation.id)}
                             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-transparent text-neutral-400 opacity-0 transition-colors duration-150 group-hover:opacity-100 hover:border-black/10 hover:bg-black/5 hover:text-neutral-700 dark:hover:border-white/10 dark:hover:bg-white/5 dark:hover:text-neutral-200"
-                            aria-label="Delete conversation"
+                            aria-label="删除对话"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

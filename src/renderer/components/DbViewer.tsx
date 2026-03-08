@@ -337,14 +337,14 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
                                   )
                                 }
                                 className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100 hover:text-indigo-600 dark:hover:bg-neutral-700"
-                                title="Edit"
+                                title="编辑"
                               >
                                 <Pencil className="h-3 w-3" />
                               </button>
                               <button
                                 onClick={() => handleDeleteRow(rowId)}
                                 className="rounded p-0.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
-                                title="Delete"
+                                title="删除"
                               >
                                 <Trash2 className="h-3 w-3" />
                               </button>

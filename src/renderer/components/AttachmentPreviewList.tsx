@@ -95,7 +95,7 @@ export default function AttachmentPreviewList({
             {onRemove && (
               <button
                 type="button"
-                aria-label={`Remove ${attachment.name}`}
+                aria-label={`删除 ${attachment.name}`}
                 onClick={() => handleRemove(attachment.id)}
                 className="absolute top-1.5 right-1.5 rounded-full bg-white/90 p-1 text-neutral-600 shadow-sm transition hover:bg-white dark:bg-neutral-900/80 dark:text-neutral-200"
               >

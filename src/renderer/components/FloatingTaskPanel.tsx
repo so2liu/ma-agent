@@ -60,7 +60,7 @@ export default function FloatingTaskPanel({ messages }: FloatingTaskPanelProps) 
           <div className="flex items-center gap-2">
             <ListTodo className="size-4 text-neutral-500 dark:text-neutral-400" />
             <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
-              Task Progress
+              任务进度
             </span>
             <span className="text-xs text-neutral-400 dark:text-neutral-500">
               {completedCount}/{totalCount}

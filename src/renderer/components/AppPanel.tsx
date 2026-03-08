@@ -125,7 +125,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
               <button
                 onClick={() => onOpenDbViewer(app.id, app.name)}
                 className="shrink-0 rounded p-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-indigo-600 dark:hover:bg-neutral-700 dark:hover:text-indigo-400"
-                title="View Data"
+                title="查看数据"
               >
                 <Database className="h-3 w-3" />
               </button>
@@ -183,7 +183,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
               <button
                 onClick={() => handleCopyUrl(app.lanUrl!)}
                 className="shrink-0 p-0.5 text-blue-400 hover:text-blue-600 dark:hover:text-blue-200"
-                title="Copy URL"
+                title="复制链接"
               >
                 <Copy className="h-2.5 w-2.5" />
               </button>
@@ -230,7 +230,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
               <button
                 onClick={() => handleCopyUrl(app.lanUrl!)}
                 className="shrink-0 p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-                title="Copy URL"
+                title="复制链接"
               >
                 <Copy className="h-2.5 w-2.5" />
               </button>

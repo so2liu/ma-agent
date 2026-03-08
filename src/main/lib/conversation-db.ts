@@ -203,8 +203,8 @@ export function generateTitleFromMessages(messages: unknown[]): string {
         content = msg.content;
       }
       // Truncate to 60 characters
-      return content.length > 60 ? content.substring(0, 60) + '...' : content || 'New Chat';
+      return content.length > 60 ? content.substring(0, 60) + '...' : content || '新对话';
     }
   }
-  return 'New Chat';
+  return '新对话';
 }

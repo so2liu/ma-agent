@@ -24,12 +24,12 @@ export default function ReadTool({ tool }: ReadToolProps) {
       <FilePath path={input.file_path} />
       {input.offset !== undefined && (
         <span className="rounded border border-neutral-200/50 bg-neutral-50/50 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-neutral-500 uppercase dark:border-neutral-700/50 dark:bg-neutral-900/50 dark:text-neutral-400">
-          offset {input.offset}
+          第 {input.offset} 行起
         </span>
       )}
       {input.limit !== undefined && (
         <span className="rounded border border-neutral-200/50 bg-neutral-50/50 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-neutral-500 uppercase dark:border-neutral-700/50 dark:bg-neutral-900/50 dark:text-neutral-400">
-          limit {input.limit}
+          读 {input.limit} 行
         </span>
       )}
     </div>

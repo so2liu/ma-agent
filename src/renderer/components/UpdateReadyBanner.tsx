@@ -61,7 +61,7 @@ export default function UpdateReadyBanner() {
         </div>
         <button
           onClick={handleInstall}
-          className="flex items-center gap-1.5 rounded-full bg-green-700 px-4 py-1.5 text-xs font-semibold tracking-wide text-white uppercase transition-colors hover:bg-green-800 dark:bg-green-500 dark:hover:bg-green-400"
+          className="flex items-center gap-1.5 rounded-full bg-green-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-800 dark:bg-green-500 dark:hover:bg-green-400"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           重启并安装

@@ -719,6 +719,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
               </div>
               <SkillCardGrid
                 onSelectSkill={(prompt) => setInputValue(prompt)}
+                currentInput={inputValue}
               />
             </div>
           ) : (

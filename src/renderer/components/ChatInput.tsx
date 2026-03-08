@@ -282,7 +282,7 @@ export default function ChatInput({
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder="How can I help you today?"
+            placeholder="输入你想让我做的事..."
             rows={1}
             className="w-full resize-none border-0 bg-transparent px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:outline-none dark:text-neutral-100 dark:placeholder-neutral-500"
             style={{
@@ -297,7 +297,7 @@ export default function ChatInput({
                 type="button"
                 onClick={handleAttachmentButtonClick}
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200/80 bg-neutral-100 text-neutral-600 transition hover:bg-neutral-200 focus:ring-2 focus:ring-neutral-400 focus:outline-none dark:border-neutral-700/70 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:ring-neutral-500"
-                title="Attach files"
+                title="添加附件"
               >
                 <Paperclip className="h-4 w-4" />
               </button>

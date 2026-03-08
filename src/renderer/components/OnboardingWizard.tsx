@@ -1,5 +1,5 @@
 import { ArrowRight, CheckCircle2, Key, Loader2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 interface OnboardingWizardProps {
   onComplete: (apiKeySaved: boolean) => void;
@@ -32,13 +32,6 @@ function OnboardingContent({ onComplete }: { onComplete: (apiKeySaved: boolean) 
     }
   };
 
-  useEffect(() => {
-    if (step === 'done') {
-      const timer = setTimeout(() => onComplete(true), 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [step, onComplete]);
-
   return (
     <>
       {step === 'welcome' && (
@@ -47,10 +40,11 @@ function OnboardingContent({ onComplete }: { onComplete: (apiKeySaved: boolean) 
           <h1 className="mb-2 text-2xl font-bold text-neutral-900 dark:text-white">
             欢迎使用小马快跑
           </h1>
-          <p className="mb-8 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-            小马快跑是你的 AI 工作助手，能帮你分析数据、处理文档、撰写文案等。
-            <br />
-            只需简单设置，就可以开始使用。
+          <p className="mb-2 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+            你的 AI 工作助手，能帮你分析数据、处理文档、撰写文案等。
+          </p>
+          <p className="mb-8 text-xs text-neutral-400 dark:text-neutral-500">
+            设置 API 密钥后即可开始
           </p>
           <button
             onClick={() => setStep('apikey')}
@@ -121,9 +115,16 @@ function OnboardingContent({ onComplete }: { onComplete: (apiKeySaved: boolean) 
           <h2 className="mb-2 text-xl font-bold text-neutral-900 dark:text-white">
             设置完成
           </h2>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            一切就绪，开始体验吧!
+          <p className="mb-6 text-sm text-neutral-500 dark:text-neutral-400">
+            一切就绪，开始体验吧
           </p>
+          <button
+            onClick={() => onComplete(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-neutral-900 px-6 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+          >
+            开始使用
+            <ArrowRight className="h-4 w-4" />
+          </button>
         </div>
       )}
     </>

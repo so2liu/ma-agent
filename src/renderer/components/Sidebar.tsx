@@ -455,7 +455,7 @@ export default function Sidebar({
       <div className="shrink-0 px-3 pb-2">
         <button
           onClick={() => onNewChat()}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-200/70 active:bg-neutral-200 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:active:bg-neutral-700"
+          className="flex w-full items-center gap-2.5 rounded-xl bg-neutral-800 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 active:bg-neutral-900 dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:active:bg-neutral-100"
         >
           <SquarePen className="h-4 w-4" />
           新建任务
@@ -777,13 +777,13 @@ export default function Sidebar({
             )}
 
           {isLoading && conversations.length === 0 && (
-            <div className="py-4 text-center text-xs text-neutral-400">Loading...</div>
+            <div className="py-4 text-center text-xs text-neutral-400">加载中...</div>
           )}
 
           {!isLoading && conversations.length === 0 && scheduledTasks.length === 0 && !isProjectsCollapsed && (
             <div className="flex flex-col items-center gap-1.5 py-6 text-center">
               <MessageSquare className="h-5 w-5 text-neutral-300 dark:text-neutral-600" />
-              <p className="text-xs text-neutral-400 dark:text-neutral-500">暂无任务</p>
+              <p className="text-xs text-neutral-400 dark:text-neutral-500">点击上方「新建任务」开始</p>
             </div>
           )}
         </div>
