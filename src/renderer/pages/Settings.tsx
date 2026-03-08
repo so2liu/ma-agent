@@ -1,6 +1,7 @@
 import { ArrowLeft, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { Switch } from '@/components/ui/switch';
 import type { UpdateChannel } from '@/electron';
 
 interface SettingsProps {
@@ -557,29 +558,16 @@ function Settings({ onBack }: SettingsProps) {
                     更新通道
                   </h2>
                   <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                    {updateChannel === 'nightly'
-                      ? '接收 main 分支的每日构建（可能不稳定）'
-                      : '仅接收稳定版本更新'}
+                    {updateChannel === 'stable'
+                      ? '仅接收稳定版本更新'
+                      : '接收 main 分支的每日构建（可能不稳定）'}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleToggleUpdateChannel}
+                <Switch
+                  checked={updateChannel === 'stable'}
+                  onCheckedChange={() => handleToggleUpdateChannel()}
                   disabled={isSavingChannel}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-transparent px-0.5 transition-colors duration-200 focus:ring-2 focus:ring-neutral-400/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
-                    updateChannel === 'nightly'
-                      ? 'bg-neutral-900 dark:bg-neutral-100'
-                      : 'bg-neutral-200 dark:bg-neutral-700'
-                  }`}
-                  role="switch"
-                  aria-checked={updateChannel === 'nightly'}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition duration-200 ${
-                      updateChannel === 'nightly' ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+                />
               </div>
             </section>
 
@@ -598,24 +586,11 @@ function Settings({ onBack }: SettingsProps) {
                       : '关闭后对话界面更简洁'}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleToggleDebugMode}
+                <Switch
+                  checked={debugMode}
+                  onCheckedChange={() => handleToggleDebugMode()}
                   disabled={isSavingDebugMode}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-transparent px-0.5 transition-colors duration-200 focus:ring-2 focus:ring-neutral-400/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
-                    debugMode
-                      ? 'bg-neutral-900 dark:bg-neutral-100'
-                      : 'bg-neutral-200 dark:bg-neutral-700'
-                  }`}
-                  role="switch"
-                  aria-checked={debugMode}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition duration-200 ${
-                      debugMode ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+                />
               </div>
             </section>
 
