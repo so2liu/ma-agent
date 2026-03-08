@@ -75,6 +75,20 @@ export default function Sidebar({
     }
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sidebar-projects-collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isTasksCollapsed, setIsTasksCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sidebar-tasks-collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [isFilesCollapsed, setIsFilesCollapsed] = useState(() => {
     try {
       return localStorage.getItem('sidebar-files-collapsed') === 'true';
@@ -504,23 +518,43 @@ export default function Sidebar({
         {/* --- 项目 Section --- */}
         <div className="px-3 pb-1">
           <div className="flex items-center justify-between py-1.5">
-            <span className="text-xs font-semibold text-neutral-400 dark:text-neutral-500">
-              项目
-            </span>
             <button
               onClick={() => {
-                setCreatingProject(true);
-                setTimeout(() => newProjectInputRef.current?.focus(), 0);
+                setIsProjectsCollapsed((prev) => {
+                  const next = !prev;
+                  try {
+                    localStorage.setItem('sidebar-projects-collapsed', String(next));
+                  } catch {
+                    /* ignore */
+                  }
+                  return next;
+                });
               }}
-              className="rounded p-0.5 text-neutral-400 transition hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-              title="新建项目"
+              className="flex items-center gap-1 text-xs font-semibold text-neutral-400 transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
             >
-              <Plus className="h-3.5 w-3.5" />
+              {isProjectsCollapsed ? (
+                <ChevronRight className="h-3 w-3" />
+              ) : (
+                <ChevronDown className="h-3 w-3" />
+              )}
+              项目
             </button>
+            {!isProjectsCollapsed && (
+              <button
+                onClick={() => {
+                  setCreatingProject(true);
+                  setTimeout(() => newProjectInputRef.current?.focus(), 0);
+                }}
+                className="rounded p-0.5 text-neutral-400 transition hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+                title="新建项目"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           {/* New project inline input */}
-          {creatingProject && (
+          {!isProjectsCollapsed && creatingProject && (
             <div className="mb-1 flex items-center gap-2 rounded-lg px-2.5 py-1.5">
               <FolderOpen className="h-4 w-4 shrink-0 text-neutral-400" />
               <input
@@ -543,7 +577,7 @@ export default function Sidebar({
           )}
 
           {/* Project list */}
-          {filteredProjects.map((project) => {
+          {!isProjectsCollapsed && filteredProjects.map((project) => {
             const projectConversations = grouped[project.id] ?? [];
             const isCollapsed = collapsedProjects.has(project.id);
             const isDragOver = dragOverProjectId === project.id;
@@ -619,7 +653,7 @@ export default function Sidebar({
             );
           })}
 
-          {projects.length === 0 && !creatingProject && (
+          {!isProjectsCollapsed && projects.length === 0 && !creatingProject && (
             <button
               onClick={() => {
                 setCreatingProject(true);
@@ -636,30 +670,50 @@ export default function Sidebar({
         {/* --- 所有任务 Section --- */}
         <div className="flex-1 px-3 pt-1">
           <div className="flex items-center justify-between py-1.5">
-            <span className="text-xs font-semibold text-neutral-400 dark:text-neutral-500">
-              所有任务
-            </span>
             <button
               onClick={() => {
-                setIsSearchOpen((prev) => {
-                  if (!prev) setTimeout(() => searchInputRef.current?.focus(), 0);
-                  else setSearchQuery('');
-                  return !prev;
+                setIsTasksCollapsed((prev) => {
+                  const next = !prev;
+                  try {
+                    localStorage.setItem('sidebar-tasks-collapsed', String(next));
+                  } catch {
+                    /* ignore */
+                  }
+                  return next;
                 });
               }}
-              className={`rounded p-0.5 transition-colors ${
-                isSearchOpen
-                  ? 'bg-neutral-200/80 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
-                  : 'text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
-              }`}
-              title="搜索 / 筛选"
+              className="flex items-center gap-1 text-xs font-semibold text-neutral-400 transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
+              {isTasksCollapsed ? (
+                <ChevronRight className="h-3 w-3" />
+              ) : (
+                <ChevronDown className="h-3 w-3" />
+              )}
+              所有任务
             </button>
+            {!isTasksCollapsed && (
+              <button
+                onClick={() => {
+                  setIsSearchOpen((prev) => {
+                    if (!prev) setTimeout(() => searchInputRef.current?.focus(), 0);
+                    else setSearchQuery('');
+                    return !prev;
+                  });
+                }}
+                className={`rounded p-0.5 transition-colors ${
+                  isSearchOpen
+                    ? 'bg-neutral-200/80 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
+                    : 'text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
+                }`}
+                title="搜索 / 筛选"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Search input */}
-          {isSearchOpen && (
+          {!isTasksCollapsed && isSearchOpen && (
             <div className="mb-1.5">
               <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-800">
                 <Search className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
@@ -681,7 +735,7 @@ export default function Sidebar({
           )}
 
           {/* Task list */}
-          <div className="pb-2">
+          {!isTasksCollapsed && <div className="pb-2">
             {isLoading ? (
               <div className="py-4 text-center text-xs text-neutral-400">Loading...</div>
             ) : conversations.length === 0 && apps.length === 0 ? (
@@ -823,7 +877,7 @@ export default function Sidebar({
                   )}
               </>
             )}
-          </div>
+          </div>}
         </div>
       </div>
 
