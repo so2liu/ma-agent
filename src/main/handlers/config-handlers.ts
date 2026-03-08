@@ -208,11 +208,12 @@ export function registerConfigHandlers(): void {
       }
 
       const baseURL = params?.baseUrl?.trim() || getApiBaseUrl();
+      const customModel = params?.modelId?.trim() || getCustomModelId();
       const modelId =
-        params?.modelId?.trim() ||
-        getCustomModelId() ||
+        customModel ||
         MODEL_BY_PREFERENCE[getCurrentModelPreference()] ||
         'claude-haiku-4-5-20251001';
+      const isCustomModel = Boolean(customModel);
 
       try {
         const client = new Anthropic({
@@ -229,7 +230,7 @@ export function registerConfigHandlers(): void {
         return {
           success: true,
           model: response.model,
-          message: `连接成功 -- 模型: ${response.model}`
+          message: isCustomModel ? `连接成功 (自定义模型)` : '连接成功，API 可用'
         };
       } catch (err: unknown) {
         // Use SDK error classes for reliable detection

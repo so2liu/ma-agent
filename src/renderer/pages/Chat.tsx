@@ -121,6 +121,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
   const [modelPreference, setModelPreference] = useState<ChatModelPreference>('fast');
   const [isModelPreferenceUpdating, setIsModelPreferenceUpdating] = useState(false);
+  const [customModelActive, setCustomModelActive] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const { messages, setMessages, isLoading, setIsLoading } = useClaudeChat();
   const messagesContainerRef = useAutoScroll(isLoading, messages);
@@ -161,6 +162,12 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
         if (isMounted && preference) setModelPreference(preference);
       })
       .catch((error) => console.error('Error loading model preference:', error));
+    window.electron.config
+      .getCustomModelId()
+      .then(({ customModelId }) => {
+        if (isMounted) setCustomModelActive(Boolean(customModelId?.trim()));
+      })
+      .catch(() => {});
     return () => {
       isMounted = false;
     };
@@ -578,6 +585,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
                   modelPreference={modelPreference}
                   onModelPreferenceChange={handleModelPreferenceChange}
                   isModelPreferenceUpdating={isModelPreferenceUpdating}
+                  customModelActive={customModelActive}
                 />
               </div>
               <SkillCardGrid
