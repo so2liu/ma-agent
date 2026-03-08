@@ -185,6 +185,7 @@ export interface Project {
   name: string;
   order: number;
   isArchived: boolean;
+  isDefault?: boolean;
   createdAt: number;
   updatedAt: number;
 }

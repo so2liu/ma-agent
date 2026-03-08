@@ -1,6 +1,7 @@
 import { ArrowLeft, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { Switch } from '@/components/ui/switch';
 import type { UpdateChannel } from '@/electron';
 
 interface SettingsProps {
@@ -71,7 +72,7 @@ function Settings({ onBack }: SettingsProps) {
   const [baseUrlSaveState, setBaseUrlSaveState] = useState<'idle' | 'success' | 'error'>('idle');
 
   const [customModelId, setCustomModelId] = useState<string>('');
-  const [isLoadingModelId, setIsLoadingModelId] = useState(true);
+  const [_isLoadingModelId, setIsLoadingModelId] = useState(true);
   const [isSavingModelId, setIsSavingModelId] = useState(false);
   const [modelIdSaveState, setModelIdSaveState] = useState<'idle' | 'success' | 'error'>('idle');
 
@@ -318,7 +319,7 @@ function Settings({ onBack }: SettingsProps) {
   };
 
   const isFormLoading =
-    isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl || isLoadingChannel || isLoadingModelId;
+    isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl || isLoadingChannel;
   const apiKeyPlaceholder = apiKeyStatus.lastFour ? `...${apiKeyStatus.lastFour}` : 'sk-ant-...';
 
   // Shared styles
@@ -468,47 +469,6 @@ function Settings({ onBack }: SettingsProps) {
 
             <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
-            {/* Custom Model ID */}
-            <section className="space-y-3">
-              <div>
-                <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                  模型 ID
-                </h2>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                  自定义模型 ID（如 MiniMax-2.5、k2.5、GLM-5 等），留空使用默认 Anthropic 模型
-                </p>
-                {customModelId.trim() && (
-                  <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
-                    * 设置后将覆盖聊天页面的模型选择器（Fast/Sonnet/Opus）
-                  </p>
-                )}
-              </div>
-              <input
-                type="text"
-                value={customModelId}
-                onChange={(e) => setCustomModelId(e.target.value)}
-                placeholder="留空使用默认模型"
-                className={inputClass}
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSaveModelId}
-                  disabled={isSavingModelId}
-                  className={primaryBtnClass}
-                >
-                  {isSavingModelId ? '保存中...' : '保存'}
-                </button>
-                {modelIdSaveState === 'success' && (
-                  <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
-                )}
-                {modelIdSaveState === 'error' && (
-                  <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
-                )}
-              </div>
-            </section>
-
-            <div className="border-t border-neutral-100 dark:border-neutral-800" />
-
             {/* Test Connection */}
             <section className="space-y-3">
               <div>
@@ -598,29 +558,16 @@ function Settings({ onBack }: SettingsProps) {
                     更新通道
                   </h2>
                   <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                    {updateChannel === 'nightly'
-                      ? '接收 main 分支的每日构建（可能不稳定）'
-                      : '仅接收稳定版本更新'}
+                    {updateChannel === 'stable'
+                      ? '仅接收稳定版本更新'
+                      : '接收 main 分支的每日构建（可能不稳定）'}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleToggleUpdateChannel}
+                <Switch
+                  checked={updateChannel === 'stable'}
+                  onCheckedChange={() => handleToggleUpdateChannel()}
                   disabled={isSavingChannel}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-transparent px-0.5 transition-colors duration-200 focus:ring-2 focus:ring-neutral-400/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
-                    updateChannel === 'nightly'
-                      ? 'bg-neutral-900 dark:bg-neutral-100'
-                      : 'bg-neutral-200 dark:bg-neutral-700'
-                  }`}
-                  role="switch"
-                  aria-checked={updateChannel === 'nightly'}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition duration-200 ${
-                      updateChannel === 'nightly' ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+                />
               </div>
             </section>
 
@@ -639,24 +586,11 @@ function Settings({ onBack }: SettingsProps) {
                       : '关闭后对话界面更简洁'}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleToggleDebugMode}
+                <Switch
+                  checked={debugMode}
+                  onCheckedChange={() => handleToggleDebugMode()}
                   disabled={isSavingDebugMode}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-transparent px-0.5 transition-colors duration-200 focus:ring-2 focus:ring-neutral-400/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
-                    debugMode
-                      ? 'bg-neutral-900 dark:bg-neutral-100'
-                      : 'bg-neutral-200 dark:bg-neutral-700'
-                  }`}
-                  role="switch"
-                  aria-checked={debugMode}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition duration-200 ${
-                      debugMode ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+                />
               </div>
             </section>
 
@@ -683,6 +617,41 @@ function Settings({ onBack }: SettingsProps) {
               </button>
               {isDebugExpanded && (
                 <div className="mt-2 space-y-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-800/50">
+                  {/* Custom Model ID */}
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold tracking-widest text-neutral-400 uppercase dark:text-neutral-500">
+                      自定义模型
+                    </p>
+                    <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                      填写后将替换聊天页面的快速/均衡/强力三档选择
+                    </p>
+                    <input
+                      type="text"
+                      value={customModelId}
+                      onChange={(e) => setCustomModelId(e.target.value)}
+                      placeholder={_isLoadingModelId ? '加载中...' : '留空使用默认模型'}
+                      disabled={_isLoadingModelId}
+                      className={inputClass}
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveModelId}
+                        disabled={isSavingModelId || _isLoadingModelId}
+                        className={primaryBtnClass}
+                      >
+                        {isSavingModelId ? '保存中...' : '保存'}
+                      </button>
+                      {modelIdSaveState === 'success' && (
+                        <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
+                      )}
+                      {modelIdSaveState === 'error' && (
+                        <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-neutral-200 dark:border-neutral-700" />
+
                   {/* App Information */}
                   <div className="space-y-2">
                     <p className="text-[10px] font-semibold tracking-widest text-neutral-400 uppercase dark:text-neutral-500">

@@ -159,16 +159,18 @@ function TreeNode({ node, depth, onFileSelect, selectedPath, onDelete }: TreeNod
         )}
         {isOpen && node.children && (
           <div>
-            {node.children.map((child) => (
-              <TreeNode
-                key={child.path}
-                node={child}
-                depth={depth + 1}
-                onFileSelect={onFileSelect}
-                selectedPath={selectedPath}
-                onDelete={onDelete}
-              />
-            ))}
+            {node.children
+              .filter((child) => !child.name.startsWith('.'))
+              .map((child) => (
+                <TreeNode
+                  key={child.path}
+                  node={child}
+                  depth={depth + 1}
+                  onFileSelect={onFileSelect}
+                  selectedPath={selectedPath}
+                  onDelete={onDelete}
+                />
+              ))}
           </div>
         )}
       </div>
@@ -269,27 +271,32 @@ export default function FileTree({ onFileSelect, selectedPath, onFileDeleted }: 
     [loadFiles, onFileDeleted]
   );
 
+  const visibleFiles = files.filter((node) => !node.name.startsWith('.'));
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-3 py-1.5">
-        <span className="text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500">
-          Files
+        <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+          工作区
         </span>
         <button
           onClick={loadFiles}
           disabled={isLoading}
           className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-          title="Refresh file tree"
+          title="刷新文件列表"
         >
           <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
         </button>
       </div>
+      <p className="px-3 pb-1.5 text-[10px] text-neutral-400 dark:text-neutral-500">
+        您的工作产出和 AI 任务产出均保存在此处
+      </p>
       <div className="flex-1 overflow-y-auto px-1 pb-2">
-        {files.length === 0 ?
+        {visibleFiles.length === 0 ?
           <div className="px-3 py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">
-            {isLoading ? 'Loading...' : 'No files'}
+            {isLoading ? '加载中...' : '暂无文件'}
           </div>
-        : files.map((node) => (
+        : visibleFiles.map((node) => (
             <TreeNode
               key={node.path}
               node={node}

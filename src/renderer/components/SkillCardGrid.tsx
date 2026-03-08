@@ -101,15 +101,23 @@ export default function SkillCardGrid({ onSelectSkill, onMoreClick }: SkillCardG
             <div className="mb-3 space-y-2">
               <div>
                 <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-                  示例提示词
+                  场景
                 </div>
                 <p className="text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
-                  {selectedCard.prefillPrompt}
+                  {selectedCard.detail.background}
                 </p>
               </div>
               <div>
                 <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-                  最终产物
+                  安排任务
+                </div>
+                <p className="text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
+                  {selectedCard.detail.task}
+                </p>
+              </div>
+              <div>
+                <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                  完成效果
                 </div>
                 <p className="text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
                   {selectedCard.detail.output}
@@ -121,7 +129,7 @@ export default function SkillCardGrid({ onSelectSkill, onMoreClick }: SkillCardG
               onClick={handleUsePrompt}
               className="flex items-center gap-1 rounded-lg bg-neutral-800 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-neutral-700 dark:bg-neutral-200 dark:text-neutral-800 dark:hover:bg-neutral-300"
             >
-              使用此提示词
+              使用此场景
               <ArrowRight className="h-3 w-3" />
             </button>
           </div>
