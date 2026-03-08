@@ -96,7 +96,7 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  // Set app name to match productName in package.json
+  // Set app display name (overrides productName from package.json)
   app.name = '小马快跑';
 
   // Set About panel options

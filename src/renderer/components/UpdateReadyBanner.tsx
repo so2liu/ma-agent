@@ -52,7 +52,7 @@ export default function UpdateReadyBanner() {
           </span>
           <div>
             <p className="text-sm font-semibold text-green-900 dark:text-green-100">
-              Update ready: {status.updateInfo?.version}
+              有新版本可用: {status.updateInfo?.version}
             </p>
             <p className="text-xs text-green-700 dark:text-green-300">
               重启小马快跑以完成安装。
@@ -64,7 +64,7 @@ export default function UpdateReadyBanner() {
           className="flex items-center gap-1.5 rounded-full bg-green-700 px-4 py-1.5 text-xs font-semibold tracking-wide text-white uppercase transition-colors hover:bg-green-800 dark:bg-green-500 dark:hover:bg-green-400"
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          Restart & Install
+          重启并安装
         </button>
       </div>
     </div>
