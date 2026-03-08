@@ -3,8 +3,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
-  Folder,
-  FolderPlus,
+  FolderOpen,
   Globe,
   Info,
   MessageSquare,
@@ -12,7 +11,9 @@ import {
   Plus,
   Search,
   Settings,
+  SlidersHorizontal,
   Sparkles,
+  SquarePen,
   Timer,
   Trash2,
 } from 'lucide-react';
@@ -286,7 +287,6 @@ export default function Sidebar({
           role: string;
           content: string | { type: string; text?: string }[];
         }>;
-        // Show the last assistant text as a summary of what was done
         let preview = '';
         for (let i = parsed.length - 1; i >= 0; i--) {
           if (parsed[i].role !== 'assistant') continue;
@@ -368,7 +368,7 @@ export default function Sidebar({
     return { grouped, ungrouped };
   }, [conversations, projectIds]);
 
-  // Filter conversations and projects by search query
+  // Filter by search query
   const filteredUngrouped = useMemo(() => {
     if (!searchQuery.trim()) return ungrouped;
     const q = searchQuery.toLowerCase();
@@ -413,7 +413,7 @@ export default function Sidebar({
         draggable
         onDragStart={(e) => handleDragStart(e, conversation.id)}
         onClick={() => onLoadConversation(conversation.id)}
-        className={`group mb-0.5 cursor-pointer rounded-lg px-2 py-1.5 transition-colors ${
+        className={`group mb-0.5 cursor-pointer rounded-lg px-2.5 py-2 transition-colors ${
           isActive
             ? 'bg-white shadow-sm dark:bg-neutral-800'
             : 'hover:bg-white/60 dark:hover:bg-neutral-800/50'
@@ -421,13 +421,10 @@ export default function Sidebar({
       >
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0 flex-1">
-            <div className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-200">
+            <div className="truncate text-[13px] leading-tight text-neutral-800 dark:text-neutral-200">
               {conversation.title}
             </div>
-            <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500 dark:text-neutral-400">
-              {conversationPreviews[conversation.id]}
-            </p>
-            <div className="mt-0.5 flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-500">
+            <div className="mt-1 flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-500">
               <Clock className="h-2.5 w-2.5" />
               <span>{formatRelativeDate(conversation.updatedAt)}</span>
             </div>
@@ -449,8 +446,8 @@ export default function Sidebar({
       {/* Drag region for macOS traffic lights */}
       <div className="h-7 shrink-0 [-webkit-app-region:drag]" />
 
-      {/* Brand + Onboarding */}
-      <div className="shrink-0 px-3 pb-2.5">
+      {/* Brand */}
+      <div className="shrink-0 px-4 pb-3">
         <div className="flex items-center gap-2">
           <span className="text-xl" role="img" aria-label="horse">
             🐴
@@ -460,7 +457,7 @@ export default function Sidebar({
           </span>
           <button
             onClick={onOnboardingClick}
-            className="ml-auto rounded-full p-0.5 text-neutral-300 transition hover:bg-neutral-200/60 hover:text-neutral-500 dark:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-400"
+            className="ml-auto rounded-full p-1 text-neutral-300 transition hover:bg-neutral-200/60 hover:text-neutral-500 dark:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-400"
             title="新手引导"
           >
             <Info className="h-3.5 w-3.5" />
@@ -468,13 +465,180 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Task List Header */}
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center justify-between px-3 pb-1.5">
-          <span className="text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500">
-            任务
-          </span>
-          <div className="flex items-center gap-0.5">
+      {/* === Primary Action: 新建任务 === */}
+      <div className="shrink-0 px-3 pb-2">
+        <button
+          onClick={() => onNewChat()}
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-200/70 active:bg-neutral-200 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:active:bg-neutral-700"
+        >
+          <SquarePen className="h-4 w-4" />
+          新建任务
+        </button>
+      </div>
+
+      {/* === Nav links === */}
+      <div className="shrink-0 space-y-0.5 px-3 pb-3">
+        <button
+          onClick={onSkillsClick}
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-neutral-600 transition-colors hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800"
+        >
+          <Sparkles className="h-4 w-4" />
+          Skill 精选
+        </button>
+        <button
+          onClick={onSchedulesClick}
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-neutral-600 transition-colors hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800"
+        >
+          <Timer className="h-4 w-4" />
+          定时任务
+          {scheduledTasks.length > 0 && (
+            <span className="ml-auto text-[10px] text-neutral-400 dark:text-neutral-500">
+              {scheduledTasks.filter((t) => t.enabled).length}/{scheduledTasks.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* === Scrollable content area === */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {/* --- 项目 Section --- */}
+        <div className="px-3 pb-1">
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-xs font-semibold text-neutral-400 dark:text-neutral-500">
+              项目
+            </span>
+            <button
+              onClick={() => {
+                setCreatingProject(true);
+                setTimeout(() => newProjectInputRef.current?.focus(), 0);
+              }}
+              className="rounded p-0.5 text-neutral-400 transition hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              title="新建项目"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* New project inline input */}
+          {creatingProject && (
+            <div className="mb-1 flex items-center gap-2 rounded-lg px-2.5 py-1.5">
+              <FolderOpen className="h-4 w-4 shrink-0 text-neutral-400" />
+              <input
+                ref={newProjectInputRef}
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateProject();
+                  if (e.key === 'Escape') {
+                    cancelledRef.current = true;
+                    setCreatingProject(false);
+                    setNewProjectName('');
+                  }
+                }}
+                onBlur={handleCreateProject}
+                placeholder="项目名称..."
+                className="min-w-0 flex-1 bg-transparent text-sm text-neutral-800 placeholder-neutral-400 outline-none dark:text-neutral-200 dark:placeholder-neutral-500"
+              />
+            </div>
+          )}
+
+          {/* Project list */}
+          {filteredProjects.map((project) => {
+            const projectConversations = grouped[project.id] ?? [];
+            const isCollapsed = collapsedProjects.has(project.id);
+            const isDragOver = dragOverProjectId === project.id;
+            const isEditing = editingProjectId === project.id;
+
+            const visibleConversations = searchQuery.trim()
+              ? projectConversations.filter(
+                  (conv) =>
+                    conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    (conversationPreviews[conv.id] ?? '').toLowerCase().includes(searchQuery.toLowerCase())
+                )
+              : projectConversations;
+
+            return (
+              <div key={project.id} className="mb-0.5">
+                <div
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-colors ${
+                    isDragOver
+                      ? 'bg-blue-50 dark:bg-blue-900/20'
+                      : 'hover:bg-white/60 dark:hover:bg-neutral-800/50'
+                  }`}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, projectId: project.id });
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    setDragOverProjectId(project.id);
+                  }}
+                  onDragLeave={() => setDragOverProjectId(null)}
+                  onDrop={(e) => handleDropOnProject(e, project.id)}
+                >
+                  <button
+                    onClick={() => toggleProjectCollapsed(project.id)}
+                    className="shrink-0 text-neutral-400 dark:text-neutral-500"
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight className="h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3" />
+                    )}
+                  </button>
+                  <FolderOpen className="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-500" />
+                  {isEditing ? (
+                    <input
+                      ref={editProjectInputRef}
+                      value={editingProjectName}
+                      onChange={(e) => setEditingProjectName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleRenameProject();
+                        if (e.key === 'Escape') {
+                          cancelledRef.current = true;
+                          setEditingProjectId(null);
+                        }
+                      }}
+                      onBlur={handleRenameProject}
+                      className="min-w-0 flex-1 bg-transparent text-sm text-neutral-800 outline-none dark:text-neutral-200"
+                    />
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate text-sm text-neutral-700 dark:text-neutral-300">
+                      {project.name}
+                    </span>
+                  )}
+                </div>
+
+                {!isCollapsed && visibleConversations.length > 0 && (
+                  <div className="ml-4 border-l border-neutral-200/50 pl-2 dark:border-neutral-700/50">
+                    {visibleConversations.map(renderConversationItem)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {projects.length === 0 && !creatingProject && (
+            <button
+              onClick={() => {
+                setCreatingProject(true);
+                setTimeout(() => newProjectInputRef.current?.focus(), 0);
+              }}
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-neutral-400 transition-colors hover:bg-white/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-300"
+            >
+              <FolderOpen className="h-4 w-4" />
+              新项目
+            </button>
+          )}
+        </div>
+
+        {/* --- 所有任务 Section --- */}
+        <div className="flex-1 px-3 pt-1">
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-xs font-semibold text-neutral-400 dark:text-neutral-500">
+              所有任务
+            </span>
             <button
               onClick={() => {
                 setIsSearchOpen((prev) => {
@@ -488,321 +652,178 @@ export default function Sidebar({
                   ? 'bg-neutral-200/80 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
                   : 'text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
               }`}
-              title="搜索任务"
+              title="搜索 / 筛选"
             >
-              <Search className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                setCreatingProject(true);
-                setTimeout(() => newProjectInputRef.current?.focus(), 0);
-              }}
-              className="rounded p-0.5 text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-              title="新建项目"
-            >
-              <FolderPlus className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => onNewChat()}
-              className="rounded p-0.5 text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-              title="新建任务"
-            >
-              <Plus className="h-3.5 w-3.5" />
+              <SlidersHorizontal className="h-3.5 w-3.5" />
             </button>
           </div>
-        </div>
 
-        {/* Search input */}
-        {isSearchOpen && (
-          <div className="mx-3 mb-1.5">
-            <input
-              ref={searchInputRef}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setIsSearchOpen(false);
-                  setSearchQuery('');
-                }
-              }}
-              placeholder="搜索任务..."
-              className="w-full rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-800 placeholder-neutral-400 outline-none focus:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:placeholder-neutral-500 dark:focus:border-neutral-600"
-            />
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto px-1.5 pb-1">
-          {/* Project Tasks */}
-          {isLoading ? (
-            <div className="px-2 py-4 text-center text-xs text-neutral-400">Loading...</div>
-          ) : conversations.length === 0 && projects.length === 0 && scheduledTasks.length === 0 && apps.length === 0 ? (
-            <div className="flex flex-col items-center gap-1 px-2 py-6 text-center">
-              <MessageSquare className="h-4 w-4 text-neutral-300 dark:text-neutral-600" />
-              <p className="text-xs text-neutral-400 dark:text-neutral-500">暂无任务</p>
+          {/* Search input */}
+          {isSearchOpen && (
+            <div className="mb-1.5">
+              <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-800">
+                <Search className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setIsSearchOpen(false);
+                      setSearchQuery('');
+                    }
+                  }}
+                  placeholder="搜索任务..."
+                  className="min-w-0 flex-1 bg-transparent text-xs text-neutral-800 placeholder-neutral-400 outline-none dark:text-neutral-200 dark:placeholder-neutral-500"
+                />
+              </div>
             </div>
-          ) : (
-            <>
-              {/* New project inline input */}
-              {creatingProject && (
-                <div className="mb-1 flex items-center gap-1.5 rounded-lg px-2 py-1.5">
-                  <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-                  <input
-                    ref={newProjectInputRef}
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleCreateProject();
-                      if (e.key === 'Escape') {
-                        cancelledRef.current = true;
-                        setCreatingProject(false);
-                        setNewProjectName('');
-                      }
+          )}
+
+          {/* Task list */}
+          <div className="pb-2">
+            {isLoading ? (
+              <div className="py-4 text-center text-xs text-neutral-400">Loading...</div>
+            ) : conversations.length === 0 && apps.length === 0 ? (
+              <div className="flex flex-col items-center gap-1.5 py-6 text-center">
+                <MessageSquare className="h-5 w-5 text-neutral-300 dark:text-neutral-600" />
+                <p className="text-xs text-neutral-400 dark:text-neutral-500">暂无任务</p>
+              </div>
+            ) : (
+              <>
+                {/* Ungrouped tasks */}
+                {filteredUngrouped.length > 0 && (
+                  <div
+                    className={dragOverUngrouped ? 'rounded-lg bg-blue-50/50 dark:bg-blue-900/10' : ''}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      setDragOverUngrouped(true);
                     }}
-                    onBlur={handleCreateProject}
-                    placeholder="项目名称..."
-                    className="min-w-0 flex-1 bg-transparent text-xs text-neutral-800 placeholder-neutral-400 outline-none dark:text-neutral-200 dark:placeholder-neutral-500"
-                  />
-                </div>
-              )}
+                    onDragLeave={() => setDragOverUngrouped(false)}
+                    onDrop={handleDropOnUngrouped}
+                  >
+                    {filteredUngrouped.map(renderConversationItem)}
+                  </div>
+                )}
 
-              {/* Projects */}
-              {filteredProjects.map((project) => {
-                const projectConversations = grouped[project.id] ?? [];
-                const isCollapsed = collapsedProjects.has(project.id);
-                const isDragOver = dragOverProjectId === project.id;
-                const isEditing = editingProjectId === project.id;
-
-                // Filter project conversations by search
-                const visibleConversations = searchQuery.trim()
-                  ? projectConversations.filter(
-                      (conv) =>
-                        conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        (conversationPreviews[conv.id] ?? '').toLowerCase().includes(searchQuery.toLowerCase())
-                    )
-                  : projectConversations;
-
-                return (
-                  <div key={project.id} className="mb-0.5">
-                    {/* Project header */}
-                    <div
-                      className={`flex items-center gap-1 rounded-lg px-2 py-1 transition-colors ${
-                        isDragOver
-                          ? 'bg-blue-50 dark:bg-blue-900/20'
-                          : 'hover:bg-white/60 dark:hover:bg-neutral-800/50'
-                      }`}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setContextMenu({ x: e.clientX, y: e.clientY, projectId: project.id });
+                {/* Scheduled Tasks */}
+                {filteredScheduledTasks.length > 0 && (
+                  <div className="mt-1 border-t border-neutral-200/50 pt-1 dark:border-neutral-700/50">
+                    <button
+                      onClick={() => {
+                        setIsSchedulesCollapsed((prev) => {
+                          const next = !prev;
+                          try {
+                            localStorage.setItem('sidebar-schedules-collapsed', String(next));
+                          } catch {
+                            /* ignore */
+                          }
+                          return next;
+                        });
                       }}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = 'move';
-                        setDragOverProjectId(project.id);
-                      }}
-                      onDragLeave={() => setDragOverProjectId(null)}
-                      onDrop={(e) => handleDropOnProject(e, project.id)}
+                      className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-400 transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
                     >
-                      <button
-                        onClick={() => toggleProjectCollapsed(project.id)}
-                        className="shrink-0 text-neutral-400 dark:text-neutral-500"
-                      >
-                        {isCollapsed ? (
-                          <ChevronRight className="h-3 w-3" />
-                        ) : (
-                          <ChevronDown className="h-3 w-3" />
-                        )}
-                      </button>
-                      <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
-                      {isEditing ? (
-                        <input
-                          ref={editProjectInputRef}
-                          value={editingProjectName}
-                          onChange={(e) => setEditingProjectName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleRenameProject();
-                            if (e.key === 'Escape') {
-                              cancelledRef.current = true;
-                              setEditingProjectId(null);
-                            }
-                          }}
-                          onBlur={handleRenameProject}
-                          className="min-w-0 flex-1 bg-transparent text-xs font-medium text-neutral-800 outline-none dark:text-neutral-200"
-                        />
+                      {isSchedulesCollapsed ? (
+                        <ChevronRight className="h-3 w-3" />
                       ) : (
-                        <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                          {project.name}
-                        </span>
+                        <ChevronDown className="h-3 w-3" />
                       )}
-                      <span className="shrink-0 text-[10px] text-neutral-400 dark:text-neutral-500">
-                        {projectConversations.length}
-                      </span>
-                    </div>
-
-                    {/* Project conversations */}
-                    {!isCollapsed && (
-                      <div className="ml-3 border-l border-neutral-200/50 pl-1 dark:border-neutral-700/50">
-                        {visibleConversations.map(renderConversationItem)}
+                      <Timer className="h-3 w-3" />
+                      定时任务
+                    </button>
+                    {!isSchedulesCollapsed && (
+                      <div className="mt-0.5 space-y-0.5">
+                        {filteredScheduledTasks.map((task) => (
+                          <div
+                            key={task.id}
+                            onClick={onSchedulesClick}
+                            className="group cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors hover:bg-white/60 dark:hover:bg-neutral-800/50"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                                  task.enabled
+                                    ? 'bg-green-400 dark:bg-green-500'
+                                    : 'bg-neutral-300 dark:bg-neutral-600'
+                                }`}
+                              />
+                              <span className="min-w-0 flex-1 truncate text-[13px] text-neutral-700 dark:text-neutral-300">
+                                {task.name}
+                              </span>
+                              {task.lastRunStatus && (
+                                <span
+                                  className={`shrink-0 text-[9px] ${
+                                    task.lastRunStatus === 'success'
+                                      ? 'text-green-500'
+                                      : task.lastRunStatus === 'error'
+                                        ? 'text-red-500'
+                                        : 'text-yellow-500'
+                                  }`}
+                                >
+                                  {task.lastRunStatus === 'success'
+                                    ? 'OK'
+                                    : task.lastRunStatus === 'error'
+                                      ? 'ERR'
+                                      : 'SKIP'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
-                );
-              })}
+                )}
 
-              {/* Ungrouped tasks */}
-              {filteredUngrouped.length > 0 && filteredProjects.length > 0 && (
-                <div
-                  className={`mt-1 border-t border-neutral-200/50 pt-1 dark:border-neutral-700/50 ${
-                    dragOverUngrouped ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
-                  }`}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    setDragOverUngrouped(true);
-                  }}
-                  onDragLeave={() => setDragOverUngrouped(false)}
-                  onDrop={handleDropOnUngrouped}
-                >
-                  {filteredUngrouped.map(renderConversationItem)}
-                </div>
-              )}
-
-              {/* When no projects, just show all conversations flat */}
-              {filteredProjects.length === 0 && projects.length === 0 && filteredUngrouped.map(renderConversationItem)}
-              {filteredProjects.length === 0 && projects.length > 0 && filteredUngrouped.length > 0 && (
-                <div
-                  className={dragOverUngrouped ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    setDragOverUngrouped(true);
-                  }}
-                  onDragLeave={() => setDragOverUngrouped(false)}
-                  onDrop={handleDropOnUngrouped}
-                >
-                  {filteredUngrouped.map(renderConversationItem)}
-                </div>
-              )}
-
-              {/* Scheduled Tasks Section */}
-              {filteredScheduledTasks.length > 0 && (
-                <div className="mt-1 border-t border-neutral-200/50 pt-1 dark:border-neutral-700/50">
-                  <button
-                    onClick={() => {
-                      setIsSchedulesCollapsed((prev) => {
-                        const next = !prev;
-                        try {
-                          localStorage.setItem('sidebar-schedules-collapsed', String(next));
-                        } catch {
-                          /* ignore */
-                        }
-                        return next;
-                      });
-                    }}
-                    className="flex w-full items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
-                  >
-                    {isSchedulesCollapsed ? (
-                      <ChevronRight className="h-3 w-3" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3" />
+                {/* Apps Section */}
+                {filteredApps.length > 0 && (
+                  <div className="mt-1 border-t border-neutral-200/50 pt-1 dark:border-neutral-700/50">
+                    <button
+                      onClick={() => {
+                        setIsAppsCollapsed((prev) => {
+                          const next = !prev;
+                          try {
+                            localStorage.setItem('sidebar-apps-collapsed', String(next));
+                          } catch {
+                            /* ignore */
+                          }
+                          return next;
+                        });
+                      }}
+                      className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-400 transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+                    >
+                      {isAppsCollapsed ? (
+                        <ChevronRight className="h-3 w-3" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3" />
+                      )}
+                      <Globe className="h-3 w-3" />
+                      应用
+                      <span className="ml-auto text-[10px] font-normal">
+                        {apps.length}
+                      </span>
+                    </button>
+                    {!isAppsCollapsed && (
+                      <div className="mt-0.5">
+                        <AppPanel onOpenDbViewer={onOpenDbViewer} apps={filteredApps} />
+                      </div>
                     )}
-                    <Timer className="h-3 w-3" />
-                    定时任务
-                    <span className="ml-auto text-[10px] font-normal text-neutral-400 dark:text-neutral-500">
-                      {scheduledTasks.filter((t) => t.enabled).length}/{scheduledTasks.length}
-                    </span>
-                  </button>
-                  {!isSchedulesCollapsed && (
-                    <div className="mt-0.5 space-y-0.5">
-                      {filteredScheduledTasks.map((task) => (
-                        <div
-                          key={task.id}
-                          onClick={onSchedulesClick}
-                          className="group cursor-pointer rounded-lg px-2 py-1.5 transition-colors hover:bg-white/60 dark:hover:bg-neutral-800/50"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                                task.enabled
-                                  ? 'bg-green-400 dark:bg-green-500'
-                                  : 'bg-neutral-300 dark:bg-neutral-600'
-                              }`}
-                            />
-                            <span className="min-w-0 flex-1 truncate text-xs text-neutral-700 dark:text-neutral-300">
-                              {task.name}
-                            </span>
-                            {task.lastRunStatus && (
-                              <span
-                                className={`shrink-0 text-[9px] ${
-                                  task.lastRunStatus === 'success'
-                                    ? 'text-green-500'
-                                    : task.lastRunStatus === 'error'
-                                      ? 'text-red-500'
-                                      : 'text-yellow-500'
-                                }`}
-                              >
-                                {task.lastRunStatus === 'success'
-                                  ? 'OK'
-                                  : task.lastRunStatus === 'error'
-                                    ? 'ERR'
-                                    : 'SKIP'}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Apps Section (inline in task list) */}
-              {filteredApps.length > 0 && (
-                <div className="mt-1 border-t border-neutral-200/50 pt-1 dark:border-neutral-700/50">
-                  <button
-                    onClick={() => {
-                      setIsAppsCollapsed((prev) => {
-                        const next = !prev;
-                        try {
-                          localStorage.setItem('sidebar-apps-collapsed', String(next));
-                        } catch {
-                          /* ignore */
-                        }
-                        return next;
-                      });
-                    }}
-                    className="flex w-full items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
-                  >
-                    {isAppsCollapsed ? (
-                      <ChevronRight className="h-3 w-3" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3" />
-                    )}
-                    <Globe className="h-3 w-3" />
-                    应用
-                    <span className="ml-auto text-[10px] font-normal text-neutral-400 dark:text-neutral-500">
-                      {apps.length}
-                    </span>
-                  </button>
-                  {!isAppsCollapsed && (
-                    <div className="mt-0.5">
-                      <AppPanel onOpenDbViewer={onOpenDbViewer} apps={filteredApps} />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Search no results */}
-              {searchQuery.trim() &&
-                filteredUngrouped.length === 0 &&
-                filteredProjects.length === 0 &&
-                filteredScheduledTasks.length === 0 &&
-                filteredApps.length === 0 && (
-                  <div className="px-2 py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">
-                    未找到匹配的任务
                   </div>
                 )}
-            </>
-          )}
+
+                {/* Search no results */}
+                {searchQuery.trim() &&
+                  filteredUngrouped.length === 0 &&
+                  filteredScheduledTasks.length === 0 &&
+                  filteredApps.length === 0 && (
+                    <div className="py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">
+                      未找到匹配的任务
+                    </div>
+                  )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -857,7 +878,7 @@ export default function Sidebar({
               return next;
             });
           }}
-          className="flex shrink-0 items-center gap-1 px-3 py-1.5 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+          className="flex shrink-0 items-center gap-1 px-4 py-1.5 text-xs font-semibold text-neutral-400 transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
         >
           {isFilesCollapsed ? (
             <ChevronRight className="h-3 w-3" />
@@ -875,19 +896,11 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Bottom bar - Skills & Settings */}
-      <div className="flex shrink-0 items-center justify-between border-t border-neutral-200/70 px-2 py-1.5 dark:border-neutral-800">
-        <button
-          onClick={onSkillsClick}
-          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-          title="Skill 精选"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>Skill 精选</span>
-        </button>
+      {/* Bottom bar - Settings only */}
+      <div className="flex shrink-0 items-center justify-end border-t border-neutral-200/70 px-3 py-1.5 dark:border-neutral-800">
         <button
           onClick={onSettingsClick}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
           title="设置"
         >
           <Settings className="h-4 w-4" />
