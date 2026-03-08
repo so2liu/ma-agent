@@ -15,9 +15,10 @@ import type { AppInfo } from '@/electron';
 interface AppPanelProps {
   onOpenDbViewer?: (appId: string, appName: string) => void;
   apps?: AppInfo[];
+  onAppsChanged?: () => void;
 }
 
-export default function AppPanel({ onOpenDbViewer, apps: externalApps }: AppPanelProps) {
+export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsChanged }: AppPanelProps) {
   const [internalApps, setInternalApps] = useState<AppInfo[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -25,7 +26,10 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps }: AppPane
   const apps = externalApps ?? internalApps;
 
   const loadApps = useCallback(async () => {
-    if (externalApps) return;
+    if (externalApps) {
+      onAppsChanged?.();
+      return;
+    }
     try {
       const response = await window.electron.app.scan();
       if (response.success) {
@@ -34,7 +38,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps }: AppPane
     } catch (error) {
       console.error('Error scanning apps:', error);
     }
-  }, [externalApps]);
+  }, [externalApps, onAppsChanged]);
 
   useEffect(() => {
     if (externalApps) return;

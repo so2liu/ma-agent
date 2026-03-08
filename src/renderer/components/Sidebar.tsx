@@ -163,20 +163,22 @@ export default function Sidebar({
     if (currentConversationId) loadData();
   }, [currentConversationId, loadData]);
 
+  const refreshApps = useCallback(async () => {
+    try {
+      const response = await window.electron.app.scan();
+      if (response.success) {
+        setApps(response.apps);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   // Refresh apps periodically
   useEffect(() => {
-    const timer = setInterval(async () => {
-      try {
-        const response = await window.electron.app.scan();
-        if (response.success) {
-          setApps(response.apps);
-        }
-      } catch {
-        /* ignore */
-      }
-    }, 3000);
+    const timer = setInterval(refreshApps, 3000);
     return () => clearInterval(timer);
-  }, []);
+  }, [refreshApps]);
 
   // Close context menu on click outside
   useEffect(() => {
@@ -591,6 +593,9 @@ export default function Sidebar({
                 )
               : projectConversations;
 
+            // When searching, force-expand projects that contain matches
+            const shouldShowConversations = searchQuery.trim() ? true : !isCollapsed;
+
             return (
               <div key={project.id} className="mb-0.5">
                 <div
@@ -644,7 +649,7 @@ export default function Sidebar({
                   )}
                 </div>
 
-                {!isCollapsed && visibleConversations.length > 0 && (
+                {shouldShowConversations && visibleConversations.length > 0 && (
                   <div className="ml-4 border-l border-neutral-200/50 pl-2 dark:border-neutral-700/50">
                     {visibleConversations.map(renderConversationItem)}
                   </div>
@@ -738,7 +743,7 @@ export default function Sidebar({
           {!isTasksCollapsed && <div className="pb-2">
             {isLoading ? (
               <div className="py-4 text-center text-xs text-neutral-400">Loading...</div>
-            ) : conversations.length === 0 && apps.length === 0 ? (
+            ) : conversations.length === 0 && apps.length === 0 && scheduledTasks.length === 0 ? (
               <div className="flex flex-col items-center gap-1.5 py-6 text-center">
                 <MessageSquare className="h-5 w-5 text-neutral-300 dark:text-neutral-600" />
                 <p className="text-xs text-neutral-400 dark:text-neutral-500">暂无任务</p>
@@ -860,7 +865,7 @@ export default function Sidebar({
                     </button>
                     {!isAppsCollapsed && (
                       <div className="mt-0.5">
-                        <AppPanel onOpenDbViewer={onOpenDbViewer} apps={filteredApps} />
+                        <AppPanel onOpenDbViewer={onOpenDbViewer} apps={filteredApps} onAppsChanged={refreshApps} />
                       </div>
                     )}
                   </div>
@@ -869,6 +874,7 @@ export default function Sidebar({
                 {/* Search no results */}
                 {searchQuery.trim() &&
                   filteredUngrouped.length === 0 &&
+                  filteredProjects.length === 0 &&
                   filteredScheduledTasks.length === 0 &&
                   filteredApps.length === 0 && (
                     <div className="py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">
