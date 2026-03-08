@@ -25,7 +25,7 @@ function buildSlashItems(installedSkills: SkillInfo[]): SlashCommandItem[] {
       id: `card-${card.id}`,
       name: card.id,
       displayName: card.title,
-      description: card.example,
+      description: card.description,
       prefillPrompt: card.prefillPrompt,
     });
   }
