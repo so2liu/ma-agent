@@ -234,30 +234,36 @@ export default function Sidebar({
           role: string;
           content: string | { type: string; text?: string }[];
         }>;
-        let lastUserMessage: (typeof parsed)[0] | undefined;
+        // Show the last assistant text as a summary of what was done
+        let preview = '';
         for (let i = parsed.length - 1; i >= 0; i--) {
-          if (parsed[i].role === 'user') {
-            lastUserMessage = parsed[i];
+          if (parsed[i].role !== 'assistant') continue;
+          const content = parsed[i].content;
+          if (typeof content === 'string') {
+            preview = truncateText(content);
             break;
           }
-        }
-        if (lastUserMessage) {
-          if (typeof lastUserMessage.content === 'string') {
-            acc[conversation.id] = truncateText(lastUserMessage.content);
-          } else if (Array.isArray(lastUserMessage.content)) {
-            const textBlock = lastUserMessage.content.find(
-              (block) => typeof block === 'object' && block !== null && 'text' in block
+          if (Array.isArray(content)) {
+            const textBlock = content.findLast(
+              (block) =>
+                typeof block === 'object' && block !== null && block.type === 'text' && 'text' in block
             );
-            if (textBlock && typeof textBlock === 'object' && 'text' in textBlock) {
-              acc[conversation.id] =
-                typeof textBlock.text === 'string' ? truncateText(textBlock.text) : '';
+            if (
+              textBlock &&
+              typeof textBlock === 'object' &&
+              'text' in textBlock &&
+              typeof textBlock.text === 'string'
+            ) {
+              preview = truncateText(textBlock.text);
+              break;
             }
           }
         }
+        acc[conversation.id] = preview;
       } catch {
         acc[conversation.id] = '';
       }
-      acc[conversation.id] = acc[conversation.id] || 'Continue this conversation...';
+      acc[conversation.id] = acc[conversation.id] || '继续对话...';
       return acc;
     }, {});
   }, [conversations]);

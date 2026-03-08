@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import OnboardingWizard from '@/components/OnboardingWizard';
 import UpdateCheckFeedback from '@/components/UpdateCheckFeedback';
 import UpdateReadyBanner from '@/components/UpdateReadyBanner';
 import Chat from '@/pages/Chat';
@@ -10,7 +11,25 @@ type View = 'home' | 'settings' | 'skills';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('home');
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const currentViewRef = useRef<View>('home');
+
+  useEffect(() => {
+    window.electron.config
+      .getApiKeyStatus()
+      .then(({ status }) => {
+        const isFirstLaunch = !status.configured && !localStorage.getItem('onboarding-done');
+        setShowOnboarding(isFirstLaunch);
+      })
+      .catch(() => setShowOnboarding(false));
+  }, []);
+
+  const handleOnboardingComplete = useCallback((apiKeySaved: boolean) => {
+    if (apiKeySaved) {
+      localStorage.setItem('onboarding-done', '1');
+    }
+    setShowOnboarding(false);
+  }, []);
 
   useEffect(() => {
     // Update ref whenever currentView changes
@@ -32,6 +51,9 @@ export default function App() {
       unsubscribeNavigate();
     };
   }, []);
+
+  if (showOnboarding === null) return null;
+  if (showOnboarding) return <OnboardingWizard onComplete={handleOnboardingComplete} />;
 
   return (
     <>

@@ -27,6 +27,7 @@ export default function Skills({ onBack }: SkillsProps) {
   const [editingTags, setEditingTags] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [installingSkill, setInstallingSkill] = useState<string | null>(null);
+  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
 
   const loadSkills = useCallback(async () => {
     try {
@@ -144,6 +145,11 @@ export default function Skills({ onBack }: SkillsProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-6">
+        {/* Intro */}
+        <p className="mb-4 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+          Skill 是小马快跑的能力扩展包，安装后可以处理更多类型的任务。你也可以通过局域网与同事共享 Skill。
+        </p>
+
         {error && (
           <div className="mb-4 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/20 dark:text-red-400">
             <span>{error}</span>
@@ -169,26 +175,73 @@ export default function Skills({ onBack }: SkillsProps) {
             </button>
           </div>
 
+          {/* Tag filter */}
+          {(() => {
+            const allTags = [...new Set(skills.flatMap((s) => s.manifest?.tags ?? []))];
+            if (allTags.length === 0) return null;
+            return (
+              <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => setActiveTagFilter(null)}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-medium transition ${
+                    activeTagFilter === null
+                      ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
+                      : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
+                  }`}
+                >
+                  全部
+                </button>
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => setActiveTagFilter(activeTagFilter === tag ? null : tag)}
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-medium transition ${
+                      activeTagFilter === tag
+                        ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
+                        : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
           {isLoading ?
             <div className="py-8 text-center text-xs text-neutral-400">加载中...</div>
           : skills.length === 0 ?
             <div className="py-8 text-center text-xs text-neutral-400">暂无 Skill</div>
-          : <div className="space-y-2">
-              {skills.map((skill) => (
-                <SkillCard
-                  key={skill.name}
-                  skill={skill}
-                  editingTags={editingTags}
-                  tagInput={tagInput}
-                  onTagInputChange={setTagInput}
-                  onToggleShared={handleToggleShared}
-                  onExport={handleExport}
-                  onStartEditTags={startEditTags}
-                  onSaveTags={handleSaveTags}
-                  onCancelEditTags={() => setEditingTags(null)}
-                />
-              ))}
-            </div>
+          : (() => {
+              const filtered = skills.filter((skill) =>
+                !activeTagFilter || (skill.manifest?.tags ?? []).includes(activeTagFilter)
+              );
+              if (filtered.length === 0) {
+                return (
+                  <div className="py-8 text-center text-xs text-neutral-400">
+                    没有匹配「{activeTagFilter}」的 Skill
+                  </div>
+                );
+              }
+              return (
+                <div className="space-y-2">
+                  {filtered.map((skill) => (
+                    <SkillCard
+                      key={skill.name}
+                      skill={skill}
+                      editingTags={editingTags}
+                      tagInput={tagInput}
+                      onTagInputChange={setTagInput}
+                      onToggleShared={handleToggleShared}
+                      onExport={handleExport}
+                      onStartEditTags={startEditTags}
+                      onSaveTags={handleSaveTags}
+                      onCancelEditTags={() => setEditingTags(null)}
+                    />
+                  ))}
+                </div>
+              );
+            })()
           }
         </section>
 

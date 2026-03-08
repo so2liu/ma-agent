@@ -322,7 +322,7 @@ export default function ChatInput({
                   disabled={isModelPreferenceUpdating}
                   className={modelPillClass(!isSmartMode)}
                 >
-                  Fast
+                  快速
                 </button>
                 <div className="relative flex items-center overflow-hidden">
                   <div
@@ -340,7 +340,7 @@ export default function ChatInput({
                       disabled={isModelPreferenceUpdating}
                       className={modelPillClass(isSmartMode)}
                     >
-                      Smart
+                      深度
                     </button>
                   </div>
                   <div
@@ -359,7 +359,7 @@ export default function ChatInput({
                       className={modelPillClass(smartVariant === 'sonnet', 'compact')}
                       title="claude-sonnet-4-5-20250929"
                     >
-                      Sonnet
+                      均衡
                     </button>
                     <button
                       type="button"
@@ -369,7 +369,7 @@ export default function ChatInput({
                       className={modelPillClass(smartVariant === 'opus', 'compact')}
                       title="claude-opus-4-5-20251101"
                     >
-                      Opus
+                      强力
                     </button>
                   </div>
                 </div>

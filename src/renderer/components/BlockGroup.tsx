@@ -132,35 +132,59 @@ export default function BlockGroup({
 
   if (blocks.length === 0) return null;
 
+  // Count tool calls and thinking blocks for the collapsed summary
+  const toolCount = blocks.filter((b) => b.type === 'tool_use').length;
+  const thinkingCount = blocks.filter((b) => b.type === 'thinking').length;
+
+  // Show individual badges when expanded or when actively streaming this section
+  const showIndividualBadges = isExpanded || (isLatestActiveSection && isStreaming);
+
   return (
     <div className="mt-1.5 mb-4">
-      <div className="flex flex-col items-start gap-1.5">
-        {blocks.map((block, index) => {
-          if (block.type === 'thinking') {
-            return (
-              <ThinkingBadge
-                key={`thinking-${index}`}
-                content={block.thinking || ''}
-                isComplete={block.isComplete}
-                durationMs={block.thinkingDurationMs}
-                isExpanded={isExpanded}
-                onToggle={toggleGroup}
-              />
-            );
-          }
-          if (block.type === 'tool_use' && block.tool) {
-            return (
-              <ToolBadge
-                key={`tool-${index}`}
-                tool={block.tool}
-                isExpanded={isExpanded}
-                onToggle={toggleGroup}
-              />
-            );
-          }
-          return null;
-        })}
-      </div>
+      {showIndividualBadges ?
+        <div className="flex flex-col items-start gap-1.5">
+          {blocks.map((block, index) => {
+            if (block.type === 'thinking') {
+              return (
+                <ThinkingBadge
+                  key={`thinking-${index}`}
+                  content={block.thinking || ''}
+                  isComplete={block.isComplete}
+                  durationMs={block.thinkingDurationMs}
+                  isExpanded={isExpanded}
+                  onToggle={toggleGroup}
+                />
+              );
+            }
+            if (block.type === 'tool_use' && block.tool) {
+              return (
+                <ToolBadge
+                  key={`tool-${index}`}
+                  tool={block.tool}
+                  isExpanded={isExpanded}
+                  onToggle={toggleGroup}
+                />
+              );
+            }
+            return null;
+          })}
+        </div>
+      : <button
+          type="button"
+          onClick={toggleGroup}
+          className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200/60 bg-neutral-50/80 px-2 py-1 text-[11px] font-medium text-neutral-500 transition-colors hover:bg-neutral-100/80 dark:border-neutral-700/40 dark:bg-neutral-800/40 dark:text-neutral-400 dark:hover:bg-neutral-700/40"
+        >
+          <ChevronDown className="size-3" />
+          <span>
+            {[
+              thinkingCount > 0 && `${thinkingCount} 次思考`,
+              toolCount > 0 && `${toolCount} 个操作`
+            ]
+              .filter(Boolean)
+              .join(', ')}
+          </span>
+        </button>
+      }
       {isExpanded && hasExpandableContent && (
         <div className="expanded-block-section mt-3 ml-3 pl-2.5">
           <div className="space-y-4">
