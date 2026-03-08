@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { Switch } from '@/components/ui/switch';
 import type { UpdateChannel } from '@/electron';
 
+import type { ChatModelPreference, CustomModelIds } from '../../shared/types/ipc';
+import { DEFAULT_MODEL_NAMES, MODEL_LABELS, MODEL_TOOLTIPS } from '../../shared/types/ipc';
+
 type ApiKeyStatus = {
   configured: boolean;
   source: 'env' | 'local' | null;
@@ -72,6 +75,11 @@ function Settings() {
   const [isSavingModelId, setIsSavingModelId] = useState(false);
   const [modelIdSaveState, setModelIdSaveState] = useState<'idle' | 'success' | 'error'>('idle');
 
+  const [customModelIds, setCustomModelIds] = useState<CustomModelIds>({});
+  const [isLoadingModelIds, setIsLoadingModelIds] = useState(true);
+  const [isSavingModelIds, setIsSavingModelIds] = useState(false);
+  const [modelIdsSaveState, setModelIdsSaveState] = useState<'idle' | 'success' | 'error'>('idle');
+
   const [testResult, setTestResult] = useState<TestResult>({ status: 'idle' });
 
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>('stable');
@@ -115,6 +123,14 @@ function Settings() {
         setIsLoadingModelId(false);
       })
       .catch(() => setIsLoadingModelId(false));
+
+    window.electron.config
+      .getCustomModelIds()
+      .then((response) => {
+        setCustomModelIds(response.customModelIds || {});
+        setIsLoadingModelIds(false);
+      })
+      .catch(() => setIsLoadingModelIds(false));
 
     window.electron.update
       .getChannel()
@@ -254,6 +270,22 @@ function Settings() {
       setTimeout(() => setBaseUrlSaveState('idle'), 2500);
     } finally {
       setIsSavingBaseUrl(false);
+    }
+  };
+
+  const handleSaveModelIds = async () => {
+    setIsSavingModelIds(true);
+    setModelIdsSaveState('idle');
+    try {
+      const response = await window.electron.config.setCustomModelIds(customModelIds);
+      setCustomModelIds(response.customModelIds || {});
+      setModelIdsSaveState('success');
+      setTimeout(() => setModelIdsSaveState('idle'), 2000);
+    } catch {
+      setModelIdsSaveState('error');
+      setTimeout(() => setModelIdsSaveState('idle'), 2500);
+    } finally {
+      setIsSavingModelIds(false);
     }
   };
 
@@ -486,6 +518,65 @@ function Settings() {
               {testResult.status === 'error' && testResult.message && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
                   {testResult.message}
+                </div>
+              )}
+            </section>
+
+            <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+            {/* Per-tier Model Configuration */}
+            <section className="space-y-3">
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                  模型配置
+                </h2>
+                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                  {'分别设置「快速」「均衡」「强力」三个档位使用的 AI 模型，留空则使用默认模型'}
+                </p>
+              </div>
+              {isLoadingModelIds ? (
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">加载中...</p>
+              ) : (
+                <div className="space-y-3">
+                  {(['fast', 'smart-sonnet', 'smart-opus'] as ChatModelPreference[]).map((pref) => (
+                    <div key={pref} className="space-y-1.5">
+                      <div className="flex items-baseline gap-2">
+                        <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                          {MODEL_LABELS[pref]}
+                        </label>
+                        <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                          {MODEL_TOOLTIPS[pref].description}
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        value={customModelIds[pref] || ''}
+                        onChange={(e) =>
+                          setCustomModelIds((prev) => ({ ...prev, [pref]: e.target.value }))
+                        }
+                        placeholder={`默认：${DEFAULT_MODEL_NAMES[pref]}`}
+                        className={inputClass}
+                      />
+                      <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                        推荐：{MODEL_TOOLTIPS[pref].suggestions.join('、')}
+                      </p>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleSaveModelIds}
+                      disabled={isSavingModelIds}
+                      className={primaryBtnClass}
+                    >
+                      {isSavingModelIds ? '保存中...' : '保存'}
+                    </button>
+                    {modelIdsSaveState === 'success' && (
+                      <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
+                    )}
+                    {modelIdsSaveState === 'error' && (
+                      <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
+                    )}
+                  </div>
                 </div>
               )}
             </section>

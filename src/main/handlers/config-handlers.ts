@@ -12,6 +12,7 @@ import Anthropic, {
   RateLimitError
 } from '@anthropic-ai/sdk';
 
+import type { CustomModelIds } from '../../shared/types/ipc';
 import {
   buildClaudeSessionEnv,
   buildEnhancedPath,
@@ -20,15 +21,17 @@ import {
   getApiKey,
   getApiKeyStatus,
   getCustomModelId,
+  getCustomModelIds,
   getDebugMode,
   getWorkspaceDir,
   loadConfig,
   saveConfig,
   setApiBaseUrl,
   setApiKey,
-  setCustomModelId
+  setCustomModelId,
+  setCustomModelIds
 } from '../lib/config';
-import { getCurrentModelPreference, MODEL_BY_PREFERENCE } from '../lib/claude-session';
+import { getModelIdForPreference } from '../lib/claude-session';
 import { restartFileWatcher } from './workspace-handlers';
 
 const requireModule = createRequire(import.meta.url);
@@ -194,6 +197,17 @@ export function registerConfigHandlers(): void {
     return { success: true, customModelId: getCustomModelId() };
   });
 
+  // Get per-tier custom model IDs
+  ipcMain.handle('config:get-custom-model-ids', () => {
+    return { customModelIds: getCustomModelIds() };
+  });
+
+  // Set per-tier custom model IDs
+  ipcMain.handle('config:set-custom-model-ids', (_event, ids: CustomModelIds) => {
+    setCustomModelIds(ids);
+    return { success: true, customModelIds: getCustomModelIds() };
+  });
+
   // Test API connection using form values (not persisted config)
   ipcMain.handle(
     'config:test-api',
@@ -208,12 +222,9 @@ export function registerConfigHandlers(): void {
       }
 
       const baseURL = params?.baseUrl?.trim() || getApiBaseUrl();
-      const customModel = params?.modelId?.trim() || getCustomModelId();
-      const modelId =
-        customModel ||
-        MODEL_BY_PREFERENCE[getCurrentModelPreference()] ||
-        'claude-haiku-4-5-20251001';
-      const isCustomModel = Boolean(customModel);
+      const explicitModel = params?.modelId?.trim();
+      const modelId = explicitModel || getModelIdForPreference();
+      const isCustomModel = Boolean(explicitModel);
 
       try {
         const client = new Anthropic({
