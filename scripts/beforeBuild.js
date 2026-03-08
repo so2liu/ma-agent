@@ -158,7 +158,10 @@ export default async function beforeBuild(_context) {
   console.log('Pruning non-runtime files from out/node_modules...');
   pruneNonRuntimeFiles(outNodeModulesDir);
 
-  // Step 3: Compile skills from project root
+  // Step 3: Clean stale skills from previous builds, then compile
+  const outSkillsDir = join(projectDir, 'out', '.claude', 'skills');
+  rmIfExists(outSkillsDir);
+
   console.log('\nCompiling Claude skills...');
   const buildSkillsScript = join(__dirname, 'buildSkills.js');
   const result = spawnSync('bun', [buildSkillsScript], {
