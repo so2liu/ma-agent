@@ -1,5 +1,5 @@
 import { spawnSync } from 'child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -14,6 +14,28 @@ const CURRENT_RIPGREP_TARGET =
 function rmIfExists(path) {
   if (existsSync(path)) {
     rmSync(path, { recursive: true, force: true });
+  }
+}
+
+// Remove .d.ts, .d.mts, .map, and other non-runtime files from a copied dependency tree.
+function pruneNonRuntimeFiles(dir) {
+  const PRUNE_EXTENSIONS = new Set(['.d.ts', '.d.mts', '.map']);
+  const PRUNE_DIRS = new Set(['docs', 'doc', 'example', 'examples', 'test', 'tests', '__tests__']);
+
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (PRUNE_DIRS.has(entry.name)) {
+        rmSync(fullPath, { recursive: true, force: true });
+      } else {
+        pruneNonRuntimeFiles(fullPath);
+      }
+    } else if (entry.isFile()) {
+      const matchesExt = [...PRUNE_EXTENSIONS].some((ext) => entry.name.endsWith(ext));
+      if (matchesExt) {
+        rmSync(fullPath, { force: true });
+      }
+    }
   }
 }
 
@@ -44,7 +66,7 @@ function pruneSdkVendorArtifacts(depName, targetDir) {
 export default async function beforeBuild(_context) {
   const projectDir = join(__dirname, '..');
 
-  // Step 1: Download runtime binaries (bun, uv)
+  // Step 1: Download runtime binaries
   console.log('Downloading runtime binaries...');
   const downloadBinariesScript = join(__dirname, 'downloadRuntimeBinaries.js');
   const downloadResult = spawnSync('node', [downloadBinariesScript], {
@@ -65,6 +87,7 @@ export default async function beforeBuild(_context) {
 
   const nodeModulesDir = join(projectDir, 'node_modules');
   const outNodeModulesDir = join(projectDir, 'out', 'node_modules');
+  rmIfExists(outNodeModulesDir);
   mkdirSync(outNodeModulesDir, { recursive: true });
 
   // Track which dependencies we've already copied to avoid duplicates
@@ -130,6 +153,10 @@ export default async function beforeBuild(_context) {
   for (const depName of runtimeDeps) {
     copyDependency(depName, optionalDeps.has(depName));
   }
+
+  // Step 2b: Remove non-runtime files (.d.ts, .map, tests, docs) from copied dependencies
+  console.log('Pruning non-runtime files from out/node_modules...');
+  pruneNonRuntimeFiles(outNodeModulesDir);
 
   // Step 3: Compile skills from project root
   console.log('\nCompiling Claude skills...');

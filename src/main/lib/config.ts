@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { cp, mkdir, rename, rm } from 'fs/promises';
-import { dirname, join, resolve } from 'path';
+import { join, resolve } from 'path';
 import { app } from 'electron';
 
 import type { ChatModelPreference } from '../../shared/types/ipc';
@@ -156,36 +156,6 @@ export function setChatModelPreferenceSetting(preference: ChatModelPreference): 
   saveConfig(config);
 }
 
-export function getBundledBunPath(): string {
-  // Return the path to the bundled bun executable
-  // In development: resources/bun in project root
-  // In production: app.asar.unpacked not needed as resources/ is at top level
-  const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL;
-  const bunName = process.platform === 'win32' ? 'bun.exe' : 'bun';
-  if (isDev) {
-    // In dev, resources/ is in the project root
-    return join(app.getAppPath(), 'resources', bunName);
-  } else {
-    // In production, resources/ is at the app bundle root
-    return join(process.resourcesPath, bunName);
-  }
-}
-
-export function getBundledUvPath(): string {
-  // Return the path to the bundled uv executable (Python package manager)
-  // In development: resources/uv in project root
-  // In production: resources/ is at the app bundle root
-  const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL;
-  const uvName = process.platform === 'win32' ? 'uv.exe' : 'uv';
-  if (isDev) {
-    // In dev, resources/ is in the project root
-    return join(app.getAppPath(), 'resources', uvName);
-  } else {
-    // In production, resources/ is at the app bundle root
-    return join(process.resourcesPath, uvName);
-  }
-}
-
 export function getBundledGitPath(): string | null {
   // Return the path to the bundled Git directory (Windows only)
   // In development: resources/git-portable in project root
@@ -306,18 +276,14 @@ export function getBashExePath(): string | null {
 }
 
 /**
- * Builds an enhanced PATH that includes all bundled binaries (bun, uv, git, msys2)
+ * Builds an enhanced PATH that includes bundled binaries (git, msys2 on Windows)
  * and filters out duplicates from the user's existing PATH.
  * This ensures consistent PATH setup for both the Electron app and Claude Agent SDK.
  */
 export function buildEnhancedPath(): string {
   const pathSeparator = process.platform === 'win32' ? ';' : ':';
 
-  // Collect all bundled binary directories
-  const bundledBinDirs: string[] = [
-    resolve(dirname(getBundledBunPath())),
-    resolve(dirname(getBundledUvPath()))
-  ];
+  const bundledBinDirs: string[] = [];
 
   // Add Git paths (Windows only)
   const bundledGitPath = getBundledGitPath();
@@ -396,7 +362,7 @@ export function buildClaudeSessionEnv(): Record<string, string> {
 
       // MSYS2 bash requires special environment variables to properly inherit
       // Windows environment variables and PATH. Without these, env vars and binaries
-      // (like bun, uv) passed to the SDK won't be available inside the bash session.
+      // passed to the SDK won't be available inside the bash session.
       if (isMsys2Bash(bashExePath)) {
         // MSYSTEM tells MSYS2 which environment to use (MSYS, MINGW64, etc.)
         env.MSYSTEM = 'MSYS';

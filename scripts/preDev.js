@@ -12,7 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 console.log('Preparing development environment...\n');
 
-// Step 1: Download runtime binaries (bun, uv)
+// Step 1: Download runtime binaries
 const downloadBinariesScript = join(__dirname, 'downloadRuntimeBinaries.js');
 const downloadResult = spawnSync('node', [downloadBinariesScript], {
   stdio: 'inherit',

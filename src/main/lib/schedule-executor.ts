@@ -38,8 +38,9 @@ export async function executeScheduledTask(task: ScheduledTask): Promise<string>
       permissionMode: 'acceptEdits',
       allowedTools: ['Bash', 'WebFetch', 'WebSearch', 'Skill'],
       pathToClaudeCodeExecutable: resolveClaudeCodeCli(),
-      executable: 'bun',
-      env,
+      executable: process.execPath as 'node',
+      executableArgs: ['--no-warnings'],
+      env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',

@@ -6,6 +6,22 @@ license: Proprietary. LICENSE.txt has complete terms
 
 # PDF Processing Guide
 
+## Prerequisites
+
+This skill requires Python 3. Before running any Python command, check availability:
+
+```bash
+python3 --version
+```
+
+If python3 is not found, install uv (a fast Python package manager that includes a managed Python runtime):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then use `uv run --python 3.12 --with <deps> script.py` instead of `python script.py` for all Python commands, so uv automatically provisions Python and dependencies.
+
 ## Overview
 
 This guide covers essential PDF processing operations using Python libraries and command-line tools. For advanced features, JavaScript libraries, and detailed examples, see reference.md. If you need to fill out a PDF form, read forms.md and follow its instructions.

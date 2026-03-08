@@ -25,8 +25,7 @@ import { createApplicationMenu } from './menu';
 // The crash occurs in v8::V8::EnableWebAssemblyTrapHandler during V8 initialization
 app.commandLine.appendSwitch('disable-features', 'WebAssemblyTrapHandler');
 
-// Fix PATH for all platforms - merge bundled binaries (bun, uv, git, msys2) with user's PATH
-// This ensures bundled binaries are available while preserving user's existing PATH entries
+// Fix PATH for Windows - merge bundled binaries (git, msys2) with user's PATH
 process.env.PATH = buildEnhancedPath();
 
 let mainWindow: BrowserWindow | null = null;

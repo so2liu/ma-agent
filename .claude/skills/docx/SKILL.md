@@ -6,6 +6,22 @@ license: Proprietary. LICENSE.txt has complete terms
 
 # DOCX creation, editing, and analysis
 
+## Prerequisites
+
+This skill requires Python 3. Before running any Python command, check availability:
+
+```bash
+python3 --version
+```
+
+If python3 is not found, install uv (a fast Python package manager that includes a managed Python runtime):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then use `uv run --python 3.12 --with <deps> script.py` instead of `python script.py` for all Python commands, so uv automatically provisions Python and dependencies.
+
 ## Overview
 
 A user may ask you to create, edit, or analyze the contents of a .docx file. A .docx file is essentially a ZIP archive containing XML files and other resources that you can read or edit. You have different tools and workflows available for different tasks.

@@ -9,9 +9,9 @@
 
 The [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview) is a powerful toolkit for building AI agents that can execute code, manage files, search the web, and perform complex multi-step tasks. However, using it typically requires programming knowledge, terminal commands, and installing developer tools like Node.js, Python, and package managers.
 
-**Claude Agent Desktop removes these barriers entirely.** Designed for all knowledge workers, not just engineers, it packages the full power of the Claude Agent SDK into a simple desktop application:
+**Claude Agent Desktop removes most of these barriers.** Designed for all knowledge workers, not just engineers, it packages the full power of the Claude Agent SDK into a simple desktop application:
 
-- **Zero technical setup** — All required runtimes are bundled: [bun](https://bun.sh) for JavaScript/TypeScript, [uv](https://docs.astral.sh/uv/) for Python, and portable Git/Unix tools for Windows. No installation of development tools needed.
+- **Practical local tooling** — The app bundles [bun](https://bun.sh) for JavaScript/TypeScript workflows plus portable Git/Unix tools on Windows. Python workflows can use tools already available on your machine.
 - **Accessible workspace** — Your agent workspace defaults to `~/Desktop/claude-agent`, a shared environment for mutual collaboration. The agent can build applications, generate spreadsheets, and create documents here, while you can drag and drop your own files into the folder for the agent to analyze and work with.
 - **Pre-configured [Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)** — Built-in capabilities for document handling, data analysis, and more are automatically available without any configuration.
 - **Full agent capabilities** — Execute scripts, analyze files, create documents, automate workflows, and tackle complex knowledge work—all through natural conversation.

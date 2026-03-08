@@ -6,6 +6,22 @@ license: Proprietary. LICENSE.txt has complete terms
 
 # Requirements for Outputs
 
+## Prerequisites
+
+This skill requires Python 3 (for formula recalculation via recalc.py). Before running any Python command, check availability:
+
+```bash
+python3 --version
+```
+
+If python3 is not found, install uv (a fast Python package manager that includes a managed Python runtime):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then use `uv run --python 3.12 --with <deps> script.py` instead of `python script.py` for all Python commands, so uv automatically provisions Python and dependencies.
+
 ## All Excel files
 
 ### Zero Formula Errors

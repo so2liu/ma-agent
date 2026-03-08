@@ -96,9 +96,9 @@ function scaffoldApp(appDir: string, manifest: AppManifest): void {
   }
 }
 
-/** Install dependencies using bun */
+/** Install dependencies */
 function installDeps(appDir: string): void {
-  execSync('bun install', {
+  execSync('npm install', {
     cwd: appDir,
     stdio: 'pipe',
     timeout: 120_000
@@ -107,7 +107,7 @@ function installDeps(appDir: string): void {
 
 /** Build the Vite app for production */
 function buildApp(appDir: string): void {
-  execSync('bunx vite build', {
+  execSync('npx vite build', {
     cwd: appDir,
     stdio: 'pipe',
     timeout: 120_000

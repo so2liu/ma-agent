@@ -56,8 +56,8 @@ export const SYSTEM_PROMPT_APPEND = `**Workspace Context:**
 This is a multi-purpose workspace for diverse projects, scripts, and workflows—not a single monolithic codebase. Each subdirectory may represent different applications or tasks. Always understand context before making assumptions about project structure.
 
 **Tooling preferences:**
-- JavaScript/TypeScript: Use bun (not node/npm/npx).
-- Python: Use uv (not python/pip/conda). Write scripts to files (e.g., temp.py) instead of inline -c commands and run with uv run --with <deps> script.py.
+- JavaScript/TypeScript: Use node/npm/npx. If bun is available in PATH, prefer it.
+- Python: Prefer python3 when it's already available in PATH. Do not assume uv, pip, or conda are installed.
 
 **Memory:**
 Maintain \`CLAUDE.md\` in the workspace root as your persistent memory. Update continuously (not just when asked) with: database schemas, project patterns, code snippets, user preferences, and anything useful for future tasks.`;
@@ -210,11 +210,19 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
         permissionMode: 'acceptEdits',
         allowedTools: ['Bash', 'WebFetch', 'WebSearch', 'Skill'],
         pathToClaudeCodeExecutable: resolveClaudeCodeCli(),
-        executable: 'bun',
-        env,
+        executable: process.execPath as 'node',
+        executableArgs: ['--no-warnings'],
+        env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
         stderr: (message: string) => {
-          // Always check for error patterns and surface to user
           if (mainWindow && !mainWindow.isDestroyed()) {
+            // Skip SDK spawn/debug info lines that are not real errors
+            const isSpawnInfo = /^Spawning Claude Code/i.test(message.trim());
+            if (isSpawnInfo) {
+              if (getDebugMode()) {
+                mainWindow.webContents.send('chat:debug-message', message);
+              }
+              return;
+            }
             const isError =
               /rate.?limit|429|401|403|5\d{2}|error|ECONNREFUSED|ETIMEDOUT|unauthorized|forbidden/i.test(
                 message
