@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   BarChart3,
   FileText,
   Globe,
@@ -28,60 +29,60 @@ interface SkillCardGridProps {
 }
 
 export default function SkillCardGrid({ onSelectSkill, onMoreClick, currentInput = '' }: SkillCardGridProps) {
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmedInput, setConfirmedInput] = useState<string | null>(null);
 
-  const hoveredCard = skillCards.find((c) => c.id === hoveredId);
   const selectedCard = skillCards.find((c) => c.id === selectedId);
+  const isConfirmed = confirmedInput !== null && confirmedInput === currentInput;
 
-  const handleClick = useCallback(
+  const handlePillClick = useCallback(
     (card: SkillCard) => {
       if (card.id === 'more') {
+        setSelectedId(null);
         onMoreClick?.();
         return;
       }
-      if (!card.prefillPrompt) return;
-
-      if (currentInput.trim()) {
-        setSelectedId(card.id);
-      } else {
-        onSelectSkill(card.prefillPrompt);
-      }
+      setSelectedId((prev) => (prev === card.id ? null : card.id));
+      setConfirmedInput(null);
     },
-    [onMoreClick, onSelectSkill, currentInput],
+    [onMoreClick],
   );
 
-  const handleConfirmReplace = useCallback(() => {
-    if (selectedCard?.prefillPrompt) {
-      onSelectSkill(selectedCard.prefillPrompt);
+  const handleUsePrompt = useCallback(() => {
+    if (!selectedCard?.prefillPrompt) return;
+
+    if (currentInput.trim() && !isConfirmed) {
+      setConfirmedInput(currentInput);
+      return;
     }
+
+    onSelectSkill(selectedCard.prefillPrompt);
     setSelectedId(null);
-  }, [selectedCard, onSelectSkill]);
+    setConfirmedInput(null);
+  }, [selectedCard, currentInput, isConfirmed, onSelectSkill]);
 
   return (
-    <div className="flex w-full max-w-2xl flex-col items-center gap-2 px-4">
+    <div className="flex w-full max-w-2xl flex-col items-center gap-3 px-4">
+      {/* Pill tags */}
       <div className="flex flex-wrap justify-center gap-2">
         {skillCards.map((card) => {
           const Icon = iconMap[card.icon];
-          const isSelected = selectedId === card.id;
+          const isSelected = card.id === selectedId;
           return (
             <button
               key={card.id}
-              onClick={() => handleClick(card)}
-              onMouseEnter={() => setHoveredId(card.id)}
-              onMouseLeave={() => setHoveredId(null)}
-              onFocus={() => setHoveredId(card.id)}
-              onBlur={() => setHoveredId(null)}
-              aria-label={`${card.title}: ${card.example}`}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all focus-visible:ring-2 focus-visible:ring-neutral-400/50 active:scale-[0.97] ${
+              onClick={() => handlePillClick(card)}
+              aria-label={`${card.title}: ${card.description}`}
+              aria-expanded={isSelected && !!card.detail}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-neutral-400/50 ${
                 isSelected
-                  ? 'border-neutral-400 bg-neutral-800 text-white dark:border-neutral-400 dark:bg-neutral-200 dark:text-neutral-900'
-                  : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-100'
+                  ? 'border-neutral-400 bg-neutral-100 text-neutral-800 dark:border-neutral-500 dark:bg-neutral-700 dark:text-neutral-100'
+                  : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-750'
               }`}
             >
               <Icon
                 className="h-3.5 w-3.5"
-                style={{ color: isSelected ? undefined : card.iconColor }}
+                style={{ color: card.iconColor }}
               />
               {card.title}
             </button>
@@ -89,25 +90,65 @@ export default function SkillCardGrid({ onSelectSkill, onMoreClick, currentInput
         })}
       </div>
 
-      {/* Hint / confirmation */}
-      <div className="h-5">
-        {hoveredCard?.example && !selectedId && (
-          <p className="animate-in fade-in duration-150 text-xs text-neutral-400 dark:text-neutral-500">
-            例: {hoveredCard.example}
-          </p>
-        )}
-        {selectedCard?.prefillPrompt && (
-          <p className="animate-in fade-in duration-150 text-xs text-neutral-400 dark:text-neutral-500">
-            将替换当前输入 —{' '}
+      {/* Detail card */}
+      {selectedCard?.detail && (
+        <div className="w-full max-w-lg animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="rounded-xl border border-neutral-200/80 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-neutral-700/80 dark:bg-neutral-800/90">
+            <div className="mb-3 flex items-center gap-2">
+              <div
+                className="flex h-6 w-6 items-center justify-center rounded-md"
+                style={{ backgroundColor: selectedCard.iconColor }}
+              >
+                {(() => {
+                  const Icon = iconMap[selectedCard.icon];
+                  return <Icon className="h-3.5 w-3.5 text-white" />;
+                })()}
+              </div>
+              <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                {selectedCard.title}
+              </span>
+              <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                {selectedCard.description}
+              </span>
+            </div>
+
+            <div className="mb-3 space-y-2">
+              <div>
+                <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                  场景
+                </div>
+                <p className="text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
+                  {selectedCard.detail.background}
+                </p>
+              </div>
+              <div>
+                <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                  安排任务
+                </div>
+                <p className="text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
+                  {selectedCard.detail.task}
+                </p>
+              </div>
+              <div>
+                <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                  完成效果
+                </div>
+                <p className="text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
+                  {selectedCard.detail.output}
+                </p>
+              </div>
+            </div>
+
             <button
-              onClick={handleConfirmReplace}
-              className="text-neutral-600 underline hover:text-neutral-800 dark:text-neutral-300 dark:hover:text-neutral-100"
+              onClick={handleUsePrompt}
+              className="flex items-center gap-1 rounded-lg bg-neutral-800 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-neutral-700 dark:bg-neutral-200 dark:text-neutral-800 dark:hover:bg-neutral-300"
             >
-              确认替换
+              {isConfirmed ? '确认替换当前输入' : '使用此场景'}
+              <ArrowRight className="h-3 w-3" />
             </button>
-          </p>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
