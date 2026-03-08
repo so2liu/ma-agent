@@ -301,9 +301,9 @@ function Settings({ onBack }: SettingsProps) {
 
   return (
     <div className="flex h-screen flex-col bg-linear-to-b from-neutral-50 via-white to-neutral-100 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950">
-      <div className="fixed top-0 right-0 left-0 z-50 h-12 [-webkit-app-region:drag]" />
+      <div className="fixed top-0 right-0 left-0 z-50 [-webkit-app-region:drag]" style={{ height: 'var(--titlebar-height)' }} />
 
-      <div className="flex flex-1 flex-col overflow-hidden pt-12">
+      <div className="flex flex-1 flex-col overflow-hidden" style={{ paddingTop: 'var(--titlebar-height)' }}>
         <div className="flex-1 overflow-y-auto px-6 pt-8 pb-16">
           <div className="mx-auto max-w-3xl space-y-8">
             <div className="flex flex-wrap items-start justify-between gap-4">

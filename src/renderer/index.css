@@ -2,6 +2,11 @@
 
 @plugin '@tailwindcss/typography';
 
+/* macOS traffic-light safe area */
+:root {
+  --titlebar-height: 38px;
+}
+
 /* Custom scrollbar styling for a cleaner look */
 * {
   scrollbar-width: thin;
