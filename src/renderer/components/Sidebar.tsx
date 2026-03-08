@@ -5,9 +5,12 @@ import {
   Clock,
   Folder,
   FolderPlus,
+  Globe,
+  Info,
   MessageSquare,
   Pencil,
   Plus,
+  Search,
   Settings,
   Sparkles,
   Timer,
@@ -15,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { Conversation, Project, ScheduledTask } from '@/electron';
+import type { AppInfo, Conversation, Project, ScheduledTask } from '@/electron';
 
 import AppPanel from './AppPanel';
 import FileTree from './FileTree';
@@ -36,6 +39,7 @@ interface SidebarProps {
   onSkillsClick?: () => void;
   onSchedulesClick?: () => void;
   onOpenDbViewer?: (appId: string, appName: string) => void;
+  onOnboardingClick?: () => void;
 }
 
 export default function Sidebar({
@@ -49,13 +53,22 @@ export default function Sidebar({
   onSkillsClick,
   onSchedulesClick,
   onOpenDbViewer,
+  onOnboardingClick,
 }: SidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
+  const [apps, setApps] = useState<AppInfo[]>([]);
   const [isSchedulesCollapsed, setIsSchedulesCollapsed] = useState(() => {
     try {
       return localStorage.getItem('sidebar-schedules-collapsed') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  const [isAppsCollapsed, setIsAppsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sidebar-apps-collapsed') !== 'false';
     } catch {
       return true;
     }
@@ -87,8 +100,11 @@ export default function Sidebar({
   } | null>(null);
   const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null);
   const [dragOverUngrouped, setDragOverUngrouped] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const newProjectInputRef = useRef<HTMLInputElement>(null);
   const editProjectInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const cancelledRef = useRef(false);
 
   const relativeTimeFormatter = useMemo(
@@ -99,10 +115,11 @@ export default function Sidebar({
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [convResponse, projResponse, schedResponse] = await Promise.all([
+      const [convResponse, projResponse, schedResponse, appResponse] = await Promise.all([
         window.electron.conversation.list(),
         window.electron.project.list(),
         window.electron.schedule.list(),
+        window.electron.app.scan(),
       ]);
       if (convResponse.success && convResponse.conversations) {
         setConversations(convResponse.conversations);
@@ -112,6 +129,9 @@ export default function Sidebar({
       }
       if (schedResponse.success && schedResponse.tasks) {
         setScheduledTasks(schedResponse.tasks);
+      }
+      if (appResponse.success) {
+        setApps(appResponse.apps);
       }
     } catch (error) {
       console.error('Error loading sidebar data:', error);
@@ -127,6 +147,21 @@ export default function Sidebar({
   useEffect(() => {
     if (currentConversationId) loadData();
   }, [currentConversationId, loadData]);
+
+  // Refresh apps periodically
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      try {
+        const response = await window.electron.app.scan();
+        if (response.success) {
+          setApps(response.apps);
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Close context menu on click outside
   useEffect(() => {
@@ -280,7 +315,7 @@ export default function Sidebar({
       } catch {
         acc[conversation.id] = '';
       }
-      acc[conversation.id] = acc[conversation.id] || '继续对话...';
+      acc[conversation.id] = acc[conversation.id] || '继续任务...';
       return acc;
     }, {});
   }, [conversations]);
@@ -333,6 +368,43 @@ export default function Sidebar({
     return { grouped, ungrouped };
   }, [conversations, projectIds]);
 
+  // Filter conversations and projects by search query
+  const filteredUngrouped = useMemo(() => {
+    if (!searchQuery.trim()) return ungrouped;
+    const q = searchQuery.toLowerCase();
+    return ungrouped.filter(
+      (conv) =>
+        conv.title.toLowerCase().includes(q) ||
+        (conversationPreviews[conv.id] ?? '').toLowerCase().includes(q)
+    );
+  }, [ungrouped, searchQuery, conversationPreviews]);
+
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery.trim()) return projects;
+    const q = searchQuery.toLowerCase();
+    return projects.filter((project) => {
+      if (project.name.toLowerCase().includes(q)) return true;
+      const projectConvs = grouped[project.id] ?? [];
+      return projectConvs.some(
+        (conv) =>
+          conv.title.toLowerCase().includes(q) ||
+          (conversationPreviews[conv.id] ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [projects, searchQuery, grouped, conversationPreviews]);
+
+  const filteredScheduledTasks = useMemo(() => {
+    if (!searchQuery.trim()) return scheduledTasks;
+    const q = searchQuery.toLowerCase();
+    return scheduledTasks.filter((task) => task.name.toLowerCase().includes(q));
+  }, [scheduledTasks, searchQuery]);
+
+  const filteredApps = useMemo(() => {
+    if (!searchQuery.trim()) return apps;
+    const q = searchQuery.toLowerCase();
+    return apps.filter((app) => app.name.toLowerCase().includes(q));
+  }, [apps, searchQuery]);
+
   const renderConversationItem = (conversation: Conversation) => {
     const isActive = conversation.id === currentConversationId;
     return (
@@ -363,7 +435,7 @@ export default function Sidebar({
           <button
             onClick={(e) => handleDelete(e, conversation.id)}
             className="shrink-0 rounded p-0.5 text-neutral-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500 dark:text-neutral-600 dark:hover:text-red-400"
-            aria-label="Delete conversation"
+            aria-label="删除任务"
           >
             <Trash2 className="h-3 w-3" />
           </button>
@@ -377,7 +449,7 @@ export default function Sidebar({
       {/* Drag region for macOS traffic lights */}
       <div className="h-7 shrink-0 [-webkit-app-region:drag]" />
 
-      {/* Brand */}
+      {/* Brand + Onboarding */}
       <div className="shrink-0 px-3 pb-2.5">
         <div className="flex items-center gap-2">
           <span className="text-xl" role="img" aria-label="horse">
@@ -386,115 +458,87 @@ export default function Sidebar({
           <span className="text-base font-bold text-neutral-800 select-none dark:text-neutral-100">
             小马快跑
           </span>
+          <button
+            onClick={onOnboardingClick}
+            className="ml-auto rounded-full p-0.5 text-neutral-300 transition hover:bg-neutral-200/60 hover:text-neutral-500 dark:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-400"
+            title="新手引导"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 
-      {/* Task List */}
+      {/* Task List Header */}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center justify-between px-3 pb-1.5">
           <span className="text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500">
-            Tasks
+            任务
           </span>
           <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => {
+                setIsSearchOpen((prev) => {
+                  if (!prev) setTimeout(() => searchInputRef.current?.focus(), 0);
+                  else setSearchQuery('');
+                  return !prev;
+                });
+              }}
+              className={`rounded p-0.5 transition-colors ${
+                isSearchOpen
+                  ? 'bg-neutral-200/80 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
+                  : 'text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
+              }`}
+              title="搜索任务"
+            >
+              <Search className="h-3.5 w-3.5" />
+            </button>
             <button
               onClick={() => {
                 setCreatingProject(true);
                 setTimeout(() => newProjectInputRef.current?.focus(), 0);
               }}
               className="rounded p-0.5 text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-              title="New project"
+              title="新建项目"
             >
               <FolderPlus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => onNewChat()}
               className="rounded p-0.5 text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-              title="New task"
+              title="新建任务"
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-1.5 pb-1">
-          {/* Scheduled Tasks Section */}
-          {scheduledTasks.length > 0 && (
-            <div className="mb-1">
-              <button
-                onClick={() => {
-                  setIsSchedulesCollapsed((prev) => {
-                    const next = !prev;
-                    try {
-                      localStorage.setItem('sidebar-schedules-collapsed', String(next));
-                    } catch {
-                      /* ignore */
-                    }
-                    return next;
-                  });
-                }}
-                className="flex w-full items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
-              >
-                {isSchedulesCollapsed ? (
-                  <ChevronRight className="h-3 w-3" />
-                ) : (
-                  <ChevronDown className="h-3 w-3" />
-                )}
-                <Timer className="h-3 w-3" />
-                定时任务
-                <span className="ml-auto text-[10px] font-normal text-neutral-400 dark:text-neutral-500">
-                  {scheduledTasks.filter((t) => t.enabled).length}/{scheduledTasks.length}
-                </span>
-              </button>
-              {!isSchedulesCollapsed && (
-                <div className="mt-0.5 space-y-0.5">
-                  {scheduledTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      onClick={onSchedulesClick}
-                      className="group cursor-pointer rounded-lg px-2 py-1.5 transition-colors hover:bg-white/60 dark:hover:bg-neutral-800/50"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                            task.enabled
-                              ? 'bg-green-400 dark:bg-green-500'
-                              : 'bg-neutral-300 dark:bg-neutral-600'
-                          }`}
-                        />
-                        <span className="min-w-0 flex-1 truncate text-xs text-neutral-700 dark:text-neutral-300">
-                          {task.name}
-                        </span>
-                        {task.lastRunStatus && (
-                          <span
-                            className={`shrink-0 text-[9px] ${
-                              task.lastRunStatus === 'success'
-                                ? 'text-green-500'
-                                : task.lastRunStatus === 'error'
-                                  ? 'text-red-500'
-                                  : 'text-yellow-500'
-                            }`}
-                          >
-                            {task.lastRunStatus === 'success'
-                              ? 'OK'
-                              : task.lastRunStatus === 'error'
-                                ? 'ERR'
-                                : 'SKIP'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+        {/* Search input */}
+        {isSearchOpen && (
+          <div className="mx-3 mb-1.5">
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setIsSearchOpen(false);
+                  setSearchQuery('');
+                }
+              }}
+              placeholder="搜索任务..."
+              className="w-full rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-800 placeholder-neutral-400 outline-none focus:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:placeholder-neutral-500 dark:focus:border-neutral-600"
+            />
+          </div>
+        )}
 
+        <div className="flex-1 overflow-y-auto px-1.5 pb-1">
+          {/* Project Tasks */}
           {isLoading ? (
             <div className="px-2 py-4 text-center text-xs text-neutral-400">Loading...</div>
-          ) : conversations.length === 0 && projects.length === 0 ? (
+          ) : conversations.length === 0 && projects.length === 0 && scheduledTasks.length === 0 && apps.length === 0 ? (
             <div className="flex flex-col items-center gap-1 px-2 py-6 text-center">
               <MessageSquare className="h-4 w-4 text-neutral-300 dark:text-neutral-600" />
-              <p className="text-xs text-neutral-400 dark:text-neutral-500">No tasks yet</p>
+              <p className="text-xs text-neutral-400 dark:text-neutral-500">暂无任务</p>
             </div>
           ) : (
             <>
@@ -515,18 +559,27 @@ export default function Sidebar({
                       }
                     }}
                     onBlur={handleCreateProject}
-                    placeholder="Project name..."
+                    placeholder="项目名称..."
                     className="min-w-0 flex-1 bg-transparent text-xs text-neutral-800 placeholder-neutral-400 outline-none dark:text-neutral-200 dark:placeholder-neutral-500"
                   />
                 </div>
               )}
 
               {/* Projects */}
-              {projects.map((project) => {
+              {filteredProjects.map((project) => {
                 const projectConversations = grouped[project.id] ?? [];
                 const isCollapsed = collapsedProjects.has(project.id);
                 const isDragOver = dragOverProjectId === project.id;
                 const isEditing = editingProjectId === project.id;
+
+                // Filter project conversations by search
+                const visibleConversations = searchQuery.trim()
+                  ? projectConversations.filter(
+                      (conv) =>
+                        conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (conversationPreviews[conv.id] ?? '').toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                  : projectConversations;
 
                 return (
                   <div key={project.id} className="mb-0.5">
@@ -588,15 +641,15 @@ export default function Sidebar({
                     {/* Project conversations */}
                     {!isCollapsed && (
                       <div className="ml-3 border-l border-neutral-200/50 pl-1 dark:border-neutral-700/50">
-                        {projectConversations.map(renderConversationItem)}
+                        {visibleConversations.map(renderConversationItem)}
                       </div>
                     )}
                   </div>
                 );
               })}
 
-              {/* Ungrouped conversations */}
-              {ungrouped.length > 0 && projects.length > 0 && (
+              {/* Ungrouped tasks */}
+              {filteredUngrouped.length > 0 && filteredProjects.length > 0 && (
                 <div
                   className={`mt-1 border-t border-neutral-200/50 pt-1 dark:border-neutral-700/50 ${
                     dragOverUngrouped ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
@@ -609,12 +662,145 @@ export default function Sidebar({
                   onDragLeave={() => setDragOverUngrouped(false)}
                   onDrop={handleDropOnUngrouped}
                 >
-                  {ungrouped.map(renderConversationItem)}
+                  {filteredUngrouped.map(renderConversationItem)}
                 </div>
               )}
 
               {/* When no projects, just show all conversations flat */}
-              {projects.length === 0 && ungrouped.map(renderConversationItem)}
+              {filteredProjects.length === 0 && projects.length === 0 && filteredUngrouped.map(renderConversationItem)}
+              {filteredProjects.length === 0 && projects.length > 0 && filteredUngrouped.length > 0 && (
+                <div
+                  className={dragOverUngrouped ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    setDragOverUngrouped(true);
+                  }}
+                  onDragLeave={() => setDragOverUngrouped(false)}
+                  onDrop={handleDropOnUngrouped}
+                >
+                  {filteredUngrouped.map(renderConversationItem)}
+                </div>
+              )}
+
+              {/* Scheduled Tasks Section */}
+              {filteredScheduledTasks.length > 0 && (
+                <div className="mt-1 border-t border-neutral-200/50 pt-1 dark:border-neutral-700/50">
+                  <button
+                    onClick={() => {
+                      setIsSchedulesCollapsed((prev) => {
+                        const next = !prev;
+                        try {
+                          localStorage.setItem('sidebar-schedules-collapsed', String(next));
+                        } catch {
+                          /* ignore */
+                        }
+                        return next;
+                      });
+                    }}
+                    className="flex w-full items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+                  >
+                    {isSchedulesCollapsed ? (
+                      <ChevronRight className="h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3" />
+                    )}
+                    <Timer className="h-3 w-3" />
+                    定时任务
+                    <span className="ml-auto text-[10px] font-normal text-neutral-400 dark:text-neutral-500">
+                      {scheduledTasks.filter((t) => t.enabled).length}/{scheduledTasks.length}
+                    </span>
+                  </button>
+                  {!isSchedulesCollapsed && (
+                    <div className="mt-0.5 space-y-0.5">
+                      {filteredScheduledTasks.map((task) => (
+                        <div
+                          key={task.id}
+                          onClick={onSchedulesClick}
+                          className="group cursor-pointer rounded-lg px-2 py-1.5 transition-colors hover:bg-white/60 dark:hover:bg-neutral-800/50"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                                task.enabled
+                                  ? 'bg-green-400 dark:bg-green-500'
+                                  : 'bg-neutral-300 dark:bg-neutral-600'
+                              }`}
+                            />
+                            <span className="min-w-0 flex-1 truncate text-xs text-neutral-700 dark:text-neutral-300">
+                              {task.name}
+                            </span>
+                            {task.lastRunStatus && (
+                              <span
+                                className={`shrink-0 text-[9px] ${
+                                  task.lastRunStatus === 'success'
+                                    ? 'text-green-500'
+                                    : task.lastRunStatus === 'error'
+                                      ? 'text-red-500'
+                                      : 'text-yellow-500'
+                                }`}
+                              >
+                                {task.lastRunStatus === 'success'
+                                  ? 'OK'
+                                  : task.lastRunStatus === 'error'
+                                    ? 'ERR'
+                                    : 'SKIP'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Apps Section (inline in task list) */}
+              {filteredApps.length > 0 && (
+                <div className="mt-1 border-t border-neutral-200/50 pt-1 dark:border-neutral-700/50">
+                  <button
+                    onClick={() => {
+                      setIsAppsCollapsed((prev) => {
+                        const next = !prev;
+                        try {
+                          localStorage.setItem('sidebar-apps-collapsed', String(next));
+                        } catch {
+                          /* ignore */
+                        }
+                        return next;
+                      });
+                    }}
+                    className="flex w-full items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+                  >
+                    {isAppsCollapsed ? (
+                      <ChevronRight className="h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3" />
+                    )}
+                    <Globe className="h-3 w-3" />
+                    应用
+                    <span className="ml-auto text-[10px] font-normal text-neutral-400 dark:text-neutral-500">
+                      {apps.length}
+                    </span>
+                  </button>
+                  {!isAppsCollapsed && (
+                    <div className="mt-0.5">
+                      <AppPanel onOpenDbViewer={onOpenDbViewer} apps={filteredApps} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Search no results */}
+              {searchQuery.trim() &&
+                filteredUngrouped.length === 0 &&
+                filteredProjects.length === 0 &&
+                filteredScheduledTasks.length === 0 &&
+                filteredApps.length === 0 && (
+                  <div className="px-2 py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">
+                    未找到匹配的任务
+                  </div>
+                )}
             </>
           )}
         </div>
@@ -639,7 +825,7 @@ export default function Sidebar({
             className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
           >
             <Pencil className="h-3 w-3" />
-            Rename
+            重命名
           </button>
           <button
             onClick={() => {
@@ -649,15 +835,10 @@ export default function Sidebar({
             className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
           >
             <Archive className="h-3 w-3" />
-            Archive
+            归档
           </button>
         </div>
       )}
-
-      {/* Apps Panel */}
-      <div className="border-t border-neutral-200/70 dark:border-neutral-800">
-        <AppPanel onOpenDbViewer={onOpenDbViewer} />
-      </div>
 
       {/* File Tree - bottom section (collapsible) */}
       <div
@@ -683,7 +864,7 @@ export default function Sidebar({
           ) : (
             <ChevronDown className="h-3 w-3" />
           )}
-          Files
+          文件
         </button>
         {!isFilesCollapsed && (
           <FileTree
@@ -694,26 +875,16 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Bottom bar - Skills, Schedules & Settings */}
+      {/* Bottom bar - Skills & Settings */}
       <div className="flex shrink-0 items-center justify-between border-t border-neutral-200/70 px-2 py-1.5 dark:border-neutral-800">
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={onSkillsClick}
-            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-            title="Skill 精选"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>Skill 精选</span>
-          </button>
-          <button
-            onClick={onSchedulesClick}
-            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-            title="定时任务"
-          >
-            <Timer className="h-3.5 w-3.5" />
-            <span>定时任务</span>
-          </button>
-        </div>
+        <button
+          onClick={onSkillsClick}
+          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          title="Skill 精选"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>Skill 精选</span>
+        </button>
         <button
           onClick={onSettingsClick}
           className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
