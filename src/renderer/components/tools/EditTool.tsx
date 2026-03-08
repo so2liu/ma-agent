@@ -24,7 +24,7 @@ export default function EditTool({ tool }: EditToolProps) {
       <FilePath path={input.file_path} />
       {input.replace_all && (
         <span className="rounded border border-orange-200/50 bg-orange-50/50 px-1.5 py-0.5 text-[10px] font-medium text-orange-600 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
-          replace all
+          全部替换
         </span>
       )}
     </div>

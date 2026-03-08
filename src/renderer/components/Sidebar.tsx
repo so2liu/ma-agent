@@ -153,8 +153,15 @@ export default function Sidebar({
   useEffect(() => {
     if (!contextMenu) return;
     const handler = () => setContextMenu(null);
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
     window.addEventListener('click', handler);
-    return () => window.removeEventListener('click', handler);
+    window.addEventListener('keydown', keyHandler);
+    return () => {
+      window.removeEventListener('click', handler);
+      window.removeEventListener('keydown', keyHandler);
+    };
   }, [contextMenu]);
 
   const handleDelete = async (conversationId: string) => {
@@ -396,7 +403,15 @@ export default function Sidebar({
         draggable
         onDragStart={(e) => handleDragStart(e, conversation.id)}
         onClick={() => onLoadConversation(conversation.id)}
-        className={`group mb-0.5 cursor-pointer rounded-lg px-2.5 py-2 transition-colors ${
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onLoadConversation(conversation.id);
+          }
+        }}
+        tabIndex={0}
+        role="button"
+        className={`group mb-0.5 cursor-pointer rounded-lg px-2.5 py-2 transition-colors focus-visible:ring-2 focus-visible:ring-neutral-400/50 focus-visible:outline-none ${
           isActive
             ? 'bg-white shadow-sm dark:bg-neutral-800'
             : 'hover:bg-white/60 dark:hover:bg-neutral-800/50'
@@ -455,7 +470,7 @@ export default function Sidebar({
       <div className="shrink-0 px-3 pb-2">
         <button
           onClick={() => onNewChat()}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-200/70 active:bg-neutral-200 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:active:bg-neutral-700"
+          className="flex w-full items-center gap-2.5 rounded-xl bg-neutral-800 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 active:bg-neutral-900 dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:active:bg-neutral-100"
         >
           <SquarePen className="h-4 w-4" />
           新建任务
@@ -605,9 +620,9 @@ export default function Sidebar({
             return (
               <div key={project.id} className="mb-0.5">
                 <div
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-colors ${
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-all duration-150 ${
                     isDragOver
-                      ? 'bg-blue-50 dark:bg-blue-900/20'
+                      ? 'bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-900/20 dark:ring-blue-800/40'
                       : isSelected
                         ? 'bg-white/80 dark:bg-neutral-800/70'
                         : 'hover:bg-white/60 dark:hover:bg-neutral-800/50'
@@ -679,8 +694,8 @@ export default function Sidebar({
           {/* Ungrouped conversations (not assigned to any project) */}
           {!isProjectsCollapsed && filteredUngrouped.length > 0 && (
             <div
-              className={`mt-1 border-t border-neutral-200/50 pt-1 dark:border-neutral-700/50 ${
-                dragOverUngrouped ? 'rounded-lg bg-blue-50/50 dark:bg-blue-900/10' : ''
+              className={`mt-1 border-t border-neutral-200/50 pt-1 transition-all duration-150 dark:border-neutral-700/50 ${
+                dragOverUngrouped ? 'rounded-lg bg-blue-50/50 ring-1 ring-blue-200/50 dark:bg-blue-900/10 dark:ring-blue-800/30' : ''
               }`}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -777,13 +792,13 @@ export default function Sidebar({
             )}
 
           {isLoading && conversations.length === 0 && (
-            <div className="py-4 text-center text-xs text-neutral-400">Loading...</div>
+            <div className="py-4 text-center text-xs text-neutral-400">加载中...</div>
           )}
 
           {!isLoading && conversations.length === 0 && scheduledTasks.length === 0 && !isProjectsCollapsed && (
             <div className="flex flex-col items-center gap-1.5 py-6 text-center">
               <MessageSquare className="h-5 w-5 text-neutral-300 dark:text-neutral-600" />
-              <p className="text-xs text-neutral-400 dark:text-neutral-500">暂无任务</p>
+              <p className="text-xs text-neutral-400 dark:text-neutral-500">点击上方「新建任务」开始</p>
             </div>
           )}
         </div>
@@ -792,6 +807,7 @@ export default function Sidebar({
       {/* Context menu for projects */}
       {contextMenu && (
         <div
+          role="menu"
           className="fixed z-50 min-w-[140px] rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-800"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >

@@ -220,36 +220,38 @@ export function getToolLabel(tool: ToolUseSimple): string {
       try {
         const parsed = JSON.parse(tool.inputJson);
         if (tool.name === 'Read' || tool.name === 'Write' || tool.name === 'Edit') {
-          return parsed.file_path ? `${tool.name} ${parsed.file_path.split('/').pop()}` : tool.name;
+          const toolNameMap: Record<string, string> = { Read: '读取', Write: '写入', Edit: '编辑' };
+          const label = toolNameMap[tool.name] ?? tool.name;
+          return parsed.file_path ? `${label} ${parsed.file_path.split('/').pop()}` : label;
         }
         if (tool.name === 'Bash') {
           return parsed.description || parsed.command ?
               parsed.description || parsed.command.split(' ')[0]
-            : 'Run command';
+            : '执行命令';
         }
         if (tool.name === 'BashOutput') {
-          return 'Bash Output';
+          return '命令输出';
         }
         if (tool.name === 'Skill') {
-          return parsed.skill ? `Skill(${parsed.skill})` : 'Skill';
+          return parsed.skill ? `技能(${parsed.skill})` : '技能';
         }
         if (tool.name === 'Glob') {
-          return 'Find';
+          return '查找';
         }
         if (tool.name === 'Grep') {
-          return 'Search';
+          return '搜索';
         }
         if (tool.name === 'WebSearch') {
-          return 'Search';
+          return '搜索';
         }
         if (tool.name === 'WebFetch') {
-          return 'Fetch';
+          return '获取';
         }
         if (tool.name === 'TodoWrite') {
-          return 'Todo List';
+          return '任务列表';
         }
         if (tool.name === 'KillShell') {
-          return 'Kill Shell';
+          return '停止终端';
         }
       } catch {
         // Ignore parse errors
@@ -262,12 +264,14 @@ export function getToolLabel(tool: ToolUseSimple): string {
     case 'Read':
     case 'Write':
     case 'Edit': {
+      const toolNameMap: Record<string, string> = { Read: '读取', Write: '写入', Edit: '编辑' };
+      const label = toolNameMap[tool.name] ?? tool.name;
       const input = tool.parsedInput as { file_path?: string };
       if (input.file_path) {
         const fileName = input.file_path.split('/').pop() || input.file_path;
-        return fileName.length > 20 ? `${fileName.substring(0, 17)}...` : fileName;
+        return fileName.length > 20 ? `${label} ${fileName.substring(0, 17)}...` : `${label} ${fileName}`;
       }
-      return tool.name;
+      return label;
     }
     case 'Bash': {
       const input = tool.parsedInput as { command?: string; description?: string };
@@ -276,28 +280,28 @@ export function getToolLabel(tool: ToolUseSimple): string {
         const cmd = input.command.split(' ')[0];
         return cmd.length > 15 ? `${cmd.substring(0, 12)}...` : cmd;
       }
-      return 'Run command';
+      return '执行命令';
     }
     case 'BashOutput': {
-      return 'Bash Output';
+      return '命令输出';
     }
     case 'Grep': {
       const input = tool.parsedInput as { pattern?: string };
       if (input.pattern) {
         const pattern =
           input.pattern.length > 15 ? `${input.pattern.substring(0, 12)}...` : input.pattern;
-        return `Search "${pattern}"`;
+        return `搜索 "${pattern}"`;
       }
-      return 'Search';
+      return '搜索';
     }
     case 'Glob': {
       const input = tool.parsedInput as { pattern?: string };
       if (input.pattern) {
         const pattern =
           input.pattern.length > 15 ? `${input.pattern.substring(0, 12)}...` : input.pattern;
-        return `Find ${pattern}`;
+        return `查找 ${pattern}`;
       }
-      return 'Find';
+      return '查找';
     }
     case 'Task': {
       const input = tool.parsedInput as { description?: string };
@@ -306,7 +310,7 @@ export function getToolLabel(tool: ToolUseSimple): string {
             `${input.description.substring(0, 22)}...`
           : input.description;
       }
-      return 'Task';
+      return '子任务';
     }
     case 'WebFetch': {
       const input = tool.parsedInput as { url?: string };
@@ -318,29 +322,29 @@ export function getToolLabel(tool: ToolUseSimple): string {
           return input.url.length > 20 ? `${input.url.substring(0, 17)}...` : input.url;
         }
       }
-      return 'Fetch';
+      return '获取';
     }
     case 'WebSearch': {
       const input = tool.parsedInput as { query?: string };
       if (input.query) {
         return input.query.length > 20 ? `${input.query.substring(0, 17)}...` : input.query;
       }
-      return 'Search';
+      return '搜索';
     }
     case 'TodoWrite': {
       const input = tool.parsedInput as { todos?: Array<{ status?: string }> };
       if (input.todos && input.todos.length > 0) {
         const completedCount = input.todos.filter((t) => t.status === 'completed').length;
-        return `Todo ${completedCount}/${input.todos.length}`;
+        return `任务 ${completedCount}/${input.todos.length}`;
       }
-      return 'Todo List';
+      return '任务列表';
     }
     case 'Skill': {
       const input = tool.parsedInput as { skill?: string };
       if (input.skill) {
-        return `Skill(${input.skill})`;
+        return `技能(${input.skill})`;
       }
-      return 'Skill';
+      return '技能';
     }
     default:
       return tool.name;
@@ -352,40 +356,43 @@ export function getToolLabel(tool: ToolUseSimple): string {
 export function getToolExpandedLabel(tool: ToolUseSimple): string {
   switch (tool.name) {
     case 'Glob':
-      return 'Find';
+      return '查找';
     case 'Grep':
-      return 'Search';
+      return '搜索';
     case 'WebSearch':
-      return 'Search';
+      return '搜索';
     case 'WebFetch':
-      return 'Fetch';
+      return '获取';
     case 'Bash': {
       const input = tool.parsedInput as { description?: string };
-      return input?.description || 'Run command';
+      return input?.description || '执行命令';
     }
     case 'BashOutput':
-      return 'Bash Output';
+      return '命令输出';
     case 'TodoWrite':
-      return 'Todo List';
+      return '任务列表';
     case 'Task': {
       const input = tool.parsedInput as { description?: string };
-      return input?.description || 'Task';
+      return input?.description || '子任务';
     }
     case 'Read':
+      return '读取';
     case 'Write':
+      return '写入';
     case 'Edit':
-      return tool.name;
+      return '编辑';
     case 'Skill': {
       const input = tool.parsedInput as { skill?: string };
-      return input?.skill ? `Skill(${input.skill})` : 'Skill';
+      return input?.skill ? `技能(${input.skill})` : '技能';
     }
     case 'NotebookEdit': {
       const input = tool.parsedInput as { edit_mode?: string };
-      const editMode = input?.edit_mode || 'replace';
-      return `${editMode.charAt(0).toUpperCase() + editMode.slice(1)} notebook cell`;
+      const modeMap: Record<string, string> = { replace: '替换', insert_before: '前插入', insert_after: '后插入' };
+      const modeLabel = modeMap[input?.edit_mode ?? 'replace'] ?? input?.edit_mode ?? '替换';
+      return `编辑笔记本(${modeLabel})`;
     }
     case 'KillShell':
-      return 'Kill Shell';
+      return '停止终端';
     default:
       return tool.name;
   }
@@ -412,12 +419,12 @@ export function getThinkingLabel(isComplete: boolean, durationMs?: number): stri
     typeof durationMs === 'number' ? Math.max(1, Math.round(durationMs / 1000)) : null;
 
   if (isComplete && durationSeconds) {
-    return `${durationSeconds}s`;
+    return `${durationSeconds}秒`;
   }
   if (isComplete) {
-    return 'Thought';
+    return '思考完成';
   }
-  return 'Thinking';
+  return '思考中';
 }
 
 // Get expanded thinking label (more descriptive)
@@ -427,10 +434,10 @@ export function getThinkingExpandedLabel(isComplete: boolean, durationMs?: numbe
 
   if (isComplete && durationSeconds) {
     const seconds = Math.round(durationMs! / 1000);
-    return `Thought for ${seconds} second${seconds === 1 ? '' : 's'}`;
+    return `思考了 ${seconds} 秒`;
   }
   if (isComplete) {
-    return 'Thought';
+    return '思考完成';
   }
-  return 'Thinking';
+  return '思考中';
 }

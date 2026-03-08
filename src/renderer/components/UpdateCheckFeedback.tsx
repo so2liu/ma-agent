@@ -41,7 +41,7 @@ export default function UpdateCheckFeedback() {
         >
           <Loader2 className="h-4 w-4 animate-spin text-neutral-600 dark:text-neutral-300" />
           <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-            Checking for updates…
+            正在检查更新…
           </p>
         </div>
       </div>
@@ -56,7 +56,7 @@ export default function UpdateCheckFeedback() {
           className={`${cardBase} border-green-200/70 bg-white/90 text-green-900 shadow-green-200/60 dark:border-green-900/50 dark:bg-green-950/70 dark:text-green-100 dark:shadow-black/30`}
         >
           <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-300" />
-          <p className="text-sm font-semibold">You&apos;re up to date. No updates available.</p>
+          <p className="text-sm font-semibold">已是最新版本，无需更新。</p>
         </div>
       </div>
     );

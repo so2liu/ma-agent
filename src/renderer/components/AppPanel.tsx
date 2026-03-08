@@ -49,7 +49,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
 
   const handleStartDev = async (appId: string) => {
     setBusyId(appId);
-    setBusyAction('Starting dev...');
+    setBusyAction('正在启动...');
     try {
       const result = await window.electron.app.startDev(appId);
       if (!result.success) {
@@ -75,7 +75,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
 
   const handlePublish = async (appId: string) => {
     setBusyId(appId);
-    setBusyAction('Publishing...');
+    setBusyAction('正在发布...');
     try {
       const result = await window.electron.app.publish(appId);
       if (!result.success) {
@@ -125,7 +125,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
               <button
                 onClick={() => onOpenDbViewer(app.id, app.name)}
                 className="shrink-0 rounded p-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-indigo-600 dark:hover:bg-neutral-700 dark:hover:text-indigo-400"
-                title="View Data"
+                title="查看数据"
               >
                 <Database className="h-3 w-3" />
               </button>
@@ -163,9 +163,9 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
       return (
         <div className="mt-1.5 flex items-center justify-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
           <Loader2 className="h-3 w-3 animate-spin" />
-          {app.status === 'scaffolding' && 'Scaffolding...'}
-          {app.status === 'installing' && 'Installing deps...'}
-          {app.status === 'building' && 'Building...'}
+          {app.status === 'scaffolding' && '正在创建项目...'}
+          {app.status === 'installing' && '正在安装依赖...'}
+          {app.status === 'building' && '正在构建...'}
         </div>
       );
     }
@@ -183,7 +183,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
               <button
                 onClick={() => handleCopyUrl(app.lanUrl!)}
                 className="shrink-0 p-0.5 text-blue-400 hover:text-blue-600 dark:hover:text-blue-200"
-                title="Copy URL"
+                title="复制链接"
               >
                 <Copy className="h-2.5 w-2.5" />
               </button>
@@ -196,7 +196,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
                 className="flex flex-1 items-center justify-center gap-1 rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
               >
                 <ExternalLink className="h-2.5 w-2.5" />
-                Preview
+                预览
               </button>
             )}
             <button
@@ -205,7 +205,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
               className="flex flex-1 items-center justify-center gap-1 rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 transition-colors hover:bg-indigo-200 disabled:opacity-50 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
             >
               <Hammer className="h-2.5 w-2.5" />
-              Build & Publish
+              构建并发布
             </button>
             <button
               onClick={() => handleStopDev(app.id)}
@@ -230,7 +230,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
               <button
                 onClick={() => handleCopyUrl(app.lanUrl!)}
                 className="shrink-0 p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-                title="Copy URL"
+                title="复制链接"
               >
                 <Copy className="h-2.5 w-2.5" />
               </button>
@@ -243,7 +243,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
                 className="flex flex-1 items-center justify-center gap-1 rounded-md bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 transition-colors hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600"
               >
                 <ExternalLink className="h-2.5 w-2.5" />
-                Preview
+                预览
               </button>
             )}
             <button
@@ -251,7 +251,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
               className="flex flex-1 items-center justify-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
             >
               <Square className="h-2.5 w-2.5" />
-              Stop
+              停止
             </button>
           </div>
         </div>
@@ -275,7 +275,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
                 </>
               : <>
                   <Code className="h-3 w-3" />
-                  Dev
+                  开发
                 </>
               }
             </button>
@@ -285,7 +285,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
               className="flex flex-1 items-center justify-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
             >
               <Play className="h-3 w-3" />
-              Publish
+              发布
             </button>
           </>
         : <button
@@ -300,7 +300,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
               </>
             : <>
                 <Play className="h-3 w-3" />
-                Publish to LAN
+                发布到局域网
               </>
             }
           </button>

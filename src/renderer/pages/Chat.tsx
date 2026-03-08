@@ -581,7 +581,9 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
     }
   };
 
-  const messageListBottomPadding = chatInputHeight > 0 ? chatInputHeight + 48 : 160;
+  const INPUT_BOTTOM_OFFSET = 48;
+  const DEFAULT_BOTTOM_PADDING = 160;
+  const messageListBottomPadding = chatInputHeight > 0 ? chatInputHeight + INPUT_BOTTOM_OFFSET : DEFAULT_BOTTOM_PADDING;
 
   const handleModelPreferenceChange = async (preference: ChatModelPreference) => {
     if (preference === modelPreference) return;
@@ -719,6 +721,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
               </div>
               <SkillCardGrid
                 onSelectSkill={(prompt) => setInputValue(prompt)}
+                currentInput={inputValue}
               />
             </div>
           ) : (

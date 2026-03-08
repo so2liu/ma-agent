@@ -606,6 +606,7 @@ function Settings({ onBack }: SettingsProps) {
                     loadEnvVars();
                   }
                 }}
+                aria-expanded={isDebugExpanded}
                 className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-medium text-neutral-600 transition hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-800"
               >
                 <span>开发者信息</span>

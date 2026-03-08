@@ -78,21 +78,21 @@ function DeleteConfirm({ name, isDirectory, onConfirm, onCancel }: DeleteConfirm
       className="mx-1 my-0.5 rounded-md border border-red-300/50 bg-red-50 p-2 dark:border-red-800/50 dark:bg-red-950/30"
     >
       <p className="mb-1.5 text-[10px] text-red-700 dark:text-red-300">
-        Delete {isDirectory ? 'folder' : 'file'} &quot;{name}&quot;?
-        {isDirectory && ' All contents will be removed.'}
+        确定删除{isDirectory ? '文件夹' : '文件'}「{name}」吗？
+        {isDirectory && '所有内容将被移除。'}
       </p>
       <div className="flex gap-1">
         <button
           onClick={onConfirm}
           className="rounded bg-red-500 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
         >
-          Delete
+          删除
         </button>
         <button
           onClick={onCancel}
           className="rounded bg-neutral-200 px-2 py-0.5 text-[10px] font-medium text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600"
         >
-          Cancel
+          取消
         </button>
       </div>
     </div>
@@ -143,7 +143,7 @@ function TreeNode({ node, depth, onFileSelect, selectedPath, onDelete }: TreeNod
                 setShowDeleteConfirm(true);
               }}
               className="absolute top-0.5 right-1 rounded p-0.5 text-neutral-400 hover:bg-red-100 hover:text-red-500 dark:text-neutral-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-              title={`Delete ${node.name}`}
+              title={`删除 ${node.name}`}
             >
               <Trash2 className="h-3 w-3" />
             </button>
@@ -196,7 +196,7 @@ function TreeNode({ node, depth, onFileSelect, selectedPath, onDelete }: TreeNod
         }`}
         style={{ paddingLeft: depth * 12 + 4 + 16 }}
         disabled={!previewable}
-        title={previewable ? node.path : `${node.path} (not previewable)`}
+        title={previewable ? node.path : `${node.path}（不可预览）`}
       >
         <FileIcon name={node.name} />
         <span className="truncate">{node.name}</span>
@@ -208,7 +208,7 @@ function TreeNode({ node, depth, onFileSelect, selectedPath, onDelete }: TreeNod
             setShowDeleteConfirm(true);
           }}
           className="absolute top-0.5 right-1 rounded p-0.5 text-neutral-400 hover:bg-red-100 hover:text-red-500 dark:text-neutral-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-          title={`Delete ${node.name}`}
+          title={`删除 ${node.name}`}
         >
           <Trash2 className="h-3 w-3" />
         </button>
