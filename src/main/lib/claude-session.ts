@@ -8,6 +8,7 @@ import {
   buildClaudeSessionEnv,
   getApiKey,
   getChatModelPreferenceSetting,
+  getCustomModelId,
   getDebugMode,
   getWorkspaceDir,
   setChatModelPreferenceSetting
@@ -71,6 +72,10 @@ const streamIndexToToolId: Map<number, string> = new Map();
 let pendingResumeSessionId: string | null = null;
 
 function getModelIdForPreference(preference: ChatModelPreference = currentModelPreference): string {
+  const customModelId = getCustomModelId();
+  if (customModelId) {
+    return customModelId;
+  }
   return MODEL_BY_PREFERENCE[preference] ?? FAST_MODEL_ID;
 }
 

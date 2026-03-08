@@ -368,6 +368,21 @@ export interface ElectronAPI {
       success: boolean;
       apiBaseUrl: string | null;
     }>;
+    getCustomModelId: () => Promise<{ customModelId: string | null }>;
+    setCustomModelId: (modelId?: string | null) => Promise<{
+      success: boolean;
+      customModelId: string | null;
+    }>;
+    testApi: (params?: {
+      apiKey?: string;
+      baseUrl?: string;
+      modelId?: string;
+    }) => Promise<{
+      success: boolean;
+      model?: string;
+      message?: string;
+      error?: string;
+    }>;
   };
   shell: {
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;

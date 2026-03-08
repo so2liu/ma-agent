@@ -1,7 +1,7 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
-import { buildClaudeSessionEnv, getApiKey, getWorkspaceDir } from './config';
+import { buildClaudeSessionEnv, getApiKey, getCustomModelId, getWorkspaceDir } from './config';
 import { MODEL_BY_PREFERENCE, SYSTEM_PROMPT_APPEND, resolveClaudeCodeCli } from './claude-session';
 import { createConversation } from './conversation-db';
 import type { ScheduledTask } from './schedule-db';
@@ -13,7 +13,8 @@ export async function executeScheduledTask(task: ScheduledTask): Promise<string>
   const env = buildClaudeSessionEnv();
   env.ANTHROPIC_API_KEY = apiKey;
 
-  const modelId = MODEL_BY_PREFERENCE[task.modelPreference] ?? MODEL_BY_PREFERENCE.fast;
+  const customModelId = getCustomModelId();
+  const modelId = customModelId || (MODEL_BY_PREFERENCE[task.modelPreference] ?? MODEL_BY_PREFERENCE.fast);
   const sessionId = `scheduled-${task.id}-${Date.now()}`;
 
   async function* promptGenerator(): AsyncGenerator<SDKUserMessage> {
