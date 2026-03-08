@@ -29,8 +29,8 @@ export default function WebSearchTool({ tool }: WebSearchToolProps) {
     <div className="space-y-1.5">
       {(input.allowed_domains || input.blocked_domains) && (
         <div className="text-[10px] text-neutral-600 dark:text-neutral-400">
-          {input.allowed_domains && <div>Allowed: {input.allowed_domains.join(', ')}</div>}
-          {input.blocked_domains && <div>Blocked: {input.blocked_domains.join(', ')}</div>}
+          {input.allowed_domains && <div>允许的域名: {input.allowed_domains.join(', ')}</div>}
+          {input.blocked_domains && <div>屏蔽的域名: {input.blocked_domains.join(', ')}</div>}
         </div>
       )}
 

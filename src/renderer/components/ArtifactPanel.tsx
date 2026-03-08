@@ -193,7 +193,7 @@ export default function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps)
             path: targetPath,
             content: null,
             dataUrl: null,
-            error: response.error || 'Failed to read file'
+            error: response.error || '读取文件失败'
           });
           return;
         }

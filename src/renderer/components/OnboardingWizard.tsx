@@ -135,7 +135,7 @@ export default function OnboardingWizard({ onComplete, mode = 'fullscreen' }: On
   if (mode === 'dialog') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div className="fixed inset-0 bg-black/50" onClick={() => onComplete(false)} />
+        <div className="fixed inset-0 bg-black/50" role="presentation" onClick={() => onComplete(false)} />
         <div className="relative z-50 w-full max-w-md rounded-xl border border-neutral-200 bg-white p-8 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
           <button
             onClick={() => onComplete(false)}

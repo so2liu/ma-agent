@@ -41,7 +41,7 @@ export default function MessageList({
         {isLoading && (
           <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-neutral-400 dark:text-neutral-500">
             <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Streaming response...</span>
+            <span>正在回复…</span>
           </div>
         )}
       </div>

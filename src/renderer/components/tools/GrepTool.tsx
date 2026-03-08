@@ -23,7 +23,7 @@ export default function GrepTool({ tool }: GrepToolProps) {
       <ToolHeader tool={tool} toolName={tool.name} />
       <InlineCode>{input.pattern}</InlineCode>
       {input.path && (
-        <span className="text-[10px] text-neutral-500 dark:text-neutral-500">in {input.path}</span>
+        <span className="text-[10px] text-neutral-500 dark:text-neutral-500">在 {input.path}</span>
       )}
     </div>
   );

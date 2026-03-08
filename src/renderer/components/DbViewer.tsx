@@ -42,7 +42,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
       setTotal(result.total ?? 0);
       setError(null);
     } else {
-      setError(result.error ?? 'Failed to load data');
+      setError(result.error ?? '加载数据失败');
     }
   }, [appId, page, pageSize]);
 
@@ -59,7 +59,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
         setReadOnly(s === 'running' || s === 'developing');
       }
       if (!tablesResult.success) {
-        setError(tablesResult.error ?? 'Failed to load tables');
+        setError(tablesResult.error ?? '加载数据表失败');
         return;
       }
       setTables(tablesResult.tables);
@@ -128,7 +128,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
       setEditingCell(null);
       refreshData(activeTable);
     } else {
-      setError(result.error ?? 'Update failed');
+      setError(result.error ?? '更新失败');
     }
   };
 
@@ -138,7 +138,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
     if (result.success) {
       refreshData(activeTable);
     } else {
-      setError(result.error ?? 'Delete failed');
+      setError(result.error ?? '删除失败');
     }
   };
 
@@ -152,7 +152,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
       setActiveTable(null);
       setError(null);
     } else {
-      setError(result.error ?? 'Query failed');
+      setError(result.error ?? '查询失败');
     }
   };
 
@@ -174,11 +174,11 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
         </button>
         <Database className="h-4 w-4 text-neutral-500" />
         <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-          {appName} - Data
+          {appName} - 数据
         </span>
         {readOnly && (
           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-            READ-ONLY (app is running)
+            只读（应用运行中）
           </span>
         )}
         <div className="flex-1" />
@@ -250,7 +250,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
       <div className="flex-1 overflow-auto">
         {rows.length === 0 ?
           <div className="flex h-32 items-center justify-center text-xs text-neutral-400">
-            No data
+            暂无数据
           </div>
         : <table className="w-full text-xs">
             <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-neutral-800">
@@ -262,7 +262,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
                   >
                     {col.name}
                     {col.pk && (
-                      <span className="ml-1 text-[9px] text-amber-500" title="Primary Key">
+                      <span className="ml-1 text-[9px] text-amber-500" title="主键">
                         PK
                       </span>
                     )}
@@ -365,7 +365,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
       {totalPages > 1 && (
         <div className="flex items-center justify-between border-t border-neutral-200 px-3 py-1.5 dark:border-neutral-700">
           <span className="text-[10px] text-neutral-500">
-            {total} rows
+            共 {total} 条
           </span>
           <div className="flex items-center gap-1">
             <button

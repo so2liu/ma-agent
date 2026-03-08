@@ -6,7 +6,7 @@ import {
   PenLine,
   Sparkles,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { ComponentType, SVGProps } from 'react';
 
 import type { SkillCard } from '@/constants/skillCards';
@@ -32,26 +32,29 @@ export default function SkillCardGrid({ onSelectSkill, onMoreClick, currentInput
 
   const activeCard = skillCards.find((c) => c.id === activeId);
 
-  const handleClick = (card: SkillCard) => {
-    if (card.id === 'more') {
-      onMoreClick?.();
-      return;
-    }
-    if (!card.prefillPrompt) return;
+  const handleClick = useCallback(
+    (card: SkillCard) => {
+      if (card.id === 'more') {
+        onMoreClick?.();
+        return;
+      }
+      if (!card.prefillPrompt) return;
 
-    if (currentInput.trim()) {
-      setActiveId(card.id);
-    } else {
-      onSelectSkill(card.prefillPrompt);
-    }
-  };
+      if (currentInput.trim()) {
+        setActiveId(card.id);
+      } else {
+        onSelectSkill(card.prefillPrompt);
+      }
+    },
+    [onMoreClick, onSelectSkill, currentInput],
+  );
 
-  const handleConfirmReplace = () => {
+  const handleConfirmReplace = useCallback(() => {
     if (activeCard?.prefillPrompt) {
       onSelectSkill(activeCard.prefillPrompt);
     }
     setActiveId(null);
-  };
+  }, [activeCard, onSelectSkill]);
 
   return (
     <div className="flex w-full max-w-2xl flex-col items-center gap-2 px-4">
@@ -66,7 +69,8 @@ export default function SkillCardGrid({ onSelectSkill, onMoreClick, currentInput
               onMouseLeave={() => !currentInput.trim() && setActiveId(null)}
               onFocus={() => !activeId && setActiveId(card.id)}
               onBlur={() => !currentInput.trim() && setActiveId(null)}
-              className="flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-600 transition-all hover:border-neutral-300 hover:bg-neutral-50 active:scale-[0.97] dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-750"
+              aria-label={`${card.title}: ${card.example}`}
+              className="flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-600 transition-all hover:border-neutral-300 hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-400/50 active:scale-[0.97] dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-750"
             >
               <Icon
                 className="h-3.5 w-3.5"

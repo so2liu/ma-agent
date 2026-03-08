@@ -239,7 +239,7 @@ export default function ChatInput({
       {floatingPanel && <div className="mb-2">{floatingPanel}</div>}
       <div className="mx-auto max-w-3xl">
         <div
-          className={`rounded-3xl bg-white/95 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.15)] backdrop-blur-xl dark:bg-neutral-900/90 dark:shadow-[0_16px_50px_rgba(0,0,0,0.65)] ${
+          className={`rounded-3xl bg-white/95 p-2 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:bg-neutral-900/90 dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] ${
             isDragActive ?
               'ring-2 ring-neutral-400/80 dark:ring-neutral-500/80'
             : 'ring-1 ring-neutral-200/80 dark:ring-neutral-700/70'
@@ -302,6 +302,8 @@ export default function ChatInput({
                 <Paperclip className="h-4 w-4" />
               </button>
               <div
+                role="radiogroup"
+                aria-label="选择模型"
                 className="flex h-10 items-center gap-1 rounded-full border border-neutral-200/80 bg-neutral-100 px-1.5 py-1 transition dark:border-neutral-700/70 dark:bg-neutral-800"
                 title={customModelActive ? '已启用自定义模型，前往设置 > 开发者信息修改' : undefined}
               >

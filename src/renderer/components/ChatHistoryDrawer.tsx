@@ -113,7 +113,7 @@ export default function ChatHistoryDrawer({
         acc[conversation.id] = '';
       }
       acc[conversation.id] =
-        acc[conversation.id] || 'Tap to resume this conversation from where you left off.';
+        acc[conversation.id] || '点击继续之前的对话';
       return acc;
     }, {});
   }, [conversations]);
@@ -168,7 +168,7 @@ export default function ChatHistoryDrawer({
         }`}
         aria-hidden={!isOpen}
       >
-        <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-black/10 bg-white/70 p-4 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.28)] backdrop-blur-2xl transition-all duration-300 ease-out dark:border-white/10 dark:bg-neutral-900/70 dark:shadow-black/50">
+        <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-black/10 bg-white/70 p-4 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)] backdrop-blur-2xl transition-all duration-300 ease-out dark:border-white/10 dark:bg-neutral-900/70 dark:shadow-black/50">
           <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-white/50 via-white/20 to-transparent opacity-90 dark:from-white/5 dark:via-white/[0.02] dark:to-transparent dark:opacity-100" />
           <div className="relative flex h-full flex-col gap-4">
             <div className="flex items-start justify-between gap-3">
