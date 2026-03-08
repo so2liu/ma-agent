@@ -270,6 +270,55 @@ export interface SkillDiscoverResponse {
   error?: string;
 }
 
+export interface DbColumn {
+  name: string;
+  type: string;
+  pk: boolean;
+}
+
+export interface DbQueryResponse {
+  success: boolean;
+  rows?: Record<string, unknown>[];
+  columns?: DbColumn[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
+  isRecordsTable?: boolean;
+  error?: string;
+}
+
+export interface ScheduledTask {
+  id: string;
+  name: string;
+  prompt: string;
+  cronExpression: string;
+  enabled: boolean;
+  modelPreference: ChatModelPreference;
+  lastRunAt?: number;
+  lastRunStatus?: 'success' | 'error' | 'skipped';
+  lastRunConversationId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ScheduleListResponse {
+  success: boolean;
+  tasks?: ScheduledTask[];
+  error?: string;
+}
+
+export interface ScheduleTaskResponse {
+  success: boolean;
+  task?: ScheduledTask;
+  error?: string;
+}
+
+export interface ScheduleRunResponse {
+  success: boolean;
+  conversationId?: string;
+  error?: string;
+}
+
 export interface ElectronAPI {
   onNavigate: (callback: (view: string) => void) => () => void;
   chat: {
@@ -340,6 +389,29 @@ export interface ElectronAPI {
     publish: (appId: string) => Promise<AppPublishResponse>;
     stop: (appId: string) => Promise<{ success: boolean; error?: string }>;
   };
+  db: {
+    getTables: (appId: string) => Promise<{ success: boolean; tables: string[]; error?: string }>;
+    queryTable: (
+      appId: string,
+      table: string,
+      page?: number,
+      pageSize?: number
+    ) => Promise<DbQueryResponse>;
+    updateCell: (
+      appId: string,
+      table: string,
+      rowId: string,
+      column: string,
+      value: unknown
+    ) => Promise<{ success: boolean; error?: string }>;
+    deleteRow: (
+      appId: string,
+      table: string,
+      rowId: string
+    ) => Promise<{ success: boolean; deleted?: boolean; error?: string }>;
+    runQuery: (appId: string, sql: string) => Promise<DbQueryResponse>;
+    getAppStatus: (appId: string) => Promise<{ success: boolean; status: string; error?: string }>;
+  };
   skill: {
     list: () => Promise<SkillListResponse>;
     toggleShared: (skillName: string) => Promise<{ success: boolean; shared?: boolean; error?: string }>;
@@ -376,6 +448,27 @@ export interface ElectronAPI {
     ) => Promise<ProjectUpdateResponse>;
     reorder: (orderedIds: string[]) => Promise<{ success: boolean; error?: string }>;
     delete: (id: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  schedule: {
+    list: () => Promise<ScheduleListResponse>;
+    create: (data: {
+      name: string;
+      prompt: string;
+      cronExpression: string;
+      modelPreference: ChatModelPreference;
+    }) => Promise<ScheduleTaskResponse>;
+    update: (
+      id: string,
+      updates: {
+        name?: string;
+        prompt?: string;
+        cronExpression?: string;
+        enabled?: boolean;
+        modelPreference?: ChatModelPreference;
+      }
+    ) => Promise<ScheduleTaskResponse>;
+    delete: (id: string) => Promise<{ success: boolean; error?: string }>;
+    runNow: (id: string) => Promise<ScheduleRunResponse>;
   };
   update: {
     getStatus: () => Promise<UpdateStatus>;

@@ -86,7 +86,7 @@ Requirements:
 #### Sandbox Global APIs
 
 ```javascript
-// Data storage (auto-persisted to JSON file by host)
+// Data storage (auto-persisted to SQLite by host)
 DB.getAll(); // Returns all records as array
 DB.getById(id); // Returns record or null
 DB.insert(record); // Returns record with auto-generated id + createdAt

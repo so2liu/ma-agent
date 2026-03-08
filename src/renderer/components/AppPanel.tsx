@@ -1,9 +1,23 @@
-import { Code, Copy, ExternalLink, Globe, Hammer, Loader2, Play, Square } from 'lucide-react';
+import {
+  Code,
+  Copy,
+  Database,
+  ExternalLink,
+  Globe,
+  Hammer,
+  Loader2,
+  Play,
+  Square
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { AppInfo } from '@/electron';
 
-export default function AppPanel() {
+interface AppPanelProps {
+  onOpenDbViewer?: (appId: string, appName: string) => void;
+}
+
+export default function AppPanel({ onOpenDbViewer }: AppPanelProps) {
   const [apps, setApps] = useState<AppInfo[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -107,6 +121,15 @@ export default function AppPanel() {
               <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-800 dark:text-neutral-200">
                 {app.name}
               </span>
+              {onOpenDbViewer && (
+                <button
+                  onClick={() => onOpenDbViewer(app.id, app.name)}
+                  className="shrink-0 rounded p-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-indigo-600 dark:hover:bg-neutral-700 dark:hover:text-indigo-400"
+                  title="View Data"
+                >
+                  <Database className="h-3 w-3" />
+                </button>
+              )}
               {app.status === 'running' && (
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
               )}
