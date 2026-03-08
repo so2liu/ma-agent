@@ -9,7 +9,7 @@ import Schedules from '@/pages/Schedules';
 import Settings from '@/pages/Settings';
 import Skills from '@/pages/Skills';
 
-type View = 'home' | 'settings' | 'skills' | 'schedules' | 'db-viewer';
+type View = 'home' | 'settings' | 'skills' | 'schedules' | 'db-viewer' | 'onboarding';
 
 interface DbViewerState {
   appId: string;
@@ -72,6 +72,9 @@ export default function App() {
     <>
       <UpdateCheckFeedback />
       <UpdateReadyBanner />
+      {currentView === 'onboarding' && (
+        <OnboardingWizard onComplete={() => setCurrentView('home')} />
+      )}
       <div className={currentView === 'settings' ? 'block' : 'hidden'}>
         <Settings onBack={() => setCurrentView('home')} />
       </div>
@@ -96,6 +99,7 @@ export default function App() {
           onSkillsClick={() => setCurrentView('skills')}
           onSchedulesClick={() => setCurrentView('schedules')}
           onOpenDbViewer={openDbViewer}
+          onOnboardingClick={() => setCurrentView('onboarding')}
         />
       </div>
     </>

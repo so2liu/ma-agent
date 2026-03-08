@@ -108,9 +108,10 @@ interface ChatProps {
   onSkillsClick?: () => void;
   onSchedulesClick?: () => void;
   onOpenDbViewer?: (appId: string, appName: string) => void;
+  onOnboardingClick?: () => void;
 }
 
-export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick, onOpenDbViewer }: ChatProps) {
+export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick, onOpenDbViewer, onOnboardingClick }: ChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -534,6 +535,7 @@ export default function Chat({ onSettingsClick, onSkillsClick, onSchedulesClick,
             onSkillsClick={onSkillsClick}
             onSchedulesClick={onSchedulesClick}
             onOpenDbViewer={onOpenDbViewer}
+            onOnboardingClick={onOnboardingClick}
           />
         </Panel>
 

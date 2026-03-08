@@ -3,7 +3,6 @@ import {
   Copy,
   Database,
   ExternalLink,
-  Globe,
   Hammer,
   Loader2,
   Play,
@@ -15,29 +14,38 @@ import type { AppInfo } from '@/electron';
 
 interface AppPanelProps {
   onOpenDbViewer?: (appId: string, appName: string) => void;
+  apps?: AppInfo[];
+  onAppsChanged?: () => void;
 }
 
-export default function AppPanel({ onOpenDbViewer }: AppPanelProps) {
-  const [apps, setApps] = useState<AppInfo[]>([]);
+export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsChanged }: AppPanelProps) {
+  const [internalApps, setInternalApps] = useState<AppInfo[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
+  const apps = externalApps ?? internalApps;
+
   const loadApps = useCallback(async () => {
+    if (externalApps) {
+      onAppsChanged?.();
+      return;
+    }
     try {
       const response = await window.electron.app.scan();
       if (response.success) {
-        setApps(response.apps);
+        setInternalApps(response.apps);
       }
     } catch (error) {
       console.error('Error scanning apps:', error);
     }
-  }, []);
+  }, [externalApps, onAppsChanged]);
 
   useEffect(() => {
+    if (externalApps) return;
     loadApps();
     const timer = setInterval(loadApps, 3000);
     return () => clearInterval(timer);
-  }, [loadApps]);
+  }, [loadApps, externalApps]);
 
   const handleStartDev = async (appId: string) => {
     setBusyId(appId);
@@ -102,57 +110,48 @@ export default function AppPanel({ onOpenDbViewer }: AppPanelProps) {
   if (apps.length === 0) return null;
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-between px-3 pt-2 pb-1.5">
-        <span className="text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-neutral-500">
-          Apps
-        </span>
-        <Globe className="h-3 w-3 text-neutral-400 dark:text-neutral-500" />
-      </div>
-
-      <div className="space-y-1 px-1.5 pb-2">
-        {apps.map((app) => (
-          <div
-            key={app.id}
-            className="rounded-lg bg-white px-2.5 py-2 shadow-sm dark:bg-neutral-800"
-          >
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm">{app.icon}</span>
-              <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-800 dark:text-neutral-200">
-                {app.name}
-              </span>
-              {onOpenDbViewer && (
-                <button
-                  onClick={() => onOpenDbViewer(app.id, app.name)}
-                  className="shrink-0 rounded p-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-indigo-600 dark:hover:bg-neutral-700 dark:hover:text-indigo-400"
-                  title="View Data"
-                >
-                  <Database className="h-3 w-3" />
-                </button>
-              )}
-              {app.status === 'running' && (
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
-              )}
-              {app.status === 'developing' && (
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
-              )}
-              {(app.status === 'scaffolding' ||
-                app.status === 'installing' ||
-                app.status === 'building') && (
-                <Loader2 className="h-3 w-3 shrink-0 animate-spin text-amber-500" />
-              )}
-            </div>
-
-            {app.description && (
-              <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500 dark:text-neutral-400">
-                {app.description}
-              </p>
+    <div className="space-y-1 px-1.5 pb-1">
+      {apps.map((app) => (
+        <div
+          key={app.id}
+          className="rounded-lg bg-white px-2.5 py-2 shadow-sm dark:bg-neutral-800"
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm">{app.icon}</span>
+            <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-800 dark:text-neutral-200">
+              {app.name}
+            </span>
+            {onOpenDbViewer && (
+              <button
+                onClick={() => onOpenDbViewer(app.id, app.name)}
+                className="shrink-0 rounded p-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-indigo-600 dark:hover:bg-neutral-700 dark:hover:text-indigo-400"
+                title="View Data"
+              >
+                <Database className="h-3 w-3" />
+              </button>
             )}
-
-            {renderAppActions(app)}
+            {app.status === 'running' && (
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
+            )}
+            {app.status === 'developing' && (
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+            )}
+            {(app.status === 'scaffolding' ||
+              app.status === 'installing' ||
+              app.status === 'building') && (
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin text-amber-500" />
+            )}
           </div>
-        ))}
-      </div>
+
+          {app.description && (
+            <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500 dark:text-neutral-400">
+              {app.description}
+            </p>
+          )}
+
+          {renderAppActions(app)}
+        </div>
+      ))}
     </div>
   );
 
