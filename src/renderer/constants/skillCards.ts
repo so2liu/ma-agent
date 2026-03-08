@@ -5,9 +5,25 @@ export interface SkillCard {
   icon: 'FileText' | 'BarChart3' | 'PenLine' | 'Globe' | 'Palette' | 'Sparkles'
   gradient: { from: string; to: string }
   prefillPrompt: string | null
+  /** Detail card content shown when the pill is selected */
+  detail?: {
+    output: string
+  }
 }
 
 export const skillCards: SkillCard[] = [
+  {
+    id: 'web-app',
+    title: '创建应用',
+    description: '根据描述快速生成网页应用',
+    icon: 'Globe',
+    gradient: { from: '#8B5CF6', to: '#A855F7' },
+    prefillPrompt:
+      '帮我创建一个露营团建住宿统计应用，可以录入参与人员，选择是否住在营地，并汇总统计结果。',
+    detail: {
+      output: '可交互的网页应用，支持数据录入、实时统计和导出',
+    },
+  },
   {
     id: 'pdf',
     title: '处理 PDF',
@@ -16,6 +32,9 @@ export const skillCards: SkillCard[] = [
     gradient: { from: '#EF4444', to: '#F97316' },
     prefillPrompt:
       '请提取附件 PDF 中的关键数据和表格，并整理成结构化的摘要。',
+    detail: {
+      output: '结构化文本摘要、提取的表格数据或处理后的 PDF 文件',
+    },
   },
   {
     id: 'xlsx',
@@ -25,6 +44,9 @@ export const skillCards: SkillCard[] = [
     gradient: { from: '#22C55E', to: '#10B981' },
     prefillPrompt:
       '请分析附件中的表格数据，找出关键趋势，并生成带图表的分析报告。',
+    detail: {
+      output: '数据分析报告，包含趋势图表和关键洞察',
+    },
   },
   {
     id: 'docx',
@@ -34,15 +56,9 @@ export const skillCards: SkillCard[] = [
     gradient: { from: '#3B82F6', to: '#6366F1' },
     prefillPrompt:
       '请审阅附件文档的内容和结构，提供修改建议并生成带修订标记的版本。',
-  },
-  {
-    id: 'web-app',
-    title: '创建应用',
-    description: '根据描述快速生成网页应用',
-    icon: 'Globe',
-    gradient: { from: '#8B5CF6', to: '#A855F7' },
-    prefillPrompt:
-      '帮我创建一个露营团建住宿统计应用，可以录入参与人员，选择是否住在营地，并汇总统计结果。',
+    detail: {
+      output: '带批注和修订标记的 Word 文档',
+    },
   },
   {
     id: 'frontend-design',
@@ -52,6 +68,9 @@ export const skillCards: SkillCard[] = [
     gradient: { from: '#EC4899', to: '#F43F5E' },
     prefillPrompt:
       '设计一个现代风格的数据看板，包含侧边导航、数据卡片和图表区域，风格专业大气。',
+    detail: {
+      output: '高保真前端页面，可直接在浏览器中预览',
+    },
   },
   {
     id: 'more',
