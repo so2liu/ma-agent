@@ -158,7 +158,11 @@ contextBridge.exposeInMainWorld('electron', {
     setOpenAIConfig: (config: OpenAIConfig) =>
       ipcRenderer.invoke('config:set-openai-config', config),
     testOpenAIApi: (params?: { apiKey?: string; baseUrl?: string; modelId?: string }) =>
-      ipcRenderer.invoke('config:test-openai-api', params)
+      ipcRenderer.invoke('config:test-openai-api', params),
+    parseApiConfig: (params: { text: string }) =>
+      ipcRenderer.invoke('config:parse-api-config', params),
+    autoDetectProvider: (params: { apiKey: string; baseUrl?: string; modelId?: string }) =>
+      ipcRenderer.invoke('config:auto-detect-provider', params)
   },
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)

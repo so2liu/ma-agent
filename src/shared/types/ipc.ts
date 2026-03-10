@@ -100,6 +100,22 @@ export interface OpenAIConfig {
   modelId?: string;
 }
 
+/** Parsed API config from server-side NLP extraction */
+export interface ParsedApiConfig {
+  apiKey?: string;
+  baseUrl?: string;
+  modelId?: string;
+  error?: string;
+}
+
+/** Result of auto-detecting provider type */
+export interface AutoDetectResult {
+  success: boolean;
+  provider?: AgentProvider;
+  model?: string;
+  error?: string;
+}
+
 /** Default OpenAI model IDs per preference tier */
 export const DEFAULT_OPENAI_MODEL_IDS: Record<ChatModelPreference, string> = {
   fast: 'gpt-4.1-mini',
