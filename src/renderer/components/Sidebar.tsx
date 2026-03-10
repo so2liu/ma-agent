@@ -472,19 +472,19 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* === Primary Action: 新建任务 === */}
-      <div className="shrink-0 px-3 pb-2">
+      {/* === Nav links === */}
+      <div className="shrink-0 space-y-0.5 px-3 pb-3">
         <button
           onClick={() => onNewChat()}
-          className="flex w-full items-center gap-2.5 rounded-xl bg-neutral-800 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 active:bg-neutral-900 dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:active:bg-neutral-100"
+          className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors ${
+            currentView === 'home' ?
+              'bg-white font-medium text-neutral-800 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
+            : 'text-neutral-600 hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800'
+          }`}
         >
           <SquarePen className="h-4 w-4" />
           新建任务
         </button>
-      </div>
-
-      {/* === Nav links === */}
-      <div className="shrink-0 space-y-0.5 px-3 pb-3">
         <button
           onClick={onSkillsClick}
           className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors ${
