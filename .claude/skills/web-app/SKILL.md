@@ -6,148 +6,121 @@ license: MIT
 
 # Web App Skill
 
-When a user asks you to create a web application, generate files following these conventions.
+When a user asks you to create a web application, use the `crud` CLI tool to scaffold the app and generate CRUD entities, then customize the generated code.
 
-## File Structure
+## Step 1: Initialize the App
 
-Write all files to `apps/{app-name}/` under the workspace root.
-Use lowercase English + hyphens for `{app-name}` (e.g., `hotel-registration`).
+```bash
+bun run .claude/tools/crud.ts init <app-id>
+```
 
-Each app requires these files:
+- `app-id`: lowercase English + hyphens (e.g., `hotel-registration`)
+- This creates the full project skeleton under `apps/<app-id>/`
 
-### 1. `app.json` — App manifest
+Then edit `apps/<app-id>/app.json` to set the display name and icon:
 
 ```json
 {
   "name": "Display Name (can be Chinese)",
-  "description": "Short description of the app",
+  "description": "Short description",
   "version": "1.0.0",
   "icon": "emoji icon"
 }
 ```
 
-### 2. `src/App.tsx` — Frontend (React component)
+## Step 2: Generate CRUD Entities
 
-This is the main React component rendered by the platform.
+For each data entity your app needs:
 
-Requirements:
+```bash
+bun run .claude/tools/crud.ts generate <app-id> <entity>
+```
 
-- Write a single `App.tsx` component as the default export
-- Use **Tailwind CSS 4** utility classes for styling (imported via `@import 'tailwindcss'` in the template's `index.css`)
-- Use **@tanstack/react-query** for data fetching (the `QueryClientProvider` is already set up in the template)
-- All API calls use `/api/` prefix (e.g., `fetch('/api/items')`)
-- Mobile-first responsive design (users may open on phones)
-- Chinese UI by default (unless user specifies otherwise)
-- No external CDN dependencies (LAN may have no internet)
-- You may create additional components as separate files under `src/` and import them
+- `entity`: singular lowercase name (e.g., `submission`, `user`, `comment`)
+- This creates: database table, API routes, and a page component
 
-Example:
+You can generate multiple entities:
+
+```bash
+bun run .claude/tools/crud.ts generate hotel-registration guest
+bun run .claude/tools/crud.ts generate hotel-registration room
+```
+
+## Step 3: Customize the Generated Code
+
+After generating entities, you only need to edit these files:
+
+### `src/db/schema.ts` — Add fields to tables
+
+The generated table has `id` and `createdAt` by default. Add your fields:
+
+```typescript
+export const submissions = sqliteTable('submissions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  createdAt: text('created_at').default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+  // Add your fields:
+  name: text('name').notNull(),
+  stayType: text('stay_type').notNull(),
+})
+```
+
+Common field types:
+
+```typescript
+text('field_name')                    // String
+text('field_name').notNull()          // Required string
+integer('field_name')                 // Number
+text('field_name').default('value')   // String with default
+```
+
+### `src/pages/<Entity>Page.tsx` — Customize the UI
+
+The generated page has a form and list with TODO placeholders. Replace them:
+
+**Form fields** — add inside the `<form>`:
 
 ```tsx
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-
-export default function App() {
-  const queryClient = useQueryClient();
-  const [name, setName] = useState('');
-
-  const { data: items = [] } = useQuery({
-    queryKey: ['items'],
-    queryFn: () => fetch('/api/items').then((r) => r.json())
-  });
-
-  const addItem = useMutation({
-    mutationFn: (newItem: { name: string }) =>
-      fetch('/api/items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newItem)
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['items'] })
-  });
-
-  return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <h1 className="text-2xl font-bold text-gray-900">My App</h1>
-      {/* ... */}
-    </div>
-  );
-}
+<div>
+  <label className="mb-1 block text-sm font-medium text-gray-700">姓名</label>
+  <input
+    type="text"
+    value={form.name ?? ''}
+    onChange={(e) => setForm({ ...form, name: e.target.value })}
+    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+    placeholder="请输入姓名"
+  />
+</div>
 ```
 
-### 3. `server.js` — Backend logic (runs in QuickJS WASM sandbox)
+**List items** — replace the `JSON.stringify(item)` with:
 
-Requirements:
-
-- Export a `handleRequest(req)` function as the entry point
-- Only use the sandbox-provided global APIs (see below)
-- Do NOT use fetch, fs, require, import, or any Node.js/browser APIs
-
-#### Sandbox Global APIs
-
-```javascript
-// Data storage (auto-persisted to SQLite by host)
-DB.getAll(); // Returns all records as array
-DB.getById(id); // Returns record or null
-DB.insert(record); // Returns record with auto-generated id + createdAt
-DB.update(id, partialRecord); // Returns true/false
-DB.remove(id); // Returns true/false
-DB.query({ field: value }); // Returns matching records
-
-// Logging
-Logger.info(message);
-Logger.error(message);
+```tsx
+<span className="text-gray-900">{item.name} - {item.stayType}</span>
 ```
 
-#### handleRequest Signature
+### `src/server/routes/<entities>.ts` — Add custom business logic (optional)
 
-**IMPORTANT:** `req.path` includes the `/api/` prefix (e.g., `/api/todos`, `/api/todos/123`).
-Strip the prefix before routing:
+The generated CRUD routes work out of the box. Only edit if you need custom validation, filtering, or business rules.
 
-```javascript
-function handleRequest(req) {
-  var method = req.method;
-  // Strip /api prefix so "/api/todos/123" becomes "/todos/123"
-  var path = req.path.replace(/^\/api/, '');
-  var parts = path.split('/').filter(Boolean); // ["todos", "123"]
+### `index.html` — Update the page title (optional)
 
-  if (parts[0] === 'todos') {
-    if (method === 'GET' && parts.length === 1) {
-      return {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(DB.getAll())
-      };
-    }
-    // ... more routes
-  }
+Change the `<title>` tag to match your app name.
 
-  return {
-    status: 404,
-    headers: { 'Content-Type': 'application/json' },
-    body: '{"error":"Not Found"}'
-  };
-}
-```
+## What NOT to Do
 
-## What NOT to Write
-
-The platform automatically provides these files from a template — do NOT create them:
-
-- `package.json` — auto-generated with React, Tailwind, TanStack Query, Vite
-- `vite.config.ts` — auto-configured with React plugin, Tailwind, API proxy
-- `tsconfig.json` — auto-configured for React + TypeScript
-- `index.html` — auto-generated entry point that loads `src/main.tsx`
-- `src/main.tsx` — auto-generated with React root + QueryClientProvider
-- `src/index.css` — auto-generated with Tailwind import
+- Do NOT create `package.json`, `vite.config.ts`, `tsconfig.json`, `drizzle.config.ts` — these are created by `crud init`
+- Do NOT create `src/main.tsx`, `src/index.css`, `src/db/index.ts`, `src/server/index.ts` — these are managed by the CLI
+- Do NOT modify files in `src/server/index.ts` imports section (the `// [crud:imports]` and `// [crud:routes]` markers are used by the CLI)
 
 ## Available Libraries
 
-These are pre-installed in every app and can be imported in `src/App.tsx`:
+These are pre-installed and can be imported:
 
 - **React 19** — `import { useState, useEffect } from 'react'`
 - **Tailwind CSS 4** — use utility classes directly in JSX
 - **@tanstack/react-query** — `import { useQuery, useMutation } from '@tanstack/react-query'`
+- **Hono** — `import { Hono } from 'hono'` (backend routes)
+- **Drizzle ORM** — `import { eq } from 'drizzle-orm'` (database queries)
 
 ## After Generating Files
 

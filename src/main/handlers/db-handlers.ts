@@ -4,7 +4,6 @@ import { ipcMain } from 'electron';
 
 import { getWorkspaceDir } from '../lib/config';
 import { appManager } from '../lib/sandbox/app-manager';
-import { migrateJsonToSqlite } from '../lib/sandbox/sandbox-api';
 import { openDatabase, type SqliteDatabase } from '../lib/sandbox/sqlite-adapter';
 
 function getAppDir(appId: string): string {
@@ -91,10 +90,6 @@ export function registerDbHandlers(): void {
   ipcMain.handle('db:get-tables', (_event, appId: unknown) => {
     try {
       const id = appId as string;
-      const appDir = getAppDir(id);
-      const jsonPath = join(appDir, 'data.json');
-      const sqlitePath = join(appDir, 'data.sqlite');
-      migrateJsonToSqlite(jsonPath, sqlitePath);
       const dbPath = getDbPath(id);
       return withDb(dbPath, true, (db) => {
         const tables = db

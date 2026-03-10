@@ -203,7 +203,11 @@ contextBridge.exposeInMainWorld('electron', {
     startDev: (appId: string) => ipcRenderer.invoke('app:start-dev', appId),
     stopDev: (appId: string) => ipcRenderer.invoke('app:stop-dev', appId),
     publish: (appId: string) => ipcRenderer.invoke('app:publish', appId),
-    stop: (appId: string) => ipcRenderer.invoke('app:stop', appId)
+    stop: (appId: string) => ipcRenderer.invoke('app:stop', appId),
+    setConversationId: (appId: string, conversationId: string) =>
+      ipcRenderer.invoke('app:set-conversation-id', appId, conversationId),
+    syncConversationId: (conversationId: string | null) =>
+      ipcRenderer.invoke('app:sync-conversation-id', conversationId)
   },
   db: {
     getTables: (appId: string) => ipcRenderer.invoke('db:get-tables', appId),

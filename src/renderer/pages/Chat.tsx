@@ -122,6 +122,7 @@ export interface ChatHandle {
   loadConversation: (id: string) => Promise<void>;
   newChat: () => Promise<void>;
   isLoading: () => boolean;
+  setInput: (text: string) => void;
 }
 
 interface ChatProps {
@@ -130,6 +131,7 @@ interface ChatProps {
   selectedProjectId: string | null;
   setSelectedProjectId: (id: string | null) => void;
   onOpenDbViewer?: (appId: string, appName: string) => void;
+  onDebugApp?: (conversationId: string, errorMsg: string) => void;
   onSkillsClick?: () => void;
 }
 
@@ -188,6 +190,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     selectedProjectId,
     setSelectedProjectId,
     onOpenDbViewer,
+    onDebugApp,
     onSkillsClick
   },
   ref
@@ -206,6 +209,8 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   const [showFilesDropdown, setShowFilesDropdown] = useState(false);
   const [showAppsDropdown, setShowAppsDropdown] = useState(false);
   const [apps, setApps] = useState<AppInfo[]>([]);
+  const appsRef = useRef(apps);
+  appsRef.current = apps;
   const projectIdForNewChatRef = useRef<string | null>(null);
   const { messages, setMessages, isLoading, setIsLoading } = useClaudeChat();
   const { track } = useAnalytics();
@@ -375,7 +380,8 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
             currentSessionId ?? undefined
           );
           if (response.success && response.conversation) {
-            setCurrentConversationId(response.conversation.id);
+            const newId = response.conversation.id;
+            setCurrentConversationId(newId);
             track('conversation_created');
             // Always assign to a project: selected project or default project
             let projectId = projectIdForNewChatRef.current;
@@ -386,7 +392,14 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
               }
             }
             if (projectId) {
-              await window.electron.conversation.setProject(response.conversation.id, projectId);
+              await window.electron.conversation.setProject(newId, projectId);
+            }
+            // Retroactively stamp apps created during this conversation before
+            // the conversation ID existed (fixes race with crud.ts init)
+            for (const a of appsRef.current) {
+              if (!a.conversationId) {
+                window.electron.app.setConversationId(a.id, newId).catch(() => {});
+              }
             }
           }
         }
@@ -399,6 +412,13 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
   }, [messages, currentConversationId, currentSessionId, setCurrentConversationId, track]);
+
+  // Sync conversationId to workspace file so CLI tools (crud.ts) can read it
+  useEffect(() => {
+    window.electron.app.syncConversationId(currentConversationId).catch((err) => {
+      console.error('Failed to sync conversation ID to workspace:', err);
+    });
+  }, [currentConversationId]);
 
   useEffect(() => {
     const unsubscribe = window.electron.chat.onSessionUpdated(({ sessionId }) => {
@@ -634,7 +654,8 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   useImperativeHandle(ref, () => ({
     loadConversation: handleLoadConversation,
     newChat: handleNewChat,
-    isLoading: () => isLoading
+    isLoading: () => isLoading,
+    setInput: (text: string) => setInputValue(text)
   }));
 
   const INPUT_BOTTOM_OFFSET = 48;
@@ -710,6 +731,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 <div className="max-h-80 overflow-y-auto p-1">
                   <AppPanel
                     onOpenDbViewer={onOpenDbViewer}
+                    onDebugApp={onDebugApp}
                     apps={apps}
                     onAppsChanged={refreshApps}
                   />

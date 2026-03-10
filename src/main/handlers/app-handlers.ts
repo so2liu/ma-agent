@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 
-import { getWorkspaceDir } from '../lib/config';
+import { getWorkspaceDir, writeCurrentConversationId } from '../lib/config';
 import { appManager } from '../lib/sandbox/app-manager';
 
 /** Validate appId to prevent path traversal attacks */
@@ -69,4 +69,34 @@ export function registerAppHandlers(): void {
       return { success: false, error: String(error) };
     }
   });
+
+  ipcMain.handle(
+    'app:set-conversation-id',
+    (_event, appId: unknown, conversationId: unknown) => {
+      try {
+        const id = validateAppId(appId);
+        if (typeof conversationId !== 'string' || conversationId.length === 0) {
+          throw new Error('conversationId must be a non-empty string');
+        }
+        const workspaceDir = getWorkspaceDir();
+        appManager.setConversationId(workspaceDir, id, conversationId);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: String(error) };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'app:sync-conversation-id',
+    (_event, conversationId: unknown) => {
+      try {
+        const id = typeof conversationId === 'string' ? conversationId : null;
+        writeCurrentConversationId(id);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: String(error) };
+      }
+    }
+  );
 }

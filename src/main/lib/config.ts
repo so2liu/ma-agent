@@ -1,4 +1,12 @@
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync
+} from 'fs';
 import { cp, mkdir, rename, rm } from 'fs/promises';
 import { join, resolve } from 'path';
 import { app } from 'electron';
@@ -400,6 +408,23 @@ export function buildClaudeSessionEnv(): Record<string, string> {
   }
 
   return env;
+}
+
+const CONVERSATION_ID_FILE = '.claude/current-conversation-id';
+
+/** Write the active conversation ID to the workspace so CLI tools (crud.ts) can read it */
+export function writeCurrentConversationId(conversationId: string | null): void {
+  const workspaceDir = getWorkspaceDir();
+  const filePath = join(workspaceDir, CONVERSATION_ID_FILE);
+  if (conversationId) {
+    const dir = join(workspaceDir, '.claude');
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(filePath, conversationId);
+  } else if (existsSync(filePath)) {
+    unlinkSync(filePath);
+  }
 }
 
 /**
