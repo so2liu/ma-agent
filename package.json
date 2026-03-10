@@ -21,6 +21,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.51",
     "@anthropic-ai/sdk": "^0.78.0",
+    "@mariozechner/pi-ai": "^0.57.1",
     "@mariozechner/pi-coding-agent": "^0.57.1",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^12.6.2",
