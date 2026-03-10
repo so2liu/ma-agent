@@ -111,13 +111,7 @@ export interface WorkspaceReadFileResponse {
   error?: string;
 }
 
-export type AppStatus =
-  | 'stopped'
-  | 'scaffolding'
-  | 'installing'
-  | 'developing'
-  | 'building'
-  | 'running';
+export type AppStatus = 'stopped' | 'installing' | 'developing' | 'building' | 'running';
 
 export interface AppInfo {
   id: string;
@@ -128,7 +122,7 @@ export interface AppInfo {
   lanUrl: string | null;
   localUrl: string | null;
   port: number | null;
-  isViteApp: boolean;
+  conversationId: string | null;
 }
 
 export interface AppScanResponse {
@@ -430,6 +424,13 @@ export interface ElectronAPI {
     stopDev: (appId: string) => Promise<{ success: boolean; error?: string }>;
     publish: (appId: string) => Promise<AppPublishResponse>;
     stop: (appId: string) => Promise<{ success: boolean; error?: string }>;
+    setConversationId: (
+      appId: string,
+      conversationId: string
+    ) => Promise<{ success: boolean; error?: string }>;
+    syncConversationId: (
+      conversationId: string | null
+    ) => Promise<{ success: boolean; error?: string }>;
   };
   db: {
     getTables: (appId: string) => Promise<{ success: boolean; tables: string[]; error?: string }>;

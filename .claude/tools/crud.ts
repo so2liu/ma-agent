@@ -13,6 +13,17 @@ import { join } from 'node:path'
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
+/** Read conversation ID from workspace file written by the Electron renderer */
+function readConversationIdFromWorkspace(): string | null {
+  try {
+    const filePath = join(process.cwd(), '.claude', 'current-conversation-id')
+    if (!existsSync(filePath)) return null
+    return readFileSync(filePath, 'utf-8').trim() || null
+  } catch {
+    return null
+  }
+}
+
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
@@ -58,11 +69,13 @@ function init(appId: string): void {
   ensureDir(join(appDir, 'src', 'server', 'routes'))
   ensureDir(join(appDir, 'src', 'pages'))
 
-  // app.json
-  writeFileSync(
-    join(appDir, 'app.json'),
-    JSON.stringify({ name: appId, description: '', version: '1.0.0', icon: '📦' }, null, 2) + '\n'
-  )
+  // app.json — include conversationId so the UI can link back to the originating conversation
+  const manifest: Record<string, string> = { name: appId, description: '', version: '1.0.0', icon: '📦' }
+  const conversationId = process.env.CONVERSATION_ID || readConversationIdFromWorkspace()
+  if (conversationId) {
+    manifest.conversationId = conversationId
+  }
+  writeFileSync(join(appDir, 'app.json'), JSON.stringify(manifest, null, 2) + '\n')
 
   // package.json
   writeFileSync(

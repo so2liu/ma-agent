@@ -1,18 +1,9 @@
 import { execSync } from 'node:child_process';
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync
-} from 'node:fs';
-import { basename, join } from 'node:path';
+import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { createBunSandbox } from './bun-sandbox';
-import { startAppServer, startStaticAppServer, type AppServer } from './http-server';
-import { createSandboxApp } from './quickjs-runtime';
-import { migrateJsonToSqlite } from './sandbox-api';
+import { startStaticAppServer, type AppServer } from './http-server';
 import type { AppInfo, AppManifest, AppStatus, PublishResult, SandboxApp } from './types';
 import { startViteDevServer, type ViteDevServer } from './vite-dev-server';
 
@@ -26,41 +17,16 @@ interface RunningApp {
 
 interface DevelopingApp {
   sandbox: SandboxApp;
-  sandboxServer: AppServer;
   viteServer: ViteDevServer;
   lanUrl: string;
   localUrl: string;
   port: number;
 }
 
-/** Resolve the path to the bundled app-template directory */
-function getTemplatePath(): string {
-  // In development: resources/app-template relative to project root
-  // In production: process.resourcesPath + '/app-template'
-  const devPath = join(__dirname, '../../resources/app-template');
-  if (existsSync(devPath)) return devPath;
-
-  const prodPath = join(process.resourcesPath ?? '', 'app-template');
-  if (existsSync(prodPath)) return prodPath;
-
-  throw new Error('App template not found');
-}
-
-/** Check if an app uses the React + Vite architecture (has src/App.tsx) */
-function isViteApp(appDir: string): boolean {
-  return existsSync(join(appDir, 'src', 'App.tsx'));
-}
-
-/** Check if an app uses the Hono backend (has src/server/index.ts) */
-function isHonoApp(appDir: string): boolean {
-  return existsSync(join(appDir, 'src', 'server', 'index.ts'));
-}
-
 /** Push Drizzle schema to SQLite database, with backup */
 function pushSchema(appDir: string): void {
   const dbPath = join(appDir, 'data.sqlite');
   const backupPath = join(appDir, 'data.sqlite.bak');
-  // Snapshot existing DB before applying schema changes
   if (existsSync(dbPath)) {
     copyFileSync(dbPath, backupPath);
   }
@@ -71,7 +37,6 @@ function pushSchema(appDir: string): void {
       timeout: 30_000
     });
   } catch (err) {
-    // Restore backup on push failure
     if (existsSync(backupPath)) {
       copyFileSync(backupPath, dbPath);
     }
@@ -79,53 +44,10 @@ function pushSchema(appDir: string): void {
   }
 }
 
-/** Check if an app has been scaffolded (has package.json from template) */
-function isScaffolded(appDir: string): boolean {
-  return existsSync(join(appDir, 'package.json'));
-}
-
-/** Check if dependencies are installed */
 function hasNodeModules(appDir: string): boolean {
   return existsSync(join(appDir, 'node_modules'));
 }
 
-/** Copy template files into app directory (skip files that already exist) */
-function scaffoldApp(appDir: string, manifest: AppManifest): void {
-  const templateDir = getTemplatePath();
-
-  const copyRecursive = (srcDir: string, destDir: string): void => {
-    if (!existsSync(destDir)) {
-      mkdirSync(destDir, { recursive: true });
-    }
-    const entries = readdirSync(srcDir, { withFileTypes: true });
-    for (const entry of entries) {
-      const srcPath = join(srcDir, entry.name);
-      const destPath = join(destDir, entry.name);
-      if (entry.isDirectory()) {
-        copyRecursive(srcPath, destPath);
-      } else if (!existsSync(destPath)) {
-        // Only copy if destination doesn't exist (don't overwrite user files)
-        copyFileSync(srcPath, destPath);
-      }
-    }
-  };
-
-  copyRecursive(templateDir, appDir);
-
-  // Replace template placeholders in scaffolded files
-  const filesToPatch = ['package.json', 'index.html'];
-  for (const file of filesToPatch) {
-    const filePath = join(appDir, file);
-    if (existsSync(filePath)) {
-      let content = readFileSync(filePath, 'utf-8');
-      content = content.replace(/\{\{APP_ID\}\}/g, basename(appDir));
-      content = content.replace(/\{\{APP_NAME\}\}/g, manifest.name);
-      writeFileSync(filePath, content);
-    }
-  }
-}
-
-/** Install dependencies */
 function installDeps(appDir: string): void {
   execSync('bun install', {
     cwd: appDir,
@@ -134,7 +56,6 @@ function installDeps(appDir: string): void {
   });
 }
 
-/** Build the Vite app for production */
 function buildApp(appDir: string): void {
   execSync('bunx vite build', {
     cwd: appDir,
@@ -174,7 +95,6 @@ class AppManager {
         const running = this.runningApps.get(dirName);
         const developing = this.developingApps.get(dirName);
         const transitionalStatus = this.appStatuses.get(dirName);
-        const viteApp = isViteApp(appDir);
 
         let status: AppStatus;
         if (transitionalStatus) {
@@ -196,7 +116,7 @@ class AppManager {
           lanUrl: developing?.lanUrl ?? running?.lanUrl ?? null,
           localUrl: developing?.localUrl ?? running?.localUrl ?? null,
           port: developing?.port ?? running?.port ?? null,
-          isViteApp: viteApp
+          conversationId: meta.conversationId ?? null
         });
       } catch {
         // Skip invalid app.json
@@ -205,93 +125,50 @@ class AppManager {
     return apps;
   }
 
+  /** Set the conversationId on an app's manifest */
+  setConversationId(workspaceDir: string, appId: string, conversationId: string): void {
+    const appJsonPath = join(workspaceDir, 'apps', appId, 'app.json');
+    if (!existsSync(appJsonPath)) return;
+    const meta = JSON.parse(readFileSync(appJsonPath, 'utf-8')) as AppManifest;
+    meta.conversationId = conversationId;
+    writeFileSync(appJsonPath, JSON.stringify(meta, null, 2));
+  }
+
   /**
-   * Start dev mode for a Vite app: scaffold, install deps, start sandbox + Vite dev server.
-   * The Vite dev server proxies /api/* requests to the sandbox server.
+   * Start dev mode: install deps, push schema, start Bun + Vite dev server.
+   * Vite dev server proxies /api/* to the Bun backend.
    */
   async startDev(workspaceDir: string, appId: string): Promise<PublishResult> {
-    // Stop any existing dev/running instance
     await this.stopDev(appId);
     await this.stop(appId);
 
     const appDir = join(workspaceDir, 'apps', appId);
 
-    if (!isViteApp(appDir)) {
-      throw new Error(`App "${appId}" is not a Vite app (missing src/App.tsx)`);
+    if (!existsSync(join(appDir, 'src', 'server', 'index.ts'))) {
+      throw new Error(`App "${appId}" is missing src/server/index.ts`);
     }
 
-    // Detect app type: Hono (new) vs QuickJS (legacy)
-    const honoApp = isHonoApp(appDir);
-
     try {
-      // Scaffold if needed (legacy apps only — Hono apps are created by crud CLI)
-      if (!honoApp && !isScaffolded(appDir)) {
-        this.appStatuses.set(appId, 'scaffolding');
-        const meta = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
-        scaffoldApp(appDir, meta);
-      }
-
-      // Install deps if needed
       if (!hasNodeModules(appDir)) {
         this.appStatuses.set(appId, 'installing');
         installDeps(appDir);
       }
 
-      let sandbox: SandboxApp;
-      let sandboxServer: AppServer | null = null;
-      let apiPort: number;
+      pushSchema(appDir);
+      const bunSandbox = await createBunSandbox(appDir);
 
-      if (honoApp) {
-        // Hono mode: push Drizzle schema, start Bun subprocess
-        // The Bun subprocess is already an HTTP server, so no extra wrapper needed
-        pushSchema(appDir);
-        const bunSandbox = await createBunSandbox(appDir);
-        sandbox = bunSandbox;
-        apiPort = bunSandbox.port;
-      } else {
-        // Legacy mode: QuickJS sandbox wrapped in an HTTP server
-        const serverPath = join(appDir, 'server.js');
-        const dataPath = join(appDir, 'data.sqlite');
-        migrateJsonToSqlite(join(appDir, 'data.json'), dataPath);
-
-        if (existsSync(serverPath)) {
-          const backendJs = readFileSync(serverPath, 'utf-8');
-          sandbox = await createSandboxApp(backendJs, appId, dataPath);
-        } else {
-          sandbox = {
-            handleRequest: async () => ({
-              status: 404,
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ error: 'No server.js backend' })
-            }),
-            dispose: () => {}
-          };
-        }
-        sandboxServer = await startAppServer('', sandbox);
-        apiPort = sandboxServer.port;
-      }
-
-      // Start Vite dev server with proxy to API backend
       this.appStatuses.set(appId, 'developing');
       let viteServer: ViteDevServer;
       try {
-        viteServer = await startViteDevServer(appDir, apiPort);
+        viteServer = await startViteDevServer(appDir, bunSandbox.port);
       } catch (err) {
-        // Clean up on Vite startup failure
-        if (sandboxServer) await sandboxServer.stop();
-        sandbox.dispose();
+        bunSandbox.dispose();
         throw err;
       }
 
       this.appStatuses.delete(appId);
       this.developingApps.set(appId, {
-        sandbox,
-        sandboxServer: sandboxServer ?? ({
-          port: apiPort,
-          lanUrl: '',
-          localUrl: '',
-          stop: async () => {}
-        } as AppServer),
+        sandbox: bunSandbox,
         viteServer,
         lanUrl: viteServer.lanUrl,
         localUrl: viteServer.localUrl,
@@ -317,7 +194,6 @@ class AppManager {
     if (!dev) return;
 
     await dev.viteServer.stop();
-    await dev.sandboxServer.stop();
     dev.sandbox.dispose();
     this.developingApps.delete(appId);
     this.appStatuses.delete(appId);
@@ -325,9 +201,8 @@ class AppManager {
     console.log(`[AppManager] Dev stopped "${appId}"`);
   }
 
-  /** Publish an app: build for production + start sandbox + static server */
+  /** Publish an app: build for production + start Bun backend + static server */
   async publish(workspaceDir: string, appId: string): Promise<PublishResult> {
-    // Prevent concurrent publish for the same app
     const existing = this.publishLocks.get(appId);
     if (existing) {
       return existing;
@@ -343,151 +218,63 @@ class AppManager {
 
   private async _doPublish(workspaceDir: string, appId: string): Promise<PublishResult> {
     const appDir = join(workspaceDir, 'apps', appId);
-    const serverPath = join(appDir, 'server.js');
-    const dataPath = join(appDir, 'data.sqlite');
 
-    const viteApp = isViteApp(appDir);
-    const honoApp = isHonoApp(appDir);
+    if (!existsSync(join(appDir, 'src', 'server', 'index.ts'))) {
+      throw new Error(`App "${appId}" is missing src/server/index.ts`);
+    }
 
-    if (viteApp) {
-      // Stop dev server if running
-      await this.stopDev(appId);
+    await this.stopDev(appId);
 
+    try {
+      if (!hasNodeModules(appDir)) {
+        this.appStatuses.set(appId, 'installing');
+        installDeps(appDir);
+      }
+
+      pushSchema(appDir);
+
+      this.appStatuses.set(appId, 'building');
+      buildApp(appDir);
+
+      const distDir = join(appDir, 'dist');
+      if (!existsSync(distDir)) {
+        throw new Error(`Build failed: dist/ directory not found for app "${appId}"`);
+      }
+
+      const sandbox = await createBunSandbox(appDir);
+
+      let server: AppServer;
       try {
-        // Ensure scaffolded and installed (scaffold is legacy-only)
-        if (!honoApp && !isScaffolded(appDir)) {
-          this.appStatuses.set(appId, 'scaffolding');
-          const meta = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
-          scaffoldApp(appDir, meta);
-        }
-        if (!hasNodeModules(appDir)) {
-          this.appStatuses.set(appId, 'installing');
-          installDeps(appDir);
-        }
-
-        // Push Drizzle schema for Hono apps
-        if (honoApp) {
-          pushSchema(appDir);
-        }
-
-        // Build for production
-        this.appStatuses.set(appId, 'building');
-        buildApp(appDir);
-
-        const distDir = join(appDir, 'dist');
-        if (!existsSync(distDir)) {
-          throw new Error(`Build failed: dist/ directory not found for app "${appId}"`);
-        }
-
-        // Create sandbox/backend for API routes
-        let sandbox: SandboxApp;
-        if (honoApp) {
-          sandbox = await createBunSandbox(appDir);
-        } else {
-          // Legacy QuickJS mode
-          migrateJsonToSqlite(join(appDir, 'data.json'), dataPath);
-          if (existsSync(serverPath)) {
-            const backendJs = readFileSync(serverPath, 'utf-8');
-            sandbox = await createSandboxApp(backendJs, appId, dataPath);
-          } else {
-            sandbox = {
-              handleRequest: async () => ({
-                status: 404,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ error: 'No server.js backend' })
-              }),
-              dispose: () => {}
-            };
-          }
-        }
-
-        // Start static server serving dist/ with API backend
-        let server: AppServer;
-        try {
-          server = await startStaticAppServer(distDir, sandbox);
-        } catch (err) {
-          // Clean up Bun subprocess if static server fails to start
-          sandbox.dispose();
-          throw err;
-        }
-
-        // Stop old running instance after new one is ready
-        if (this.runningApps.has(appId)) {
-          await this.stop(appId);
-        }
-
-        this.appStatuses.delete(appId);
-        this.runningApps.set(appId, {
-          sandbox,
-          server,
-          lanUrl: server.lanUrl,
-          localUrl: server.localUrl,
-          port: server.port
-        });
-
-        console.log(`[AppManager] Published Vite app "${appId}" at ${server.lanUrl}`);
-
-        return {
-          lanUrl: server.lanUrl,
-          localUrl: server.localUrl,
-          port: server.port
-        };
+        server = await startStaticAppServer(distDir, sandbox);
       } catch (err) {
-        this.appStatuses.delete(appId);
+        sandbox.dispose();
         throw err;
       }
+
+      if (this.runningApps.has(appId)) {
+        await this.stop(appId);
+      }
+
+      this.appStatuses.delete(appId);
+      this.runningApps.set(appId, {
+        sandbox,
+        server,
+        lanUrl: server.lanUrl,
+        localUrl: server.localUrl,
+        port: server.port
+      });
+
+      console.log(`[AppManager] Published "${appId}" at ${server.lanUrl}`);
+
+      return {
+        lanUrl: server.lanUrl,
+        localUrl: server.localUrl,
+        port: server.port
+      };
+    } catch (err) {
+      this.appStatuses.delete(appId);
+      throw err;
     }
-
-    // Legacy app path (raw HTML)
-    const indexPath = join(appDir, 'index.html');
-    if (!existsSync(indexPath)) {
-      throw new Error(`Missing index.html in app: ${appId}`);
-    }
-    if (!existsSync(serverPath)) {
-      throw new Error(`Missing server.js in app: ${appId}`);
-    }
-
-    const frontendHtml = readFileSync(indexPath, 'utf-8');
-    const backendJs = readFileSync(serverPath, 'utf-8');
-
-    // Migrate from data.json if needed
-    migrateJsonToSqlite(join(appDir, 'data.json'), dataPath);
-
-    // Read preferred port from manifest
-    const manifest = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
-    const preferredPort = manifest.port;
-
-    // Create sandbox first (validates backend code before stopping old app)
-    const sandbox = await createSandboxApp(backendJs, appId, dataPath);
-
-    // Stop old app before starting new one so preferred port is available
-    if (this.runningApps.has(appId)) {
-      await this.stop(appId);
-    }
-
-    const server = await startAppServer(frontendHtml, sandbox, preferredPort);
-
-    this.runningApps.set(appId, {
-      sandbox,
-      server,
-      lanUrl: server.lanUrl,
-      localUrl: server.localUrl,
-      port: server.port
-    });
-
-    // Persist port to app.json so it stays stable across restarts
-    if (server.port !== preferredPort) {
-      manifest.port = server.port;
-      writeFileSync(join(appDir, 'app.json'), JSON.stringify(manifest, null, 2));
-    }
-
-    console.log(`[AppManager] Published "${appId}" at ${server.lanUrl}`);
-
-    return {
-      lanUrl: server.lanUrl,
-      localUrl: server.localUrl,
-      port: server.port
-    };
   }
 
   /** Stop a running (published) app */

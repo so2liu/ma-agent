@@ -16,16 +16,10 @@ export interface AppManifest {
   description: string;
   version: string;
   icon: string;
-  port?: number;
+  conversationId?: string;
 }
 
-export type AppStatus =
-  | 'stopped'
-  | 'scaffolding'
-  | 'installing'
-  | 'developing'
-  | 'building'
-  | 'running';
+export type AppStatus = 'stopped' | 'installing' | 'developing' | 'building' | 'running';
 
 export interface AppInfo {
   id: string;
@@ -36,8 +30,7 @@ export interface AppInfo {
   lanUrl: string | null;
   localUrl: string | null;
   port: number | null;
-  /** Whether this app uses the React + Vite architecture */
-  isViteApp: boolean;
+  conversationId: string | null;
 }
 
 export interface PublishResult {

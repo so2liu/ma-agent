@@ -95,6 +95,16 @@ export default function App() {
     await chatRef.current?.newChat();
   }, []);
 
+  const handleDebugApp = useCallback(
+    async (conversationId: string, errorMsg: string) => {
+      if (chatRef.current?.isLoading()) return;
+      setCurrentView('home');
+      await chatRef.current?.loadConversation(conversationId);
+      chatRef.current?.setInput(`应用出错了，请帮我修复：\n\n${errorMsg}`);
+    },
+    []
+  );
+
   if (showOnboarding === null) return null;
   if (showOnboarding) return <OnboardingWizard onComplete={handleOnboardingComplete} />;
 
@@ -140,6 +150,7 @@ export default function App() {
                 selectedProjectId={selectedProjectId}
                 setSelectedProjectId={setSelectedProjectId}
                 onOpenDbViewer={openDbViewer}
+                onDebugApp={handleDebugApp}
                 onSkillsClick={() => navigate('skills')}
               />
             </div>

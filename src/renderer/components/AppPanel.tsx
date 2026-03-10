@@ -1,16 +1,28 @@
-import { Code, Copy, Database, ExternalLink, Hammer, Loader2, Play, Square } from 'lucide-react';
+import {
+  Code,
+  Copy,
+  Database,
+  ExternalLink,
+  Hammer,
+  Loader2,
+  Play,
+  Square,
+  Wrench
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { AppInfo } from '@/electron';
 
 interface AppPanelProps {
   onOpenDbViewer?: (appId: string, appName: string) => void;
+  onDebugApp?: (conversationId: string, errorMsg: string) => void;
   apps?: AppInfo[];
   onAppsChanged?: () => void;
 }
 
 export default function AppPanel({
   onOpenDbViewer,
+  onDebugApp,
   apps: externalApps,
   onAppsChanged
 }: AppPanelProps) {
@@ -18,6 +30,7 @@ export default function AppPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorAppId, setErrorAppId] = useState<string | null>(null);
 
   const apps = externalApps ?? internalApps;
 
@@ -47,16 +60,19 @@ export default function AppPanel({
     setBusyId(appId);
     setBusyAction('正在启动...');
     setErrorMsg(null);
+    setErrorAppId(null);
     try {
       const result = await window.electron.app.startDev(appId);
       if (!result.success) {
         console.error('Start dev failed:', result.error);
         setErrorMsg(result.error ?? '启动开发服务失败');
+        setErrorAppId(appId);
       }
       await loadApps();
     } catch (error) {
       console.error('Error starting dev:', error);
       setErrorMsg(String(error));
+      setErrorAppId(appId);
     } finally {
       setBusyId(null);
       setBusyAction(null);
@@ -76,16 +92,19 @@ export default function AppPanel({
     setBusyId(appId);
     setBusyAction('正在发布...');
     setErrorMsg(null);
+    setErrorAppId(null);
     try {
       const result = await window.electron.app.publish(appId);
       if (!result.success) {
         console.error('Publish failed:', result.error);
         setErrorMsg(result.error ?? '发布失败');
+        setErrorAppId(appId);
       }
       await loadApps();
     } catch (error) {
       console.error('Error publishing app:', error);
       setErrorMsg(String(error));
+      setErrorAppId(appId);
     } finally {
       setBusyId(null);
       setBusyAction(null);
@@ -114,14 +133,31 @@ export default function AppPanel({
   return (
     <div className="space-y-1 px-1.5 pb-1">
       {errorMsg && (
-        <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">
-          <span className="min-w-0 flex-1 whitespace-pre-wrap break-all">{errorMsg}</span>
-          <button
-            onClick={() => setErrorMsg(null)}
-            className="shrink-0 text-red-400 hover:text-red-600 dark:hover:text-red-200"
-          >
-            ✕
-          </button>
+        <div className="space-y-1.5 rounded-lg bg-red-50 px-3 py-2 dark:bg-red-900/30">
+          <div className="flex items-start gap-2 text-xs text-red-700 dark:text-red-300">
+            <span className="min-w-0 flex-1 whitespace-pre-wrap break-all">{errorMsg}</span>
+            <button
+              onClick={() => {
+                setErrorMsg(null);
+                setErrorAppId(null);
+              }}
+              className="shrink-0 text-red-400 hover:text-red-600 dark:hover:text-red-200"
+            >
+              ✕
+            </button>
+          </div>
+          {onDebugApp && errorAppId && (() => {
+            const errorApp = apps.find((a) => a.id === errorAppId);
+            return errorApp?.conversationId ? (
+              <button
+                onClick={() => onDebugApp(errorApp.conversationId!, errorMsg)}
+                className="flex w-full items-center justify-center gap-1 rounded-md bg-red-100 px-2 py-1 text-[10px] font-medium text-red-700 transition-colors hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/60"
+              >
+                <Wrench className="h-3 w-3" />
+                让小马修复
+              </button>
+            ) : null;
+          })()}
         </div>
       )}
       {apps.map((app) => (
@@ -146,9 +182,7 @@ export default function AppPanel({
             {app.status === 'developing' && (
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
             )}
-            {(app.status === 'scaffolding' ||
-              app.status === 'installing' ||
-              app.status === 'building') && (
+            {(app.status === 'installing' || app.status === 'building') && (
               <Loader2 className="h-3 w-3 shrink-0 animate-spin text-amber-500" />
             )}
           </div>
@@ -169,11 +203,10 @@ export default function AppPanel({
     const isBusy = busyId === app.id;
 
     // Transitional states
-    if (app.status === 'scaffolding' || app.status === 'installing' || app.status === 'building') {
+    if (app.status === 'installing' || app.status === 'building') {
       return (
         <div className="mt-1.5 flex items-center justify-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
           <Loader2 className="h-3 w-3 animate-spin" />
-          {app.status === 'scaffolding' && '正在创建项目...'}
           {app.status === 'installing' && '正在安装依赖...'}
           {app.status === 'building' && '正在构建...'}
         </div>
@@ -271,50 +304,30 @@ export default function AppPanel({
     // Stopped state
     return (
       <div className="mt-1.5 flex gap-1">
-        {app.isViteApp ?
-          <>
-            <button
-              onClick={() => handleStartDev(app.id)}
-              disabled={isBusy}
-              className="flex flex-1 items-center justify-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isBusy ?
-                <>
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  {busyAction}
-                </>
-              : <>
-                  <Code className="h-3 w-3" />
-                  开发
-                </>
-              }
-            </button>
-            <button
-              onClick={() => handlePublish(app.id)}
-              disabled={isBusy}
-              className="flex flex-1 items-center justify-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-            >
-              <Play className="h-3 w-3" />
-              发布
-            </button>
-          </>
-        : <button
-            onClick={() => handlePublish(app.id)}
-            disabled={isBusy}
-            className="flex w-full items-center justify-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {isBusy ?
-              <>
-                <Loader2 className="h-3 w-3 animate-spin" />
-                {busyAction}
-              </>
-            : <>
-                <Play className="h-3 w-3" />
-                发布到局域网
-              </>
-            }
-          </button>
-        }
+        <button
+          onClick={() => handleStartDev(app.id)}
+          disabled={isBusy}
+          className="flex flex-1 items-center justify-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+        >
+          {isBusy ?
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {busyAction}
+            </>
+          : <>
+              <Code className="h-3 w-3" />
+              开发
+            </>
+          }
+        </button>
+        <button
+          onClick={() => handlePublish(app.id)}
+          disabled={isBusy}
+          className="flex flex-1 items-center justify-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+        >
+          <Play className="h-3 w-3" />
+          发布
+        </button>
       </div>
     );
   }

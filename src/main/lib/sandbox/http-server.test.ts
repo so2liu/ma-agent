@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
-import { startAppServer, startStaticAppServer } from './http-server';
+import { startStaticAppServer } from './http-server';
 import type { SandboxApp, SandboxRequest, SandboxResponse } from './types';
 
 function createMockSandbox(): SandboxApp {
@@ -16,49 +16,6 @@ function createMockSandbox(): SandboxApp {
     dispose: () => {}
   };
 }
-
-describe('startAppServer (legacy)', () => {
-  test('serves frontend HTML at root', async () => {
-    const sandbox = createMockSandbox();
-    const server = await startAppServer('<html><body>Hello</body></html>', sandbox);
-
-    try {
-      const res = await fetch(server.localUrl);
-      expect(res.status).toBe(200);
-      const text = await res.text();
-      expect(text).toContain('Hello');
-    } finally {
-      await server.stop();
-    }
-  });
-
-  test('routes /api/ to sandbox', async () => {
-    const sandbox = createMockSandbox();
-    const server = await startAppServer('<html></html>', sandbox);
-
-    try {
-      const res = await fetch(`${server.localUrl}/api/test`);
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.method).toBe('GET');
-      expect(body.path).toBe('/api/test');
-    } finally {
-      await server.stop();
-    }
-  });
-
-  test('returns 404 for unknown paths', async () => {
-    const sandbox = createMockSandbox();
-    const server = await startAppServer('<html></html>', sandbox);
-
-    try {
-      const res = await fetch(`${server.localUrl}/unknown`);
-      expect(res.status).toBe(404);
-    } finally {
-      await server.stop();
-    }
-  });
-});
 
 describe('startStaticAppServer', () => {
   let distDir: string;

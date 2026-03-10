@@ -24,8 +24,7 @@
     "@mariozechner/pi-coding-agent": "^0.57.1",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^12.6.2",
-    "posthog-node": "^5.28.0",
-    "quickjs-emscripten": "^0.32.0"
+    "posthog-node": "^5.28.0"
   },
   "devDependencies": {
     "lucide-react": "^0.554.0",
@@ -113,12 +112,7 @@
         "NSDocumentsFolderUsageDescription": "Claude Agent Desktop needs access to your Documents folder to read and write files.",
         "NSDownloadsFolderUsageDescription": "Claude Agent Desktop needs access to your Downloads folder to read and write files."
       },
-      "extraResources": [
-        {
-          "from": "resources/app-template",
-          "to": "app-template"
-        }
-      ]
+      "extraResources": []
     },
     "win": {
       "target": [
@@ -136,10 +130,6 @@
         {
           "from": "resources/msys2",
           "to": "msys2"
-        },
-        {
-          "from": "resources/app-template",
-          "to": "app-template"
         }
       ]
     },

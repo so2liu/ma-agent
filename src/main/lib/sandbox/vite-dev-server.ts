@@ -46,25 +46,6 @@ export async function startViteDevServer(
 ): Promise<ViteDevServer> {
   const port = await findAvailablePort();
 
-  // Patch vite.config.ts to use the correct sandbox port for API proxy.
-  // Hono apps use API_PORT env var; legacy apps use file patching.
-  const { existsSync, readFileSync, writeFileSync } = await import('node:fs');
-  const { join } = await import('node:path');
-  const isHono = existsSync(join(appDir, 'src', 'server', 'index.ts'));
-
-  if (!isHono) {
-    // Legacy mode: patch the placeholder and any previous port in vite.config.ts
-    const viteConfigPath = join(appDir, 'vite.config.ts');
-    const viteConfig = readFileSync(viteConfigPath, 'utf-8');
-    const patchedConfig = viteConfig
-      .replace(/\{\{SANDBOX_PORT\}\}/g, String(sandboxPort))
-      .replace(
-        /target:\s*['"]http:\/\/localhost:\d+['"]/g,
-        `target: 'http://localhost:${String(sandboxPort)}'`
-      );
-    writeFileSync(viteConfigPath, patchedConfig);
-  }
-
   return new Promise<ViteDevServer>((resolve, reject) => {
     const child: ChildProcess = spawn(
       'bunx',
