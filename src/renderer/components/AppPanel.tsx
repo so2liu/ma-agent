@@ -75,14 +75,17 @@ export default function AppPanel({
   const handlePublish = async (appId: string) => {
     setBusyId(appId);
     setBusyAction('正在发布...');
+    setErrorMsg(null);
     try {
       const result = await window.electron.app.publish(appId);
       if (!result.success) {
         console.error('Publish failed:', result.error);
+        setErrorMsg(result.error ?? '发布失败');
       }
       await loadApps();
     } catch (error) {
       console.error('Error publishing app:', error);
+      setErrorMsg(String(error));
     } finally {
       setBusyId(null);
       setBusyAction(null);

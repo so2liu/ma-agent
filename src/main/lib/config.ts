@@ -295,6 +295,15 @@ export function buildEnhancedPath(): string {
 
   const bundledBinDirs: string[] = [];
 
+  // Add Bun paths (cross-platform)
+  const homedir = process.env.HOME || process.env.USERPROFILE || '';
+  if (homedir) {
+    const bunBinDir = join(homedir, '.bun', 'bin');
+    if (existsSync(bunBinDir)) {
+      bundledBinDirs.push(resolve(bunBinDir));
+    }
+  }
+
   // Add Git paths (Windows only)
   const bundledGitPath = getBundledGitPath();
   if (bundledGitPath) {
