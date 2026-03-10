@@ -310,9 +310,7 @@ class AppManager {
         // Ensure scaffolded and installed
         if (!isScaffolded(appDir)) {
           this.appStatuses.set(appId, 'scaffolding');
-          const meta = JSON.parse(
-            readFileSync(join(appDir, 'app.json'), 'utf-8')
-          ) as AppManifest;
+          const meta = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
           scaffoldApp(appDir, meta);
         }
         if (!hasNodeModules(appDir)) {

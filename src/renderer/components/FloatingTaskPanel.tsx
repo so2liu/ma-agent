@@ -50,7 +50,7 @@ export default function FloatingTaskPanel({ messages }: FloatingTaskPanelProps) 
 
   return (
     <div className="mx-auto w-full max-w-2xl px-2">
-      <div className="rounded-2xl border border-neutral-200/60 bg-white/95 shadow-lg shadow-black/5 backdrop-blur-xl dark:border-neutral-700/50 dark:bg-neutral-850/90 dark:shadow-black/30">
+      <div className="dark:bg-neutral-850/90 rounded-2xl border border-neutral-200/60 bg-white/95 shadow-lg shadow-black/5 backdrop-blur-xl dark:border-neutral-700/50 dark:shadow-black/30">
         {/* Header */}
         <button
           type="button"
@@ -95,11 +95,10 @@ export default function FloatingTaskPanel({ messages }: FloatingTaskPanelProps) 
                   </span>
                   <span
                     className={`text-sm leading-snug ${
-                      todo.status === 'completed'
-                        ? 'text-neutral-400 line-through dark:text-neutral-500'
-                        : todo.status === 'in_progress'
-                          ? 'text-neutral-700 dark:text-neutral-200'
-                          : 'text-neutral-500 dark:text-neutral-400'
+                      todo.status === 'completed' ?
+                        'text-neutral-400 line-through dark:text-neutral-500'
+                      : todo.status === 'in_progress' ? 'text-neutral-700 dark:text-neutral-200'
+                      : 'text-neutral-500 dark:text-neutral-400'
                     }`}
                   >
                     {todo.content}

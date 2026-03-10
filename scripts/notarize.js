@@ -1,7 +1,7 @@
+import { spawnSync } from 'child_process';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { spawnSync } from 'child_process';
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -96,7 +96,9 @@ export default async function notarize(context) {
 
   const credentials = getNotaryCredentials();
   if (!credentials) {
-    console.log('Skipping notarization: APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID not set');
+    console.log(
+      'Skipping notarization: APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID not set'
+    );
     return;
   }
 

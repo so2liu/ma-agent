@@ -31,7 +31,9 @@ export function CollapsibleTool({
       >
         <div className="flex-1">{collapsedContent}</div>
         {hasExpandedContent && (
-          <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center text-neutral-400 transition-transform duration-200 dark:text-neutral-500 ${isExpanded ? 'rotate-180' : ''}`}>
+          <span
+            className={`flex h-5 w-5 flex-shrink-0 items-center justify-center text-neutral-400 transition-transform duration-200 dark:text-neutral-500 ${isExpanded ? 'rotate-180' : ''}`}
+          >
             <ChevronDown className="size-3" />
           </span>
         )}

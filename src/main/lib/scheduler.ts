@@ -3,10 +3,7 @@ import { Notification } from 'electron';
 import { isSessionActive } from './claude-session';
 import { listScheduledTasks, updateScheduledTask } from './schedule-db';
 import { executeScheduledTask } from './schedule-executor';
-import {
-  isScheduledTaskExecuting,
-  setScheduledTaskExecuting,
-} from './schedule-state';
+import { isScheduledTaskExecuting, setScheduledTaskExecuting } from './schedule-state';
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -59,11 +56,11 @@ async function checkAndExecute(): Promise<void> {
     if (isSessionActive()) {
       updateScheduledTask(task.id, {
         lastRunAt: now.getTime(),
-        lastRunStatus: 'skipped',
+        lastRunStatus: 'skipped'
       });
       new Notification({
         title: '定时任务已跳过',
-        body: `"${task.name}" 因当前有活跃会话而跳过`,
+        body: `"${task.name}" 因当前有活跃会话而跳过`
       }).show();
       continue;
     }
@@ -74,21 +71,21 @@ async function checkAndExecute(): Promise<void> {
       updateScheduledTask(task.id, {
         lastRunAt: now.getTime(),
         lastRunStatus: 'success',
-        lastRunConversationId: conversationId,
+        lastRunConversationId: conversationId
       });
       new Notification({
         title: '定时任务完成',
-        body: `"${task.name}" 执行成功`,
+        body: `"${task.name}" 执行成功`
       }).show();
     } catch (error) {
       console.error(`Scheduled task "${task.name}" failed:`, error);
       updateScheduledTask(task.id, {
         lastRunAt: now.getTime(),
-        lastRunStatus: 'error',
+        lastRunStatus: 'error'
       });
       new Notification({
         title: '定时任务失败',
-        body: `"${task.name}" 执行出错: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        body: `"${task.name}" 执行出错: ${error instanceof Error ? error.message : 'Unknown error'}`
       }).show();
     } finally {
       setScheduledTaskExecuting(false);

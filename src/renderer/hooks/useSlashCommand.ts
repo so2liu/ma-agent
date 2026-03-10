@@ -26,7 +26,7 @@ function buildSlashItems(installedSkills: SkillInfo[]): SlashCommandItem[] {
       name: card.id,
       displayName: card.title,
       description: card.description,
-      prefillPrompt: card.prefillPrompt,
+      prefillPrompt: card.prefillPrompt
     });
   }
 
@@ -38,7 +38,7 @@ function buildSlashItems(installedSkills: SkillInfo[]): SlashCommandItem[] {
       name: skill.name,
       displayName: skill.name,
       description: skill.manifest?.description ?? '',
-      prefillPrompt: null,
+      prefillPrompt: null
     });
   }
 
@@ -92,7 +92,7 @@ export function useSlashCommand(inputValue: string) {
       (item) =>
         item.name.toLowerCase().includes(slashMatch) ||
         item.displayName.toLowerCase().includes(slashMatch) ||
-        item.description.toLowerCase().includes(slashMatch),
+        item.description.toLowerCase().includes(slashMatch)
     );
   }, [slashMatch, allItems]);
 
@@ -117,7 +117,7 @@ export function useSlashCommand(inputValue: string) {
         return next;
       });
     },
-    [filtered.length],
+    [filtered.length]
   );
 
   const getSelectedItem = useCallback((): SlashCommandItem | null => {
@@ -132,6 +132,6 @@ export function useSlashCommand(inputValue: string) {
     moveSelection,
     getSelectedItem,
     dismiss,
-    refreshSkills,
+    refreshSkills
   };
 }

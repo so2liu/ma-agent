@@ -276,9 +276,7 @@ export default function FileTree({ onFileSelect, selectedPath, onFileDeleted }: 
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-3 py-1.5">
-        <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-          工作区
-        </span>
+        <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">工作区</span>
         <button
           onClick={loadFiles}
           disabled={isLoading}

@@ -9,7 +9,7 @@ import {
   initializeDatabase,
   listConversations,
   setConversationProject,
-  updateConversation,
+  updateConversation
 } from '../lib/conversation-db';
 
 export function registerConversationHandlers(): void {
@@ -88,7 +88,7 @@ export function registerConversationHandlers(): void {
         console.error('Error setting conversation project:', error);
         return {
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error occurred',
+          error: error instanceof Error ? error.message : 'Unknown error occurred'
         };
       }
     }

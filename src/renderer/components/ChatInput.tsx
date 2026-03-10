@@ -120,7 +120,7 @@ export default function ChatInput({
       }
       textareaRef.current?.focus();
     },
-    [onChange],
+    [onChange]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -275,10 +275,7 @@ export default function ChatInput({
   }, [reportHeight]);
 
   return (
-    <div
-      ref={containerRef}
-      className="px-4 pt-6 pb-5 [-webkit-app-region:no-drag]"
-    >
+    <div ref={containerRef} className="px-4 pt-6 pb-5 [-webkit-app-region:no-drag]">
       {floatingPanel && <div className="mb-2">{floatingPanel}</div>}
       <div className="mx-auto max-w-3xl">
         <div
@@ -360,7 +357,9 @@ export default function ChatInput({
                   role="radiogroup"
                   aria-label="选择模型"
                   className="flex h-10 items-center gap-1 rounded-full border border-neutral-200/80 bg-neutral-100 px-1.5 py-1 transition dark:border-neutral-700/70 dark:bg-neutral-800"
-                  title={customModelActive ? '已启用自定义模型，前往设置 > 开发者信息修改' : undefined}
+                  title={
+                    customModelActive ? '已启用自定义模型，前往设置 > 开发者信息修改' : undefined
+                  }
                 >
                   {customModelActive ?
                     <span className="px-2.5 py-1 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
@@ -392,7 +391,8 @@ export default function ChatInput({
                     </p>
                     <div className="mt-2 border-t border-neutral-100 pt-2 dark:border-neutral-700">
                       <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
-                        当前模型：{customModelIds[hoveredModel] || DEFAULT_MODEL_NAMES[hoveredModel]}
+                        当前模型：
+                        {customModelIds[hoveredModel] || DEFAULT_MODEL_NAMES[hoveredModel]}
                       </p>
                       <p className="mt-0.5 text-[10px] text-neutral-400 dark:text-neutral-500">
                         推荐：{MODEL_TOOLTIPS[hoveredModel].suggestions.join('、')}

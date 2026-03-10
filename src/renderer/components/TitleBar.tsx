@@ -4,6 +4,9 @@
  */
 export default function TitleBar() {
   return (
-    <div className="pointer-events-none absolute top-0 right-0 left-0 z-40 [-webkit-app-region:drag]" style={{ height: 'var(--titlebar-height)' }} />
+    <div
+      className="pointer-events-none absolute top-0 right-0 left-0 z-40 [-webkit-app-region:drag]"
+      style={{ height: 'var(--titlebar-height)' }}
+    />
   );
 }

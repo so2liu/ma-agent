@@ -40,7 +40,12 @@ function extractDeliverables(blocks: ContentBlock[]): Deliverable[] {
   return deliverables;
 }
 
-export default function Message({ message, isLoading = false, onDeliverablePreview, conversationId }: MessageProps) {
+export default function Message({
+  message,
+  isLoading = false,
+  onDeliverablePreview,
+  conversationId
+}: MessageProps) {
   if (message.role === 'user') {
     const userContent = typeof message.content === 'string' ? message.content : '';
     const hasText = userContent.trim().length > 0;
@@ -171,11 +176,7 @@ export default function Message({ message, isLoading = false, onDeliverablePrevi
                   hasTextAfter={hasTextAfter}
                 />
                 {deliverables.map((d) => (
-                  <DeliverableCard
-                    key={d.id}
-                    deliverable={d}
-                    onPreview={onDeliverablePreview}
-                  />
+                  <DeliverableCard key={d.id} deliverable={d} onPreview={onDeliverablePreview} />
                 ))}
               </div>
             );

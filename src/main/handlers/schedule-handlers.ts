@@ -7,13 +7,10 @@ import {
   deleteScheduledTask,
   getScheduledTask,
   listScheduledTasks,
-  updateScheduledTask,
+  updateScheduledTask
 } from '../lib/schedule-db';
 import { executeScheduledTask } from '../lib/schedule-executor';
-import {
-  isScheduledTaskExecuting,
-  setScheduledTaskExecuting,
-} from '../lib/schedule-state';
+import { isScheduledTaskExecuting, setScheduledTaskExecuting } from '../lib/schedule-state';
 
 export function registerScheduleHandlers(): void {
   ipcMain.handle('schedule:list', async () => {
@@ -23,7 +20,7 @@ export function registerScheduleHandlers(): void {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   });
@@ -45,7 +42,7 @@ export function registerScheduleHandlers(): void {
       } catch (error) {
         return {
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : 'Unknown error'
         };
       }
     }
@@ -70,7 +67,7 @@ export function registerScheduleHandlers(): void {
       } catch (error) {
         return {
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : 'Unknown error'
         };
       }
     }
@@ -83,7 +80,7 @@ export function registerScheduleHandlers(): void {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   });
@@ -103,7 +100,7 @@ export function registerScheduleHandlers(): void {
         updateScheduledTask(id, {
           lastRunAt: Date.now(),
           lastRunStatus: 'success',
-          lastRunConversationId: conversationId,
+          lastRunConversationId: conversationId
         });
         return { success: true, conversationId };
       } finally {
@@ -114,12 +111,12 @@ export function registerScheduleHandlers(): void {
       if (task) {
         updateScheduledTask(id, {
           lastRunAt: Date.now(),
-          lastRunStatus: 'error',
+          lastRunStatus: 'error'
         });
       }
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   });

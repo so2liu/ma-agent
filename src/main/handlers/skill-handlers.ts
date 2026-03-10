@@ -1,6 +1,7 @@
-import { dialog, ipcMain } from 'electron';
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { dialog, ipcMain } from 'electron';
+
 import { getWorkspaceDir } from '../lib/config';
 import { skillDiscovery } from '../lib/skill-discovery';
 import { readManifest } from '../lib/skill-manifest';
@@ -127,28 +128,25 @@ export function registerSkillHandlers(getMainWindow: () => Electron.BrowserWindo
   });
 
   // Install a skill from a LAN peer
-  ipcMain.handle(
-    'skill:install',
-    async (_event, peerInstanceId: unknown, skillName: unknown) => {
-      try {
-        if (typeof peerInstanceId !== 'string') throw new Error('peerInstanceId must be a string');
-        if (typeof skillName !== 'string') throw new Error('skillName must be a string');
+  ipcMain.handle('skill:install', async (_event, peerInstanceId: unknown, skillName: unknown) => {
+    try {
+      if (typeof peerInstanceId !== 'string') throw new Error('peerInstanceId must be a string');
+      if (typeof skillName !== 'string') throw new Error('skillName must be a string');
 
-        const peers = skillDiscovery.getDiscoveredPeers();
-        const peer = peers.find((p) => p.instanceId === peerInstanceId);
-        if (!peer) throw new Error('Peer not found or offline');
+      const peers = skillDiscovery.getDiscoveredPeers();
+      const peer = peers.find((p) => p.instanceId === peerInstanceId);
+      if (!peer) throw new Error('Peer not found or offline');
 
-        const zipBuffer = await skillDiscovery.downloadSkill(peer, skillName);
-        const workspaceDir = getWorkspaceDir();
-        const skillsDir = getSkillsDir(workspaceDir);
-        const { manifest } = importSkill(zipBuffer, skillsDir);
+      const zipBuffer = await skillDiscovery.downloadSkill(peer, skillName);
+      const workspaceDir = getWorkspaceDir();
+      const skillsDir = getSkillsDir(workspaceDir);
+      const { manifest } = importSkill(zipBuffer, skillsDir);
 
-        return { success: true, manifest };
-      } catch (error) {
-        return { success: false, error: String(error) };
-      }
+      return { success: true, manifest };
+    } catch (error) {
+      return { success: false, error: String(error) };
     }
-  );
+  });
 
   // Start/stop discovery service
   ipcMain.handle('skill:start-discovery', async () => {

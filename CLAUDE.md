@@ -90,12 +90,15 @@ Commit messages follow Conventional Commits format.
 ## Design Context
 
 ### Users
+
 非技术知识工作者（文档处理、数据分析、表格处理、自动化），在日常工作中使用 AI 助手提高效率。他们不懂编程，需要直觉化的操作体验。
 
 ### Brand Personality
+
 简洁、智能、亲切。品牌名"小马快跑"传达轻快、友好的形象。
 
 ### Aesthetic Direction
+
 - **视觉基调**: Notion 风格 — 简洁但功能丰富，留白充分，信息层次清晰
 - **参考**: Notion（简洁布局、优雅排版）、Apple 原生应用（毛玻璃、圆角）
 - **反参考**: 不要像传统 IDE 或终端工具那样技术感过重
@@ -103,6 +106,7 @@ Commit messages follow Conventional Commits format.
 - **色彩**: 中性色为主（neutral 色阶），搭配渐变色点缀技能卡片
 
 ### Design Principles
+
 1. **零认知负担** — 界面自解释，用户不需要思考下一步该做什么
 2. **内容优先** — UI 退居幕后，让对话内容和结果成为焦点
 3. **渐进展示** — 复杂功能逐层呈现，不一次性暴露所有选项

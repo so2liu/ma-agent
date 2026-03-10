@@ -14,7 +14,7 @@ import {
   Sparkles,
   SquarePen,
   Timer,
-  Trash2,
+  Trash2
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -26,7 +26,7 @@ import {
   AlertDialogCancel,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogTitle,
+  AlertDialogTitle
 } from './ui/alert-dialog';
 
 const truncateText = (text: string, maxLength: number = 60) => {
@@ -59,7 +59,7 @@ export default function Sidebar({
   onSchedulesClick,
   onOnboardingClick,
   selectedProjectId,
-  onSelectProject,
+  onSelectProject
 }: SidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -117,7 +117,7 @@ export default function Sidebar({
       const [convResponse, projResponse, schedResponse] = await Promise.all([
         window.electron.conversation.list(),
         window.electron.project.list(),
-        window.electron.schedule.list(),
+        window.electron.schedule.list()
       ]);
       if (convResponse.success && convResponse.conversations) {
         setConversations(convResponse.conversations);
@@ -172,7 +172,10 @@ export default function Sidebar({
     try {
       const response = await window.electron.conversation.delete(conversationId);
       if (response.success) {
-        window.electron.analytics.trackEvent({ type: 'conversation_deleted', timestamp: Date.now() });
+        window.electron.analytics.trackEvent({
+          type: 'conversation_deleted',
+          timestamp: Date.now()
+        });
         await loadData();
         if (conversationId === currentConversationId) await onNewChat();
       }
@@ -299,7 +302,10 @@ export default function Sidebar({
           if (Array.isArray(content)) {
             const textBlock = content.findLast(
               (block) =>
-                typeof block === 'object' && block !== null && block.type === 'text' && 'text' in block
+                typeof block === 'object' &&
+                block !== null &&
+                block.type === 'text' &&
+                'text' in block
             );
             if (
               textBlock &&
@@ -417,9 +423,9 @@ export default function Sidebar({
         tabIndex={0}
         role="button"
         className={`group mb-0.5 cursor-pointer rounded-lg px-2.5 py-2 transition-colors focus-visible:ring-2 focus-visible:ring-neutral-400/50 focus-visible:outline-none ${
-          isActive
-            ? 'bg-white shadow-sm dark:bg-neutral-800'
-            : 'hover:bg-white/60 dark:hover:bg-neutral-800/50'
+          isActive ?
+            'bg-white shadow-sm dark:bg-neutral-800'
+          : 'hover:bg-white/60 dark:hover:bg-neutral-800/50'
         }`}
       >
         <div className="flex items-start justify-between gap-1">
@@ -448,9 +454,20 @@ export default function Sidebar({
   };
 
   return (
-    <div className="flex h-full flex-col border-r" style={{ borderColor: 'var(--color-sidebar-border)', background: 'var(--color-sidebar-bg)', backdropFilter: 'saturate(180%) blur(20px)', WebkitBackdropFilter: 'saturate(180%) blur(20px)' }}>
+    <div
+      className="flex h-full flex-col border-r"
+      style={{
+        borderColor: 'var(--color-sidebar-border)',
+        background: 'var(--color-sidebar-bg)',
+        backdropFilter: 'saturate(180%) blur(20px)',
+        WebkitBackdropFilter: 'saturate(180%) blur(20px)'
+      }}
+    >
       {/* Drag region for macOS traffic lights */}
-      <div className="shrink-0 [-webkit-app-region:drag]" style={{ height: 'var(--titlebar-height)' }} />
+      <div
+        className="shrink-0 [-webkit-app-region:drag]"
+        style={{ height: 'var(--titlebar-height)' }}
+      />
 
       {/* Brand */}
       <div className="shrink-0 px-4 pb-3">
@@ -487,9 +504,9 @@ export default function Sidebar({
         <button
           onClick={onSkillsClick}
           className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors ${
-            currentView === 'skills'
-              ? 'bg-white font-medium text-neutral-800 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
-              : 'text-neutral-600 hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800'
+            currentView === 'skills' ?
+              'bg-white font-medium text-neutral-800 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
+            : 'text-neutral-600 hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800'
           }`}
         >
           <Sparkles className="h-4 w-4" />
@@ -498,9 +515,9 @@ export default function Sidebar({
         <button
           onClick={onSchedulesClick}
           className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors ${
-            currentView === 'schedules'
-              ? 'bg-white font-medium text-neutral-800 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
-              : 'text-neutral-600 hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800'
+            currentView === 'schedules' ?
+              'bg-white font-medium text-neutral-800 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
+            : 'text-neutral-600 hover:bg-neutral-200/70 dark:text-neutral-300 dark:hover:bg-neutral-800'
           }`}
         >
           <Timer className="h-4 w-4" />
@@ -532,11 +549,9 @@ export default function Sidebar({
               }}
               className="flex items-center gap-1 text-xs font-semibold text-neutral-400 transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
             >
-              {isProjectsCollapsed ? (
+              {isProjectsCollapsed ?
                 <ChevronRight className="h-3 w-3" />
-              ) : (
-                <ChevronDown className="h-3 w-3" />
-              )}
+              : <ChevronDown className="h-3 w-3" />}
               项目
             </button>
             <div className="flex items-center gap-0.5">
@@ -551,9 +566,9 @@ export default function Sidebar({
                       });
                     }}
                     className={`rounded p-0.5 transition-colors ${
-                      isSearchOpen
-                        ? 'bg-neutral-200/80 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
-                        : 'text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
+                      isSearchOpen ?
+                        'bg-neutral-200/80 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
+                      : 'text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
                     }`}
                     title="搜索 / 筛选"
                   >
@@ -620,95 +635,94 @@ export default function Sidebar({
           )}
 
           {/* Project list */}
-          {!isProjectsCollapsed && projects.map((project) => {
-            const filteredConversations = getFilteredConversationsForProject(project.id);
-            const isCollapsed = collapsedProjects.has(project.id);
-            const isDragOver = dragOverProjectId === project.id;
-            const isEditing = editingProjectId === project.id;
-            const isSelected = selectedProjectId === project.id;
+          {!isProjectsCollapsed &&
+            projects.map((project) => {
+              const filteredConversations = getFilteredConversationsForProject(project.id);
+              const isCollapsed = collapsedProjects.has(project.id);
+              const isDragOver = dragOverProjectId === project.id;
+              const isEditing = editingProjectId === project.id;
+              const isSelected = selectedProjectId === project.id;
 
-            // When searching, force-expand projects that contain matches
-            const shouldShowConversations = searchQuery.trim() ? true : !isCollapsed;
+              // When searching, force-expand projects that contain matches
+              const shouldShowConversations = searchQuery.trim() ? true : !isCollapsed;
 
-            return (
-              <div key={project.id} className="mb-0.5">
-                <div
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-all duration-150 ${
-                    isDragOver
-                      ? 'bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-900/20 dark:ring-blue-800/40'
-                      : isSelected
-                        ? 'bg-white/80 dark:bg-neutral-800/70'
-                        : 'hover:bg-white/60 dark:hover:bg-neutral-800/50'
-                  }`}
-                  onContextMenu={(e) => {
-                    if (project.isDefault) return;
-                    e.preventDefault();
-                    setContextMenu({ x: e.clientX, y: e.clientY, projectId: project.id });
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    setDragOverProjectId(project.id);
-                  }}
-                  onDragLeave={() => setDragOverProjectId(null)}
-                  onDrop={(e) => handleDropOnProject(e, project.id)}
-                  onClick={() => onSelectProject(project.id)}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleProjectCollapsed(project.id);
+              return (
+                <div key={project.id} className="mb-0.5">
+                  <div
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-all duration-150 ${
+                      isDragOver ?
+                        'bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-900/20 dark:ring-blue-800/40'
+                      : isSelected ? 'bg-white/80 dark:bg-neutral-800/70'
+                      : 'hover:bg-white/60 dark:hover:bg-neutral-800/50'
+                    }`}
+                    onContextMenu={(e) => {
+                      if (project.isDefault) return;
+                      e.preventDefault();
+                      setContextMenu({ x: e.clientX, y: e.clientY, projectId: project.id });
                     }}
-                    className="shrink-0 text-neutral-400 dark:text-neutral-500"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      setDragOverProjectId(project.id);
+                    }}
+                    onDragLeave={() => setDragOverProjectId(null)}
+                    onDrop={(e) => handleDropOnProject(e, project.id)}
+                    onClick={() => onSelectProject(project.id)}
                   >
-                    {isCollapsed ? (
-                      <ChevronRight className="h-3 w-3" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3" />
-                    )}
-                  </button>
-                  <FolderOpen className="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-500" />
-                  {isEditing ? (
-                    <input
-                      ref={editProjectInputRef}
-                      value={editingProjectName}
-                      onChange={(e) => setEditingProjectName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleRenameProject();
-                        if (e.key === 'Escape') {
-                          cancelledRef.current = true;
-                          setEditingProjectId(null);
-                        }
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleProjectCollapsed(project.id);
                       }}
-                      onBlur={handleRenameProject}
-                      className="min-w-0 flex-1 bg-transparent text-sm text-neutral-800 outline-none dark:text-neutral-200"
-                    />
-                  ) : (
-                    <span className="min-w-0 flex-1 truncate text-sm text-neutral-700 dark:text-neutral-300">
-                      {project.name}
-                    </span>
-                  )}
-                  {(grouped[project.id]?.length ?? 0) > 0 && (
-                    <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
-                      {grouped[project.id].length}
-                    </span>
+                      className="shrink-0 text-neutral-400 dark:text-neutral-500"
+                    >
+                      {isCollapsed ?
+                        <ChevronRight className="h-3 w-3" />
+                      : <ChevronDown className="h-3 w-3" />}
+                    </button>
+                    <FolderOpen className="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-500" />
+                    {isEditing ?
+                      <input
+                        ref={editProjectInputRef}
+                        value={editingProjectName}
+                        onChange={(e) => setEditingProjectName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleRenameProject();
+                          if (e.key === 'Escape') {
+                            cancelledRef.current = true;
+                            setEditingProjectId(null);
+                          }
+                        }}
+                        onBlur={handleRenameProject}
+                        className="min-w-0 flex-1 bg-transparent text-sm text-neutral-800 outline-none dark:text-neutral-200"
+                      />
+                    : <span className="min-w-0 flex-1 truncate text-sm text-neutral-700 dark:text-neutral-300">
+                        {project.name}
+                      </span>
+                    }
+                    {(grouped[project.id]?.length ?? 0) > 0 && (
+                      <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                        {grouped[project.id].length}
+                      </span>
+                    )}
+                  </div>
+
+                  {shouldShowConversations && filteredConversations.length > 0 && (
+                    <div className="ml-4 border-l border-neutral-200/50 pl-2 dark:border-neutral-700/50">
+                      {filteredConversations.map(renderConversationItem)}
+                    </div>
                   )}
                 </div>
-
-                {shouldShowConversations && filteredConversations.length > 0 && (
-                  <div className="ml-4 border-l border-neutral-200/50 pl-2 dark:border-neutral-700/50">
-                    {filteredConversations.map(renderConversationItem)}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
 
           {/* Ungrouped conversations (not assigned to any project) */}
           {!isProjectsCollapsed && filteredUngrouped.length > 0 && (
             <div
               className={`mt-1 border-t border-neutral-200/50 pt-1 transition-all duration-150 dark:border-neutral-700/50 ${
-                dragOverUngrouped ? 'rounded-lg bg-blue-50/50 ring-1 ring-blue-200/50 dark:bg-blue-900/10 dark:ring-blue-800/30' : ''
+                dragOverUngrouped ?
+                  'rounded-lg bg-blue-50/50 ring-1 ring-blue-200/50 dark:bg-blue-900/10 dark:ring-blue-800/30'
+                : ''
               }`}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -742,11 +756,9 @@ export default function Sidebar({
                 }}
                 className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-400 transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
               >
-                {isSchedulesCollapsed ? (
+                {isSchedulesCollapsed ?
                   <ChevronRight className="h-3 w-3" />
-                ) : (
-                  <ChevronDown className="h-3 w-3" />
-                )}
+                : <ChevronDown className="h-3 w-3" />}
                 <Timer className="h-3 w-3" />
                 定时任务
               </button>
@@ -761,9 +773,9 @@ export default function Sidebar({
                       <div className="flex items-center gap-1.5">
                         <span
                           className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                            task.enabled
-                              ? 'bg-green-400 dark:bg-green-500'
-                              : 'bg-neutral-300 dark:bg-neutral-600'
+                            task.enabled ?
+                              'bg-green-400 dark:bg-green-500'
+                            : 'bg-neutral-300 dark:bg-neutral-600'
                           }`}
                         />
                         <span className="min-w-0 flex-1 truncate text-[13px] text-neutral-700 dark:text-neutral-300">
@@ -772,18 +784,16 @@ export default function Sidebar({
                         {task.lastRunStatus && (
                           <span
                             className={`shrink-0 text-[9px] ${
-                              task.lastRunStatus === 'success'
-                                ? 'text-green-500'
-                                : task.lastRunStatus === 'error'
-                                  ? 'text-red-500'
-                                  : 'text-yellow-500'
+                              task.lastRunStatus === 'success' ? 'text-green-500'
+                              : task.lastRunStatus === 'error' ? 'text-red-500'
+                              : 'text-yellow-500'
                             }`}
                           >
-                            {task.lastRunStatus === 'success'
-                              ? 'OK'
-                              : task.lastRunStatus === 'error'
-                                ? 'ERR'
-                                : 'SKIP'}
+                            {task.lastRunStatus === 'success' ?
+                              'OK'
+                            : task.lastRunStatus === 'error' ?
+                              'ERR'
+                            : 'SKIP'}
                           </span>
                         )}
                       </div>
@@ -808,12 +818,17 @@ export default function Sidebar({
             <div className="py-4 text-center text-xs text-neutral-400">加载中...</div>
           )}
 
-          {!isLoading && conversations.length === 0 && scheduledTasks.length === 0 && !isProjectsCollapsed && (
-            <div className="flex flex-col items-center gap-1.5 py-6 text-center">
-              <MessageSquare className="h-5 w-5 text-neutral-300 dark:text-neutral-600" />
-              <p className="text-xs text-neutral-400 dark:text-neutral-500">点击上方「新建任务」开始</p>
-            </div>
-          )}
+          {!isLoading &&
+            conversations.length === 0 &&
+            scheduledTasks.length === 0 &&
+            !isProjectsCollapsed && (
+              <div className="flex flex-col items-center gap-1.5 py-6 text-center">
+                <MessageSquare className="h-5 w-5 text-neutral-300 dark:text-neutral-600" />
+                <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                  点击上方「新建任务」开始
+                </p>
+              </div>
+            )}
         </div>
       </div>
 
@@ -870,13 +885,16 @@ export default function Sidebar({
       </AlertDialog>
 
       {/* Bottom bar - Settings only */}
-      <div className="flex shrink-0 items-center justify-end border-t px-3 py-1.5" style={{ borderColor: 'var(--color-sidebar-border)' }}>
+      <div
+        className="flex shrink-0 items-center justify-end border-t px-3 py-1.5"
+        style={{ borderColor: 'var(--color-sidebar-border)' }}
+      >
         <button
           onClick={onSettingsClick}
           className={`flex h-7 w-7 items-center justify-center rounded-lg transition ${
-            currentView === 'settings'
-              ? 'bg-white text-neutral-700 shadow-sm dark:bg-neutral-800 dark:text-neutral-200'
-              : 'text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
+            currentView === 'settings' ?
+              'bg-white text-neutral-700 shadow-sm dark:bg-neutral-800 dark:text-neutral-200'
+            : 'text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
           }`}
           title="设置"
         >

@@ -142,7 +142,7 @@ export function getConversation(id: string): Conversation | null {
     createdAt: conversationFile.createdAt,
     updatedAt: conversationFile.updatedAt,
     sessionId: conversationFile.sessionId ?? null,
-    projectId: conversationFile.projectId ?? null,
+    projectId: conversationFile.projectId ?? null
   };
 }
 
@@ -176,7 +176,7 @@ export function listConversations(limit: number = 100): Conversation[] {
     createdAt: conversationFile.createdAt,
     updatedAt: conversationFile.updatedAt,
     sessionId: conversationFile.sessionId ?? null,
-    projectId: conversationFile.projectId ?? null,
+    projectId: conversationFile.projectId ?? null
   }));
 }
 

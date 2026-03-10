@@ -31,12 +31,20 @@ function openDb(dbPath: string): SqliteDatabase {
   return db;
 }
 
-function rowToRecord(row: { id: string; data: string; created_at: string }): Record<string, unknown> {
+function rowToRecord(row: {
+  id: string;
+  data: string;
+  created_at: string;
+}): Record<string, unknown> {
   const parsed = JSON.parse(row.data) as Record<string, unknown>;
   return { ...parsed, id: row.id, createdAt: row.created_at };
 }
 
-function recordToRow(record: Record<string, unknown>): { id: string; data: string; created_at: string } {
+function recordToRow(record: Record<string, unknown>): {
+  id: string;
+  data: string;
+  created_at: string;
+} {
   const { id, createdAt, ...rest } = record;
   return {
     id: id as string,
@@ -59,7 +67,9 @@ export function migrateJsonToSqlite(jsonPath: string, sqlitePath: string): void 
   if (!Array.isArray(records) || records.length === 0) return;
 
   const db = openDb(sqlitePath);
-  const insertStmt = db.prepare('INSERT OR IGNORE INTO records (id, data, created_at) VALUES (?, ?, ?)');
+  const insertStmt = db.prepare(
+    'INSERT OR IGNORE INTO records (id, data, created_at) VALUES (?, ?, ?)'
+  );
   db.exec('BEGIN');
   for (const record of records) {
     const id = (record.id as string) || randomUUID();
@@ -98,7 +108,7 @@ export function createDBApi(dbPath: string): DBApi {
     getById: db.prepare('SELECT id, data, created_at FROM records WHERE id = ?'),
     insert: db.prepare('INSERT INTO records (id, data, created_at) VALUES (?, ?, ?)'),
     update: db.prepare('UPDATE records SET data = ? WHERE id = ?'),
-    remove: db.prepare('DELETE FROM records WHERE id = ?'),
+    remove: db.prepare('DELETE FROM records WHERE id = ?')
   };
 
   return {
@@ -108,7 +118,9 @@ export function createDBApi(dbPath: string): DBApi {
     },
 
     getById: (id: string) => {
-      const row = stmts.getById.get(id) as { id: string; data: string; created_at: string } | undefined;
+      const row = stmts.getById.get(id) as
+        | { id: string; data: string; created_at: string }
+        | undefined;
       return row ? rowToRecord(row) : null;
     },
 
@@ -121,7 +133,9 @@ export function createDBApi(dbPath: string): DBApi {
     },
 
     update: (id: string, data: Record<string, unknown>) => {
-      const existing = stmts.getById.get(id) as { id: string; data: string; created_at: string } | undefined;
+      const existing = stmts.getById.get(id) as
+        | { id: string; data: string; created_at: string }
+        | undefined;
       if (!existing) return false;
       const parsed = JSON.parse(existing.data) as Record<string, unknown>;
       const { id: _id, createdAt: _ca, ...rest } = data;
@@ -139,9 +153,7 @@ export function createDBApi(dbPath: string): DBApi {
       const rows = stmts.getAll.all() as { id: string; data: string; created_at: string }[];
       return rows
         .map(rowToRecord)
-        .filter((record) =>
-          Object.entries(filter).every(([k, v]) => record[k] === v)
-        );
+        .filter((record) => Object.entries(filter).every(([k, v]) => record[k] === v));
     },
 
     close: () => {

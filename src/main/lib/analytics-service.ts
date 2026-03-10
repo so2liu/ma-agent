@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
-import { PostHog } from 'posthog-node';
 import { app } from 'electron';
+import { PostHog } from 'posthog-node';
 
 import type {
   AnalyticsEvent,
@@ -9,7 +9,8 @@ import type {
 } from '../../shared/types/analytics';
 import { loadConfig, saveConfig } from './config';
 
-const POSTHOG_API_KEY = process.env.POSTHOG_API_KEY ?? 'phc_edveghHyU8AI3VDiJdA1UgTc5BFgiCQU0tGbtuIoIET';
+const POSTHOG_API_KEY =
+  process.env.POSTHOG_API_KEY ?? 'phc_edveghHyU8AI3VDiJdA1UgTc5BFgiCQU0tGbtuIoIET';
 // 使用 EU 端点，中国大陆访问更稳定
 const POSTHOG_HOST = process.env.POSTHOG_HOST ?? 'https://eu.i.posthog.com';
 

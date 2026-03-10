@@ -1,12 +1,4 @@
-import {
-  ArrowRight,
-  BarChart3,
-  FileText,
-  Globe,
-  Palette,
-  PenLine,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowRight, BarChart3, FileText, Globe, Palette, PenLine, Sparkles } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import type { ComponentType, SVGProps } from 'react';
 
@@ -19,7 +11,7 @@ const iconMap: Record<SkillCard['icon'], ComponentType<SVGProps<SVGSVGElement>>>
   PenLine,
   Globe,
   Palette,
-  Sparkles,
+  Sparkles
 };
 
 interface SkillCardGridProps {
@@ -28,7 +20,11 @@ interface SkillCardGridProps {
   currentInput?: string;
 }
 
-export default function SkillCardGrid({ onSelectSkill, onMoreClick, currentInput = '' }: SkillCardGridProps) {
+export default function SkillCardGrid({
+  onSelectSkill,
+  onMoreClick,
+  currentInput = ''
+}: SkillCardGridProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirmedInput, setConfirmedInput] = useState<string | null>(null);
 
@@ -45,7 +41,7 @@ export default function SkillCardGrid({ onSelectSkill, onMoreClick, currentInput
       setSelectedId((prev) => (prev === card.id ? null : card.id));
       setConfirmedInput(null);
     },
-    [onMoreClick],
+    [onMoreClick]
   );
 
   const handleUsePrompt = useCallback(() => {
@@ -74,16 +70,13 @@ export default function SkillCardGrid({ onSelectSkill, onMoreClick, currentInput
               onClick={() => handlePillClick(card)}
               aria-label={`${card.title}: ${card.description}`}
               aria-expanded={isSelected && !!card.detail}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-neutral-400/50 ${
-                isSelected
-                  ? 'border-neutral-400 bg-neutral-100 text-neutral-800 dark:border-neutral-500 dark:bg-neutral-700 dark:text-neutral-100'
-                  : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-750'
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all focus-visible:ring-2 focus-visible:ring-neutral-400/50 active:scale-[0.97] ${
+                isSelected ?
+                  'border-neutral-400 bg-neutral-100 text-neutral-800 dark:border-neutral-500 dark:bg-neutral-700 dark:text-neutral-100'
+                : 'dark:hover:bg-neutral-750 border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600'
               }`}
             >
-              <Icon
-                className="h-3.5 w-3.5"
-                style={{ color: card.iconColor }}
-              />
+              <Icon className="h-3.5 w-3.5" style={{ color: card.iconColor }} />
               {card.title}
             </button>
           );
@@ -92,7 +85,7 @@ export default function SkillCardGrid({ onSelectSkill, onMoreClick, currentInput
 
       {/* Detail card */}
       {selectedCard?.detail && (
-        <div className="w-full max-w-lg animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="animate-in fade-in slide-in-from-top-2 w-full max-w-lg duration-200">
           <div className="rounded-xl border border-neutral-200/80 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-neutral-700/80 dark:bg-neutral-800/90">
             <div className="mb-3 flex items-center gap-2">
               <div
@@ -114,7 +107,7 @@ export default function SkillCardGrid({ onSelectSkill, onMoreClick, currentInput
 
             <div className="mb-3 space-y-2">
               <div>
-                <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                <div className="mb-0.5 text-[10px] font-medium tracking-wider text-neutral-400 uppercase dark:text-neutral-500">
                   场景
                 </div>
                 <p className="text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
@@ -122,7 +115,7 @@ export default function SkillCardGrid({ onSelectSkill, onMoreClick, currentInput
                 </p>
               </div>
               <div>
-                <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                <div className="mb-0.5 text-[10px] font-medium tracking-wider text-neutral-400 uppercase dark:text-neutral-500">
                   安排任务
                 </div>
                 <p className="text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
@@ -130,7 +123,7 @@ export default function SkillCardGrid({ onSelectSkill, onMoreClick, currentInput
                 </p>
               </div>
               <div>
-                <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                <div className="mb-0.5 text-[10px] font-medium tracking-wider text-neutral-400 uppercase dark:text-neutral-500">
                   完成效果
                 </div>
                 <p className="text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">

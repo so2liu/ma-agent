@@ -31,8 +31,9 @@ function openBunSqlite(path: string, options?: { readonly?: boolean }): SqliteDa
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mod = require('bun:sqlite');
   const Database = mod.Database;
-  const db = options?.readonly
-    ? new Database(path, { readonly: true })
+  const db =
+    options?.readonly ?
+      new Database(path, { readonly: true })
     : new Database(path, { create: true, readwrite: true });
 
   return {

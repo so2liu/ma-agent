@@ -81,7 +81,9 @@ let isInterruptingResponse = false;
 const streamIndexToToolId: Map<number, string> = new Map();
 let pendingResumeSessionId: string | null = null;
 
-export function getModelIdForPreference(preference: ChatModelPreference = currentModelPreference): string {
+export function getModelIdForPreference(
+  preference: ChatModelPreference = currentModelPreference
+): string {
   // Per-tier custom model ID (set in Settings > 模型配置)
   const customModelIds = getCustomModelIds();
   const perTierCustom = customModelIds[preference]?.trim();

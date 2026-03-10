@@ -50,7 +50,7 @@ function ensureDefaultProject(projects: Project[]): Project[] {
     isArchived: false,
     isDefault: true,
     createdAt: now,
-    updatedAt: now,
+    updatedAt: now
   };
   projects.unshift(defaultProject);
   writeProjects(projects);
@@ -74,7 +74,7 @@ export function createProject(name: string): Project {
     order: maxOrder + 1,
     isArchived: false,
     createdAt: now,
-    updatedAt: now,
+    updatedAt: now
   };
   projects.push(project);
   writeProjects(projects);

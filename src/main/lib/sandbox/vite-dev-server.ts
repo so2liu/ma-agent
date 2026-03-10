@@ -54,7 +54,10 @@ export async function startViteDevServer(
   const viteConfig = readFileSync(viteConfigPath, 'utf-8');
   const patchedConfig = viteConfig
     .replace(/\{\{SANDBOX_PORT\}\}/g, String(sandboxPort))
-    .replace(/target:\s*['"]http:\/\/localhost:\d+['"]/g, `target: 'http://localhost:${String(sandboxPort)}'`);
+    .replace(
+      /target:\s*['"]http:\/\/localhost:\d+['"]/g,
+      `target: 'http://localhost:${String(sandboxPort)}'`
+    );
   writeFileSync(viteConfigPath, patchedConfig);
 
   return new Promise<ViteDevServer>((resolve, reject) => {
