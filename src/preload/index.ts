@@ -1,7 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { ChatModelPreference, CustomModelIds, SendMessagePayload } from '../shared/types/ipc';
 import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
+import type {
+  AgentProvider,
+  ChatModelPreference,
+  CustomModelIds,
+  OpenAIConfig,
+  SendMessagePayload
+} from '../shared/types/ipc';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -144,7 +150,15 @@ contextBridge.exposeInMainWorld('electron', {
     setCustomModelIds: (ids: CustomModelIds) =>
       ipcRenderer.invoke('config:set-custom-model-ids', ids),
     testApi: (params?: { apiKey?: string; baseUrl?: string; modelId?: string }) =>
-      ipcRenderer.invoke('config:test-api', params)
+      ipcRenderer.invoke('config:test-api', params),
+    getAgentProvider: () => ipcRenderer.invoke('config:get-agent-provider'),
+    setAgentProvider: (provider: AgentProvider) =>
+      ipcRenderer.invoke('config:set-agent-provider', provider),
+    getOpenAIConfig: () => ipcRenderer.invoke('config:get-openai-config'),
+    setOpenAIConfig: (config: OpenAIConfig) =>
+      ipcRenderer.invoke('config:set-openai-config', config),
+    testOpenAIApi: (params?: { apiKey?: string; baseUrl?: string; modelId?: string }) =>
+      ipcRenderer.invoke('config:test-openai-api', params)
   },
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)
@@ -158,7 +172,7 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('conversation:update', id, title, messages, sessionId),
     delete: (id: string) => ipcRenderer.invoke('conversation:delete', id),
     setProject: (conversationId: string, projectId: string | null) =>
-      ipcRenderer.invoke('conversation:set-project', conversationId, projectId),
+      ipcRenderer.invoke('conversation:set-project', conversationId, projectId)
   },
   project: {
     list: (includeArchived?: boolean) => ipcRenderer.invoke('project:list', includeArchived),
@@ -166,7 +180,7 @@ contextBridge.exposeInMainWorld('electron', {
     update: (id: string, updates: { name?: string; isArchived?: boolean }) =>
       ipcRenderer.invoke('project:update', id, updates),
     reorder: (orderedIds: string[]) => ipcRenderer.invoke('project:reorder', orderedIds),
-    delete: (id: string) => ipcRenderer.invoke('project:delete', id),
+    delete: (id: string) => ipcRenderer.invoke('project:delete', id)
   },
   workspace: {
     listFiles: () => ipcRenderer.invoke('workspace:list-files'),
@@ -230,14 +244,13 @@ contextBridge.exposeInMainWorld('electron', {
       }
     ) => ipcRenderer.invoke('schedule:update', id, updates),
     delete: (id: string) => ipcRenderer.invoke('schedule:delete', id),
-    runNow: (id: string) => ipcRenderer.invoke('schedule:run-now', id),
+    runNow: (id: string) => ipcRenderer.invoke('schedule:run-now', id)
   },
   analytics: {
     trackEvent: (event: AnalyticsEvent) => ipcRenderer.invoke('analytics:track-event', event),
     submitFeedback: (feedback: MessageFeedback) =>
       ipcRenderer.invoke('analytics:submit-feedback', feedback),
-    getSettings: () =>
-      ipcRenderer.invoke('analytics:get-settings') as Promise<AnalyticsSettings>,
+    getSettings: () => ipcRenderer.invoke('analytics:get-settings') as Promise<AnalyticsSettings>,
     setSettings: (settings: Partial<AnalyticsSettings>) =>
       ipcRenderer.invoke('analytics:set-settings', settings) as Promise<AnalyticsSettings>
   },

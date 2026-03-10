@@ -269,7 +269,9 @@ export function getToolLabel(tool: ToolUseSimple): string {
       const input = tool.parsedInput as { file_path?: string };
       if (input.file_path) {
         const fileName = input.file_path.split('/').pop() || input.file_path;
-        return fileName.length > 20 ? `${label} ${fileName.substring(0, 17)}...` : `${label} ${fileName}`;
+        return fileName.length > 20 ?
+            `${label} ${fileName.substring(0, 17)}...`
+          : `${label} ${fileName}`;
       }
       return label;
     }
@@ -387,7 +389,11 @@ export function getToolExpandedLabel(tool: ToolUseSimple): string {
     }
     case 'NotebookEdit': {
       const input = tool.parsedInput as { edit_mode?: string };
-      const modeMap: Record<string, string> = { replace: '替换', insert_before: '前插入', insert_after: '后插入' };
+      const modeMap: Record<string, string> = {
+        replace: '替换',
+        insert_before: '前插入',
+        insert_after: '后插入'
+      };
       const modeLabel = modeMap[input?.edit_mode ?? 'replace'] ?? input?.edit_mode ?? '替换';
       return `编辑笔记本(${modeLabel})`;
     }

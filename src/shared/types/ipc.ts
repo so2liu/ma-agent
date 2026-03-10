@@ -9,6 +9,9 @@ export interface SuccessResponse {
   error?: string;
 }
 
+/** Which agent runtime / LLM provider to use */
+export type AgentProvider = 'anthropic' | 'openai';
+
 export type ChatModelPreference = 'fast' | 'smart-sonnet' | 'smart-opus';
 
 export const MODEL_LABELS: Record<ChatModelPreference, string> = {
@@ -89,3 +92,24 @@ export interface ShellResponse {
   success: boolean;
   error?: string;
 }
+
+/** OpenAI provider configuration */
+export interface OpenAIConfig {
+  apiKey?: string;
+  baseUrl?: string;
+  modelId?: string;
+}
+
+/** Default OpenAI model IDs per preference tier */
+export const DEFAULT_OPENAI_MODEL_IDS: Record<ChatModelPreference, string> = {
+  fast: 'gpt-4.1-mini',
+  'smart-sonnet': 'gpt-4.1',
+  'smart-opus': 'gpt-5'
+};
+
+/** Friendly display names for the default OpenAI models */
+export const DEFAULT_OPENAI_MODEL_NAMES: Record<ChatModelPreference, string> = {
+  fast: 'GPT-4.1 Mini',
+  'smart-sonnet': 'GPT-4.1',
+  'smart-opus': 'GPT-5'
+};

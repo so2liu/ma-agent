@@ -15,10 +15,7 @@ interface DeliverableCardProps {
   onPreview?: (deliverable: Deliverable) => void;
 }
 
-const TYPE_CONFIG: Record<
-  string,
-  { icon: typeof Globe; label: string }
-> = {
+const TYPE_CONFIG: Record<string, { icon: typeof Globe; label: string }> = {
   html: { icon: Globe, label: '网页' },
   image: { icon: FileImage, label: '图片' },
   markdown: { icon: FileText, label: '文档' },

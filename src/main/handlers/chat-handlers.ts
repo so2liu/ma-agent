@@ -19,19 +19,37 @@ import {
   setChatModelPreference,
   startStreamingSession
 } from '../lib/claude-session';
-import { isScheduledTaskExecuting } from '../lib/schedule-state';
-import { getApiKey, getWorkspaceDir } from '../lib/config';
+import { getAgentProvider, getApiKey, getOpenAIApiKey, getWorkspaceDir } from '../lib/config';
 import { messageQueue } from '../lib/message-queue';
+import {
+  interruptOpenAIResponse,
+  resetOpenAISession,
+  sendOpenAIMessage
+} from '../lib/openai-session';
+import { isScheduledTaskExecuting } from '../lib/schedule-state';
 
 export function registerChatHandlers(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle('chat:send-message', async (_event, payload: SendMessagePayload) => {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-      return {
-        success: false,
-        error:
-          'API key is not configured. Add your Anthropic API key in Settings or set ANTHROPIC_API_KEY.'
-      };
+    const provider = getAgentProvider();
+
+    if (provider === 'openai') {
+      const apiKey = getOpenAIApiKey();
+      if (!apiKey) {
+        return {
+          success: false,
+          error:
+            'OpenAI API key is not configured. Add your OpenAI API key in Settings or set OPENAI_API_KEY.'
+        };
+      }
+    } else {
+      const apiKey = getApiKey();
+      if (!apiKey) {
+        return {
+          success: false,
+          error:
+            'API key is not configured. Add your Anthropic API key in Settings or set ANTHROPIC_API_KEY.'
+        };
+      }
     }
 
     const normalizedPayload = payload ?? { text: '', attachments: [] };
@@ -48,12 +66,22 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
       if (isScheduledTaskExecuting()) {
         return {
           success: false,
-          error: '定时任务正在执行中，请稍后再试',
+          error: '定时任务正在执行中，请稍后再试'
         };
       }
 
       const savedAttachments = await persistAttachments(attachments);
 
+      if (provider === 'openai') {
+        // OpenAI path: build plain text with attachment instructions, send directly
+        const fullText = buildPlainTextWithAttachments(text, savedAttachments);
+        sendOpenAIMessage(getMainWindow(), fullText, getCurrentModelPreference()).catch((error) => {
+          console.error('Failed to send OpenAI message:', error);
+        });
+        return { success: true, attachments: savedAttachments };
+      }
+
+      // Anthropic path: use Claude Agent SDK message queue
       const userMessage = buildUserMessage(text, savedAttachments);
 
       // Start streaming session if not already running
@@ -78,7 +106,9 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
 
   ipcMain.handle('chat:reset-session', async (_event, resumeSessionId?: string | null) => {
     try {
+      // Reset both sessions to handle provider switches cleanly
       await resetSession(resumeSessionId);
+      await resetOpenAISession();
       return { success: true };
     } catch (error) {
       console.error('Error resetting session:', error);
@@ -90,6 +120,16 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
   ipcMain.handle('chat:stop-message', async () => {
     try {
       const mainWindow = getMainWindow();
+      const provider = getAgentProvider();
+
+      if (provider === 'openai') {
+        const wasInterrupted = await interruptOpenAIResponse(mainWindow);
+        if (!wasInterrupted) {
+          return { success: false, error: 'No active response to stop.' };
+        }
+        return { success: true };
+      }
+
       const wasInterrupted = await interruptCurrentResponse(mainWindow);
       if (!wasInterrupted) {
         return { success: false, error: 'No active response to stop.' };
@@ -171,6 +211,27 @@ async function persistAttachments(
   }
 
   return saves;
+}
+
+function buildPlainTextWithAttachments(text: string, attachments: SavedAttachmentInfo[]): string {
+  const parts: string[] = [];
+  if (text) parts.push(text);
+  for (const attachment of attachments) {
+    const relativeSegment = attachment.relativePath;
+    const relativeWithinWorkspace =
+      relativeSegment && !relativeSegment.startsWith('..') ? relativeSegment : null;
+    const readTarget =
+      relativeWithinWorkspace ?
+        relativeWithinWorkspace.startsWith('.') ?
+          relativeWithinWorkspace
+        : `./${relativeWithinWorkspace}`
+      : attachment.savedPath;
+    const displayPath = relativeWithinWorkspace ? readTarget : attachment.savedPath;
+    parts.push(
+      `Attachment "${attachment.name}" is available at ${displayPath}. Please run Read("${readTarget}") when you need to inspect it.`
+    );
+  }
+  return parts.join('\n\n') || 'User uploaded files without additional context.';
 }
 
 function buildUserMessage(

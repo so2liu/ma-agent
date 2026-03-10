@@ -1,6 +1,10 @@
 import { ipcMain } from 'electron';
 
-import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../../shared/types/analytics';
+import type {
+  AnalyticsEvent,
+  AnalyticsSettings,
+  MessageFeedback
+} from '../../shared/types/analytics';
 import {
   getAnalyticsSettings,
   setAnalyticsSettings,
@@ -21,10 +25,7 @@ export function registerAnalyticsHandlers(): void {
     return getAnalyticsSettings();
   });
 
-  ipcMain.handle(
-    'analytics:set-settings',
-    (_event, settings: Partial<AnalyticsSettings>) => {
-      return setAnalyticsSettings(settings);
-    }
-  );
+  ipcMain.handle('analytics:set-settings', (_event, settings: Partial<AnalyticsSettings>) => {
+    return setAnalyticsSettings(settings);
+  });
 }

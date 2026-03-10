@@ -1,14 +1,4 @@
-import {
-  Download,
-  Globe,
-  Monitor,
-  Package,
-  RefreshCw,
-  Share2,
-  Tag,
-  Upload,
-  X
-} from 'lucide-react';
+import { Download, Globe, Monitor, Package, RefreshCw, Share2, Tag, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { DiscoveredPeer, SkillInfo } from '@/electron';
@@ -124,7 +114,10 @@ export default function Skills() {
   return (
     <div className="flex h-full flex-col" style={{ background: 'var(--color-content-bg)' }}>
       {/* Drag region */}
-      <div className="shrink-0 [-webkit-app-region:drag]" style={{ height: 'var(--titlebar-height)' }} />
+      <div
+        className="shrink-0 [-webkit-app-region:drag]"
+        style={{ height: 'var(--titlebar-height)' }}
+      />
       <div className="shrink-0">
         <div className="flex items-center gap-3 px-4 py-3 [-webkit-app-region:no-drag]">
           <h1 className="text-base font-semibold text-neutral-800 dark:text-neutral-100">
@@ -137,7 +130,8 @@ export default function Skills() {
       <div className="flex-1 overflow-y-auto px-4 pb-6">
         {/* Intro */}
         <p className="mb-4 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
-          Skill 是小马快跑的能力扩展包，安装后可以处理更多类型的任务。你也可以通过局域网与同事共享 Skill。
+          Skill 是小马快跑的能力扩展包，安装后可以处理更多类型的任务。你也可以通过局域网与同事共享
+          Skill。
         </p>
 
         {error && (
@@ -174,9 +168,9 @@ export default function Skills() {
                 <button
                   onClick={() => setActiveTagFilter(null)}
                   className={`rounded-full px-2.5 py-1 text-[10px] font-medium transition ${
-                    activeTagFilter === null
-                      ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
-                      : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
+                    activeTagFilter === null ?
+                      'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
+                    : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
                   }`}
                 >
                   全部
@@ -186,9 +180,9 @@ export default function Skills() {
                     key={tag}
                     onClick={() => setActiveTagFilter(activeTagFilter === tag ? null : tag)}
                     className={`rounded-full px-2.5 py-1 text-[10px] font-medium transition ${
-                      activeTagFilter === tag
-                        ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
-                        : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
+                      activeTagFilter === tag ?
+                        'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
+                      : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
                     }`}
                   >
                     {tag}
@@ -203,8 +197,9 @@ export default function Skills() {
           : skills.length === 0 ?
             <div className="py-8 text-center text-xs text-neutral-400">暂无 Skill</div>
           : (() => {
-              const filtered = skills.filter((skill) =>
-                !activeTagFilter || (skill.manifest?.tags ?? []).includes(activeTagFilter)
+              const filtered = skills.filter(
+                (skill) =>
+                  !activeTagFilter || (skill.manifest?.tags ?? []).includes(activeTagFilter)
               );
               if (filtered.length === 0) {
                 return (
@@ -374,9 +369,9 @@ function SkillCard({
           <button
             onClick={() => onToggleShared(skill.name)}
             className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] transition ${
-              m?.shared
-                ? 'bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
-                : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
+              m?.shared ?
+                'bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
+              : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
             }`}
             title={m?.shared ? '点击取消共享' : '点击共享到局域网'}
           >
@@ -413,9 +408,7 @@ function PeerCard({
         <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
           {peer.hostname}
         </span>
-        <span className="text-[10px] text-neutral-400">
-          {peer.skills.length} 个共享 Skill
-        </span>
+        <span className="text-[10px] text-neutral-400">{peer.skills.length} 个共享 Skill</span>
       </div>
       <div className="space-y-1.5">
         {peer.skills.map((skill) => {
@@ -434,7 +427,9 @@ function PeerCard({
                   <span className="text-[10px] text-neutral-400">v{skill.version}</span>
                 </div>
                 {skill.description && (
-                  <p className="mt-0.5 truncate text-[10px] text-neutral-400">{skill.description}</p>
+                  <p className="mt-0.5 truncate text-[10px] text-neutral-400">
+                    {skill.description}
+                  </p>
                 )}
               </div>
               <button
@@ -444,8 +439,7 @@ function PeerCard({
               >
                 {isInstalling ?
                   <RefreshCw className="h-3 w-3 animate-spin" />
-                : <Download className="h-3 w-3" />
-                }
+                : <Download className="h-3 w-3" />}
                 安装
               </button>
             </div>

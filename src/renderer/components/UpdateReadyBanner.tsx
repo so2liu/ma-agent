@@ -54,9 +54,7 @@ export default function UpdateReadyBanner() {
             <p className="text-sm font-semibold text-green-900 dark:text-green-100">
               有新版本可用: {status.updateInfo?.version}
             </p>
-            <p className="text-xs text-green-700 dark:text-green-300">
-              重启小马快跑以完成安装。
-            </p>
+            <p className="text-xs text-green-700 dark:text-green-300">重启小马快跑以完成安装。</p>
           </div>
         </div>
         <button

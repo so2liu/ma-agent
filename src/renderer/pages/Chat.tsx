@@ -1,9 +1,18 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { FolderOpen, Globe } from 'lucide-react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import { Group, Panel } from 'react-resizable-panels';
 
+import AppPanel from '@/components/AppPanel';
 import type { Artifact } from '@/components/ArtifactPanel';
 import ArtifactPanel from '@/components/ArtifactPanel';
-import AppPanel from '@/components/AppPanel';
 import ChatInput from '@/components/ChatInput';
 import FileTree from '@/components/FileTree';
 import FloatingTaskPanel from '@/components/FloatingTaskPanel';
@@ -11,20 +20,21 @@ import MessageList from '@/components/MessageList';
 import ResizeHandle from '@/components/ResizeHandle';
 import SkillCardGrid from '@/components/SkillCardGrid';
 import DragRegion from '@/components/TitleBar';
+import type { AppInfo } from '@/electron';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
-import type { AppInfo } from '@/electron';
 import type { Message, MessageAttachment } from '@/types/chat';
 import { extractArtifacts } from '@/utils/artifacts';
-
 import { friendlyError } from '@/utils/friendlyError';
 
 import { MAX_ATTACHMENT_BYTES } from '../../shared/constants';
 import { getArtifactType, getFileExtension } from '../../shared/file-extensions';
-import type { ChatModelPreference, CustomModelIds, SerializedAttachmentPayload } from '../../shared/types/ipc';
-
-import { FolderOpen, Globe } from 'lucide-react';
+import type {
+  ChatModelPreference,
+  CustomModelIds,
+  SerializedAttachmentPayload
+} from '../../shared/types/ipc';
 
 interface PendingAttachment {
   id: string;
@@ -128,7 +138,7 @@ function TopBarDropdown({
   onToggle,
   icon,
   title,
-  children,
+  children
 }: {
   isOpen: boolean;
   onToggle: () => void;
@@ -154,9 +164,9 @@ function TopBarDropdown({
       <button
         onClick={onToggle}
         className={`flex h-7 w-7 items-center justify-center rounded-lg transition ${
-          isOpen
-            ? 'bg-neutral-200/80 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200'
-            : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
+          isOpen ?
+            'bg-neutral-200/80 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200'
+          : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
         }`}
         title={title}
       >
@@ -171,7 +181,17 @@ function TopBarDropdown({
   );
 }
 
-const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversationId, setCurrentConversationId, selectedProjectId, setSelectedProjectId, onOpenDbViewer, onSkillsClick }, ref) {
+const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
+  {
+    currentConversationId,
+    setCurrentConversationId,
+    selectedProjectId,
+    setSelectedProjectId,
+    onOpenDbViewer,
+    onSkillsClick
+  },
+  ref
+) {
   const [inputValue, setInputValue] = useState('');
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [chatInputHeight, setChatInputHeight] = useState(0);
@@ -359,10 +379,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversati
             track('conversation_created');
             const projectId = projectIdForNewChatRef.current;
             if (projectId) {
-              await window.electron.conversation.setProject(
-                response.conversation.id,
-                projectId
-              );
+              await window.electron.conversation.setProject(response.conversation.id, projectId);
             }
           }
         }
@@ -603,12 +620,13 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversati
   useImperativeHandle(ref, () => ({
     loadConversation: handleLoadConversation,
     newChat: handleNewChat,
-    isLoading: () => isLoading,
+    isLoading: () => isLoading
   }));
 
   const INPUT_BOTTOM_OFFSET = 48;
   const DEFAULT_BOTTOM_PADDING = 160;
-  const messageListBottomPadding = chatInputHeight > 0 ? chatInputHeight + INPUT_BOTTOM_OFFSET : DEFAULT_BOTTOM_PADDING;
+  const messageListBottomPadding =
+    chatInputHeight > 0 ? chatInputHeight + INPUT_BOTTOM_OFFSET : DEFAULT_BOTTOM_PADDING;
 
   const handleModelPreferenceChange = async (preference: ChatModelPreference) => {
     if (preference === modelPreference) return;
@@ -640,153 +658,149 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat({ currentConversati
     <Group className="flex h-full overflow-hidden">
       {/* Chat area */}
       <Panel minSize="300px" className="relative flex flex-col overflow-hidden">
-          {/* Top bar with drag region and dropdown buttons */}
-          <div className="relative shrink-0" style={{ height: 'var(--titlebar-height)' }}>
-            <DragRegion />
-            {/* Right-side dropdown buttons */}
-            <div className="absolute top-1/2 right-3 z-10 flex -translate-y-1/2 items-center gap-1">
+        {/* Top bar with drag region and dropdown buttons */}
+        <div className="relative shrink-0" style={{ height: 'var(--titlebar-height)' }}>
+          <DragRegion />
+          {/* Right-side dropdown buttons */}
+          <div className="absolute top-1/2 right-3 z-10 flex -translate-y-1/2 items-center gap-1">
+            <TopBarDropdown
+              isOpen={showFilesDropdown}
+              onToggle={() => {
+                setShowFilesDropdown((p) => !p);
+                setShowAppsDropdown(false);
+              }}
+              icon={<FolderOpen className="h-4 w-4" />}
+              title="工作区"
+            >
+              <div className="max-h-80 overflow-y-auto">
+                <FileTree
+                  onFileSelect={(path) => {
+                    handleFileSelect(path);
+                    setShowFilesDropdown(false);
+                  }}
+                  selectedPath={selectedArtifact?.filePath ?? null}
+                  onFileDeleted={handleFileDeleted}
+                />
+              </div>
+            </TopBarDropdown>
+            {apps.length > 0 && (
               <TopBarDropdown
-                isOpen={showFilesDropdown}
+                isOpen={showAppsDropdown}
                 onToggle={() => {
-                  setShowFilesDropdown((p) => !p);
-                  setShowAppsDropdown(false);
+                  setShowAppsDropdown((p) => !p);
+                  setShowFilesDropdown(false);
                 }}
-                icon={<FolderOpen className="h-4 w-4" />}
-                title="工作区"
+                icon={<Globe className="h-4 w-4" />}
+                title="应用"
               >
-                <div className="max-h-80 overflow-y-auto">
-                  <FileTree
-                    onFileSelect={(path) => {
-                      handleFileSelect(path);
-                      setShowFilesDropdown(false);
-                    }}
-                    selectedPath={selectedArtifact?.filePath ?? null}
-                    onFileDeleted={handleFileDeleted}
+                <div className="max-h-80 overflow-y-auto p-1">
+                  <AppPanel
+                    onOpenDbViewer={onOpenDbViewer}
+                    apps={apps}
+                    onAppsChanged={refreshApps}
                   />
                 </div>
               </TopBarDropdown>
-              {apps.length > 0 && (
-                <TopBarDropdown
-                  isOpen={showAppsDropdown}
-                  onToggle={() => {
-                    setShowAppsDropdown((p) => !p);
-                    setShowFilesDropdown(false);
-                  }}
-                  icon={<Globe className="h-4 w-4" />}
-                  title="应用"
-                >
-                  <div className="max-h-80 overflow-y-auto p-1">
-                    <AppPanel
-                      onOpenDbViewer={onOpenDbViewer}
-                      apps={apps}
-                      onAppsChanged={refreshApps}
-                    />
-                  </div>
-                </TopBarDropdown>
-              )}
-            </div>
+            )}
           </div>
+        </div>
 
-          {messages.length === 0 && !isLoading ? (
-            /* Welcome layout: centered input + skill cards */
-            <div className="flex flex-1 flex-col items-center justify-center gap-5 px-3">
-              <div className="text-center">
-                <p className="mb-1 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
-                  {(() => {
-                    const hour = new Date().getHours();
-                    if (hour < 6) return '夜深了，还在忙吗?';
-                    if (hour < 12) return '早上好，今天想做什么?';
-                    if (hour < 18) return '下午好，需要帮忙吗?';
-                    return '晚上好，有什么可以帮你?';
-                  })()}
-                </p>
-                <p className="text-xs text-neutral-400 dark:text-neutral-500">
-                  选择下方场景快速开始，或直接输入你的需求
-                </p>
-              </div>
-              <div className="w-full max-w-3xl">
-                <ChatInput
-                  value={inputValue}
-                  onChange={setInputValue}
-                  onSend={handleSendMessage}
-                  isLoading={isLoading}
-                  onStopStreaming={handleStopStreaming}
-                  autoFocus
-                  attachments={pendingAttachments}
-                  onFilesSelected={handleFilesSelected}
-                  onRemoveAttachment={handleRemoveAttachment}
-                  canSend={Boolean(inputValue.trim()) || pendingAttachments.length > 0}
-                  attachmentError={attachmentError}
-                  modelPreference={modelPreference}
-                  onModelPreferenceChange={handleModelPreferenceChange}
-                  isModelPreferenceUpdating={isModelPreferenceUpdating}
-                  customModelActive={customModelActive}
-                  customModelIds={customModelIds}
-                />
-              </div>
-              <SkillCardGrid
-                onSelectSkill={(prompt) => setInputValue(prompt)}
-                onMoreClick={onSkillsClick}
-                currentInput={inputValue}
+        {messages.length === 0 && !isLoading ?
+          /* Welcome layout: centered input + skill cards */
+          <div className="flex flex-1 flex-col items-center justify-center gap-5 px-3">
+            <div className="text-center">
+              <p className="mb-1 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+                {(() => {
+                  const hour = new Date().getHours();
+                  if (hour < 6) return '夜深了，还在忙吗?';
+                  if (hour < 12) return '早上好，今天想做什么?';
+                  if (hour < 18) return '下午好，需要帮忙吗?';
+                  return '晚上好，有什么可以帮你?';
+                })()}
+              </p>
+              <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                选择下方场景快速开始，或直接输入你的需求
+              </p>
+            </div>
+            <div className="w-full max-w-3xl">
+              <ChatInput
+                value={inputValue}
+                onChange={setInputValue}
+                onSend={handleSendMessage}
+                isLoading={isLoading}
+                onStopStreaming={handleStopStreaming}
+                autoFocus
+                attachments={pendingAttachments}
+                onFilesSelected={handleFilesSelected}
+                onRemoveAttachment={handleRemoveAttachment}
+                canSend={Boolean(inputValue.trim()) || pendingAttachments.length > 0}
+                attachmentError={attachmentError}
+                modelPreference={modelPreference}
+                onModelPreferenceChange={handleModelPreferenceChange}
+                isModelPreferenceUpdating={isModelPreferenceUpdating}
+                customModelActive={customModelActive}
+                customModelIds={customModelIds}
               />
             </div>
-          ) : (
-            /* Chat layout: messages + bottom input */
-            <>
-              <MessageList
-                messages={messages}
-                isLoading={isLoading}
-                containerRef={messagesContainerRef}
-                bottomPadding={messageListBottomPadding}
-                conversationId={currentConversationId}
-                onDeliverablePreview={(d) =>
-                  setSelectedArtifact({
-                    id: d.id,
-                    filePath: d.filePath,
-                    fileName: d.fileName,
-                    type: d.type,
-                    content: d.content
-                  })
-                }
-              />
-              <div className="absolute inset-x-0 bottom-0 z-10">
-                <ChatInput
-                  value={inputValue}
-                  onChange={setInputValue}
-                  onSend={handleSendMessage}
-                  isLoading={isLoading}
-                  onStopStreaming={handleStopStreaming}
-                  autoFocus
-                  onHeightChange={setChatInputHeight}
-                  attachments={pendingAttachments}
-                  onFilesSelected={handleFilesSelected}
-                  onRemoveAttachment={handleRemoveAttachment}
-                  canSend={Boolean(inputValue.trim()) || pendingAttachments.length > 0}
-                  attachmentError={attachmentError}
-                  modelPreference={modelPreference}
-                  onModelPreferenceChange={handleModelPreferenceChange}
-                  isModelPreferenceUpdating={isModelPreferenceUpdating}
-                  customModelActive={customModelActive}
-                  customModelIds={customModelIds}
-                  floatingPanel={<FloatingTaskPanel messages={messages} />}
-                />
-              </div>
-            </>
-          )}
-        </Panel>
-
-        {/* Right: artifact preview panel */}
-        {selectedArtifact && (
+            <SkillCardGrid
+              onSelectSkill={(prompt) => setInputValue(prompt)}
+              onMoreClick={onSkillsClick}
+              currentInput={inputValue}
+            />
+          </div>
+        : /* Chat layout: messages + bottom input */
           <>
-            <ResizeHandle />
-            <Panel defaultSize="400px" minSize="280px" maxSize="700px">
-              <ArtifactPanel
-                artifact={selectedArtifact}
-                onClose={() => setSelectedArtifact(null)}
+            <MessageList
+              messages={messages}
+              isLoading={isLoading}
+              containerRef={messagesContainerRef}
+              bottomPadding={messageListBottomPadding}
+              conversationId={currentConversationId}
+              onDeliverablePreview={(d) =>
+                setSelectedArtifact({
+                  id: d.id,
+                  filePath: d.filePath,
+                  fileName: d.fileName,
+                  type: d.type,
+                  content: d.content
+                })
+              }
+            />
+            <div className="absolute inset-x-0 bottom-0 z-10">
+              <ChatInput
+                value={inputValue}
+                onChange={setInputValue}
+                onSend={handleSendMessage}
+                isLoading={isLoading}
+                onStopStreaming={handleStopStreaming}
+                autoFocus
+                onHeightChange={setChatInputHeight}
+                attachments={pendingAttachments}
+                onFilesSelected={handleFilesSelected}
+                onRemoveAttachment={handleRemoveAttachment}
+                canSend={Boolean(inputValue.trim()) || pendingAttachments.length > 0}
+                attachmentError={attachmentError}
+                modelPreference={modelPreference}
+                onModelPreferenceChange={handleModelPreferenceChange}
+                isModelPreferenceUpdating={isModelPreferenceUpdating}
+                customModelActive={customModelActive}
+                customModelIds={customModelIds}
+                floatingPanel={<FloatingTaskPanel messages={messages} />}
               />
-            </Panel>
+            </div>
           </>
-        )}
+        }
+      </Panel>
+
+      {/* Right: artifact preview panel */}
+      {selectedArtifact && (
+        <>
+          <ResizeHandle />
+          <Panel defaultSize="400px" minSize="280px" maxSize="700px">
+            <ArtifactPanel artifact={selectedArtifact} onClose={() => setSelectedArtifact(null)} />
+          </Panel>
+        </>
+      )}
     </Group>
   );
 });

@@ -1,8 +1,9 @@
 import { ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useState } from 'react';
 
-import type { FeedbackRating } from '../../shared/types/analytics';
 import { useAnalytics } from '@/hooks/useAnalytics';
+
+import type { FeedbackRating } from '../../shared/types/analytics';
 
 const NEGATIVE_REASONS = [
   { id: 'incorrect', label: '回答不正确' },
@@ -57,9 +58,7 @@ export default function MessageFeedback({ messageId, conversationId }: MessageFe
 
   if (submitted) {
     return (
-      <div className="mt-1 px-3 text-[11px] text-neutral-400 dark:text-neutral-500">
-        谢谢反馈
-      </div>
+      <div className="mt-1 px-3 text-[11px] text-neutral-400 dark:text-neutral-500">谢谢反馈</div>
     );
   }
 
@@ -69,9 +68,9 @@ export default function MessageFeedback({ messageId, conversationId }: MessageFe
         <button
           onClick={handlePositive}
           className={`rounded p-1 transition ${
-            rating === 'positive'
-              ? 'text-green-500'
-              : 'text-neutral-300 hover:text-neutral-500 dark:text-neutral-600 dark:hover:text-neutral-400'
+            rating === 'positive' ? 'text-green-500' : (
+              'text-neutral-300 hover:text-neutral-500 dark:text-neutral-600 dark:hover:text-neutral-400'
+            )
           }`}
           title="有帮助"
         >
@@ -80,9 +79,9 @@ export default function MessageFeedback({ messageId, conversationId }: MessageFe
         <button
           onClick={handleNegative}
           className={`rounded p-1 transition ${
-            rating === 'negative'
-              ? 'text-red-500'
-              : 'text-neutral-300 hover:text-neutral-500 dark:text-neutral-600 dark:hover:text-neutral-400'
+            rating === 'negative' ? 'text-red-500' : (
+              'text-neutral-300 hover:text-neutral-500 dark:text-neutral-600 dark:hover:text-neutral-400'
+            )
           }`}
           title="需改进"
         >
@@ -99,13 +98,11 @@ export default function MessageFeedback({ messageId, conversationId }: MessageFe
             {NEGATIVE_REASONS.map((reason) => (
               <button
                 key={reason.id}
-                onClick={() =>
-                  setSelectedReason(selectedReason === reason.id ? null : reason.id)
-                }
+                onClick={() => setSelectedReason(selectedReason === reason.id ? null : reason.id)}
                 className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
-                  selectedReason === reason.id
-                    ? 'border-neutral-800 bg-neutral-800 text-white dark:border-neutral-200 dark:bg-neutral-200 dark:text-neutral-900'
-                    : 'border-neutral-200 text-neutral-600 hover:border-neutral-300 dark:border-neutral-600 dark:text-neutral-400 dark:hover:border-neutral-500'
+                  selectedReason === reason.id ?
+                    'border-neutral-800 bg-neutral-800 text-white dark:border-neutral-200 dark:bg-neutral-200 dark:text-neutral-900'
+                  : 'border-neutral-200 text-neutral-600 hover:border-neutral-300 dark:border-neutral-600 dark:text-neutral-400 dark:hover:border-neutral-500'
                 }`}
               >
                 {reason.label}

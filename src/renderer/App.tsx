@@ -8,11 +8,10 @@ import Sidebar from '@/components/Sidebar';
 import UpdateCheckFeedback from '@/components/UpdateCheckFeedback';
 import UpdateReadyBanner from '@/components/UpdateReadyBanner';
 import Chat from '@/pages/Chat';
+import type { ChatHandle } from '@/pages/Chat';
 import Schedules from '@/pages/Schedules';
 import Settings from '@/pages/Settings';
 import Skills from '@/pages/Skills';
-
-import type { ChatHandle } from '@/pages/Chat';
 
 type View = 'home' | 'settings' | 'skills' | 'schedules' | 'db-viewer';
 

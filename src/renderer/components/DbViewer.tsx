@@ -34,24 +34,27 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
   const [readOnly, setReadOnly] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  const refreshData = useCallback(async (table: string) => {
-    const result = await window.electron.db.queryTable(appId, table, page, pageSize);
-    if (result.success) {
-      setRows(result.rows ?? []);
-      setColumns(result.columns ?? []);
-      setTotal(result.total ?? 0);
-      setError(null);
-    } else {
-      setError(result.error ?? '加载数据失败');
-    }
-  }, [appId, page, pageSize]);
+  const refreshData = useCallback(
+    async (table: string) => {
+      const result = await window.electron.db.queryTable(appId, table, page, pageSize);
+      if (result.success) {
+        setRows(result.rows ?? []);
+        setColumns(result.columns ?? []);
+        setTotal(result.total ?? 0);
+        setError(null);
+      } else {
+        setError(result.error ?? '加载数据失败');
+      }
+    },
+    [appId, page, pageSize]
+  );
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const [tablesResult, statusResult] = await Promise.all([
         window.electron.db.getTables(appId),
-        window.electron.db.getAppStatus(appId),
+        window.electron.db.getAppStatus(appId)
       ]);
       if (cancelled) return;
       if (statusResult.success) {
@@ -74,7 +77,9 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
         setTotal(dataResult.total ?? 0);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [appId, pageSize]);
 
   useEffect(() => {
@@ -90,7 +95,9 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
         setError(null);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activeTable, page, appId, pageSize]);
 
   useEffect(() => {
@@ -185,9 +192,9 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
         <button
           onClick={() => setShowSql(!showSql)}
           className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
-            showSql
-              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
-              : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400'
+            showSql ?
+              'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
+            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400'
           }`}
         >
           SQL
@@ -225,9 +232,9 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
                 setPage(1);
               }}
               className={`rounded px-2 py-0.5 text-xs transition-colors ${
-                activeTable === table
-                  ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
-                  : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                activeTable === table ?
+                  'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
+                : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
               }`}
             >
               {table}
@@ -258,7 +265,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
                 {columns.map((col) => (
                   <th
                     key={col.name}
-                    className="whitespace-nowrap border-b border-r border-neutral-200 px-2 py-1.5 text-left font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                    className="border-r border-b border-neutral-200 px-2 py-1.5 text-left font-medium whitespace-nowrap text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
                   >
                     {col.name}
                     {col.pk && (
@@ -280,10 +287,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
               {rows.map((row, rowIdx) => {
                 const rowId = pkColumn ? String(row[pkColumn]) : String(rowIdx);
                 return (
-                  <tr
-                    key={rowId}
-                    className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
-                  >
+                  <tr key={rowId} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                     {columns.map((col) => {
                       const isEditing =
                         editingCell?.rowId === rowId && editingCell?.column === col.name;
@@ -292,7 +296,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
                       return (
                         <td
                           key={col.name}
-                          className="max-w-[300px] truncate border-b border-r border-neutral-100 px-2 py-1 text-neutral-700 dark:border-neutral-800 dark:text-neutral-300"
+                          className="max-w-[300px] truncate border-r border-b border-neutral-100 px-2 py-1 text-neutral-700 dark:border-neutral-800 dark:text-neutral-300"
                           onDoubleClick={() => handleCellDoubleClick(rowId, col.name, cellValue)}
                         >
                           {isEditing ?
@@ -310,11 +314,10 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
                             />
                           : <span
                               className={
-                                cellValue === null
-                                  ? 'italic text-neutral-400'
-                                  : col.pk
-                                    ? 'font-mono text-amber-600 dark:text-amber-400'
-                                    : ''
+                                cellValue === null ? 'text-neutral-400 italic'
+                                : col.pk ?
+                                  'font-mono text-amber-600 dark:text-amber-400'
+                                : ''
                               }
                             >
                               {formatCellValue(cellValue)}
@@ -364,9 +367,7 @@ export default function DbViewer({ appId, appName, onClose }: DbViewerProps) {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between border-t border-neutral-200 px-3 py-1.5 dark:border-neutral-700">
-          <span className="text-[10px] text-neutral-500">
-            共 {total} 条
-          </span>
+          <span className="text-[10px] text-neutral-500">共 {total} 条</span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}

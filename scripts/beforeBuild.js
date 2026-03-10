@@ -5,10 +5,8 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CURRENT_RIPGREP_TARGET =
-  process.platform === 'darwin' ?
-    `${process.arch === 'arm64' ? 'arm64' : 'x64'}-darwin`
-  : process.platform === 'linux' ?
-    `${process.arch === 'arm64' ? 'arm64' : 'x64'}-linux`
+  process.platform === 'darwin' ? `${process.arch === 'arm64' ? 'arm64' : 'x64'}-darwin`
+  : process.platform === 'linux' ? `${process.arch === 'arm64' ? 'arm64' : 'x64'}-linux`
   : 'x64-win32';
 
 function rmIfExists(path) {

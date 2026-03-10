@@ -1,8 +1,12 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
+import {
+  getModelIdForPreference,
+  resolveClaudeCodeCli,
+  SYSTEM_PROMPT_APPEND
+} from './claude-session';
 import { buildClaudeSessionEnv, getApiKey, getWorkspaceDir } from './config';
-import { getModelIdForPreference, SYSTEM_PROMPT_APPEND, resolveClaudeCodeCli } from './claude-session';
 import { createConversation } from './conversation-db';
 import type { ScheduledTask } from './schedule-db';
 
@@ -21,10 +25,10 @@ export async function executeScheduledTask(task: ScheduledTask): Promise<string>
       type: 'user',
       message: {
         role: 'user' as const,
-        content: [{ type: 'text' as const, text: task.prompt }],
+        content: [{ type: 'text' as const, text: task.prompt }]
       },
       parent_tool_use_id: null,
-      session_id: sessionId,
+      session_id: sessionId
     };
   }
 
@@ -43,10 +47,10 @@ export async function executeScheduledTask(task: ScheduledTask): Promise<string>
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',
-        append: `${SYSTEM_PROMPT_APPEND}\n\nThis is a scheduled task execution. Task name: "${task.name}". Execute the prompt and provide results concisely.`,
+        append: `${SYSTEM_PROMPT_APPEND}\n\nThis is a scheduled task execution. Task name: "${task.name}". Execute the prompt and provide results concisely.`
       },
-      cwd: getWorkspaceDir(),
-    },
+      cwd: getWorkspaceDir()
+    }
   });
 
   const assistantTexts: string[] = [];
@@ -82,8 +86,8 @@ export async function executeScheduledTask(task: ScheduledTask): Promise<string>
       id: `sched-asst-${Date.now()}`,
       role: 'assistant',
       content: assistantTexts.join('\n'),
-      timestamp: now,
-    },
+      timestamp: now
+    }
   ];
 
   const conversation = createConversation(`[定时] ${task.name}`, messages);

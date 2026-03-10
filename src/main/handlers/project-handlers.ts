@@ -5,7 +5,7 @@ import {
   deleteProject,
   listProjects,
   reorderProjects,
-  updateProject,
+  updateProject
 } from '../lib/project-db';
 
 export function registerProjectHandlers(): void {
@@ -16,7 +16,7 @@ export function registerProjectHandlers(): void {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   });
@@ -28,7 +28,7 @@ export function registerProjectHandlers(): void {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   });
@@ -42,7 +42,7 @@ export function registerProjectHandlers(): void {
       } catch (error) {
         return {
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : 'Unknown error'
         };
       }
     }
@@ -55,7 +55,7 @@ export function registerProjectHandlers(): void {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   });
@@ -67,7 +67,7 @@ export function registerProjectHandlers(): void {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   });

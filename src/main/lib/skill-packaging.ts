@@ -1,9 +1,8 @@
-import AdmZip from 'adm-zip';
-import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'fs';
 import { basename, join } from 'path';
+import AdmZip from 'adm-zip';
 
 import type { SkillManifest } from '../../shared/types/skill-manifest';
-
 import { readManifest, syncManifest, validateManifest } from './skill-manifest';
 
 const SKILL_MD = 'SKILL.md';

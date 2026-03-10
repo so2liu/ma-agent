@@ -1,15 +1,8 @@
-import {
-  Clock,
-  Pause,
-  Play,
-  Plus,
-  RotateCw,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Clock, Pause, Play, Plus, RotateCw, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { ScheduledTask } from '@/electron';
+
 import { MODEL_LABELS, type ChatModelPreference } from '../../shared/types/ipc';
 
 const CRON_PRESETS = [
@@ -20,7 +13,7 @@ const CRON_PRESETS = [
   { label: '每天 18:00', value: '0 18 * * *' },
   { label: '工作日 09:00', value: '0 9 * * 1-5' },
   { label: '每周一 09:00', value: '0 9 * * 1' },
-  { label: '每天 00:00', value: '0 0 * * *' },
+  { label: '每天 00:00', value: '0 0 * * *' }
 ];
 
 const CRON_DESCRIPTIONS: Record<string, string> = Object.fromEntries(
@@ -32,9 +25,21 @@ function describeCron(expr: string): string {
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  success: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', label: '成功' },
-  error: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', label: '失败' },
-  skipped: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', label: '已跳过' },
+  success: {
+    bg: 'bg-green-100 dark:bg-green-900/30',
+    text: 'text-green-700 dark:text-green-400',
+    label: '成功'
+  },
+  error: {
+    bg: 'bg-red-100 dark:bg-red-900/30',
+    text: 'text-red-700 dark:text-red-400',
+    label: '失败'
+  },
+  skipped: {
+    bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+    text: 'text-yellow-700 dark:text-yellow-400',
+    label: '已跳过'
+  }
 };
 
 export default function Schedules() {
@@ -101,18 +106,19 @@ export default function Schedules() {
     if (!formName.trim() || !formPrompt.trim() || !formCron) return;
 
     try {
-      const response = editingTask
-        ? await window.electron.schedule.update(editingTask.id, {
+      const response =
+        editingTask ?
+          await window.electron.schedule.update(editingTask.id, {
             name: formName.trim(),
             prompt: formPrompt.trim(),
             cronExpression: formCron,
-            modelPreference: formModel,
+            modelPreference: formModel
           })
         : await window.electron.schedule.create({
             name: formName.trim(),
             prompt: formPrompt.trim(),
             cronExpression: formCron,
-            modelPreference: formModel,
+            modelPreference: formModel
           });
 
       if (!response.success) {
@@ -178,11 +184,12 @@ export default function Schedules() {
   return (
     <div className="flex h-full flex-col" style={{ background: 'var(--color-content-bg)' }}>
       {/* Header */}
-      <div className="shrink-0 [-webkit-app-region:drag]" style={{ height: 'var(--titlebar-height)' }} />
+      <div
+        className="shrink-0 [-webkit-app-region:drag]"
+        style={{ height: 'var(--titlebar-height)' }}
+      />
       <div className="flex shrink-0 items-center gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-        <h1 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-          定时任务
-        </h1>
+        <h1 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">定时任务</h1>
         <div className="flex-1" />
         <button
           onClick={openCreateForm}
@@ -207,27 +214,24 @@ export default function Schedules() {
           定时任务在 App 运行期间按计划自动执行。如果当前有活跃会话，任务会被跳过。
         </div>
 
-        {isLoading ? (
+        {isLoading ?
           <div className="py-8 text-center text-sm text-neutral-400">加载中...</div>
-        ) : tasks.length === 0 ? (
+        : tasks.length === 0 ?
           <div className="flex flex-col items-center gap-2 py-12 text-center">
             <Clock className="h-8 w-8 text-neutral-300 dark:text-neutral-600" />
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
-              暂无定时任务
-            </p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">暂无定时任务</p>
             <p className="text-xs text-neutral-400 dark:text-neutral-500">
               创建定时任务，让 Agent 按计划自动执行
             </p>
           </div>
-        ) : (
-          <div className="space-y-3">
+        : <div className="space-y-3">
             {tasks.map((task) => (
               <div
                 key={task.id}
                 className={`rounded-lg border p-4 transition ${
-                  task.enabled
-                    ? 'border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800'
-                    : 'border-neutral-100 bg-neutral-50 opacity-60 dark:border-neutral-800 dark:bg-neutral-900'
+                  task.enabled ?
+                    'border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800'
+                  : 'border-neutral-100 bg-neutral-50 opacity-60 dark:border-neutral-800 dark:bg-neutral-900'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -256,9 +260,7 @@ export default function Schedules() {
                         {describeCron(task.cronExpression)}
                       </span>
                       <span>{MODEL_LABELS[task.modelPreference]}</span>
-                      {task.lastRunAt && (
-                        <span>上次运行: {formatTime(task.lastRunAt)}</span>
-                      )}
+                      {task.lastRunAt && <span>上次运行: {formatTime(task.lastRunAt)}</span>}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -277,11 +279,9 @@ export default function Schedules() {
                       className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
                       title={task.enabled ? '暂停' : '启用'}
                     >
-                      {task.enabled ? (
+                      {task.enabled ?
                         <Pause className="h-3.5 w-3.5" />
-                      ) : (
-                        <Play className="h-3.5 w-3.5" />
-                      )}
+                      : <Play className="h-3.5 w-3.5" />}
                     </button>
                     <button
                       onClick={() => handleDelete(task.id)}
@@ -295,7 +295,7 @@ export default function Schedules() {
               </div>
             ))}
           </div>
-        )}
+        }
       </div>
 
       {/* Create/Edit Modal */}

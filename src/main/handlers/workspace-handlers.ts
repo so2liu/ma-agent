@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from 'fs';
 import { readdir, readFile, rm, stat } from 'fs/promises';
 import { join, relative, resolve, sep } from 'path';
-import { type BrowserWindow, ipcMain, shell } from 'electron';
+import { ipcMain, shell, type BrowserWindow } from 'electron';
 
 import { ALL_TEXT_EXTENSIONS, MAX_PREVIEW_FILE_SIZE } from '../../shared/file-extensions';
 import { getWorkspaceDir } from '../lib/config';

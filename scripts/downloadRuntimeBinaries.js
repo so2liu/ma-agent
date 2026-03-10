@@ -1,13 +1,6 @@
 import { spawnSync } from 'child_process';
 import { randomUUID } from 'crypto';
-import {
-  createWriteStream,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync
-} from 'fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { Readable } from 'stream';

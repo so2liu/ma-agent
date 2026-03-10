@@ -1,9 +1,8 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-
 import { Database } from 'bun:sqlite';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { createDBApi, migrateJsonToSqlite } from './sandbox-api';
 
@@ -163,7 +162,10 @@ describe('migrateJsonToSqlite', () => {
     const jsonPath = join(tempDir, 'data.json');
     const sqlitePath = join(tempDir, 'data.sqlite');
 
-    writeFileSync(jsonPath, JSON.stringify([{ id: 'abc', name: 'Alice', createdAt: '2024-01-01' }]));
+    writeFileSync(
+      jsonPath,
+      JSON.stringify([{ id: 'abc', name: 'Alice', createdAt: '2024-01-01' }])
+    );
 
     const db = createDBApi(sqlitePath);
     db.close();

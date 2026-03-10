@@ -43,16 +43,20 @@ export function AlertDialogTitle({ children }: { children: React.ReactNode }) {
 }
 
 export function AlertDialogDescription({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">{children}</p>
-  );
+  return <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">{children}</p>;
 }
 
 export function AlertDialogFooter({ children }: { children: React.ReactNode }) {
   return <div className="mt-4 flex justify-end gap-2">{children}</div>;
 }
 
-export function AlertDialogCancel({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+export function AlertDialogCancel({
+  children,
+  onClick
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+}) {
   return (
     <button
       onClick={onClick}
@@ -63,14 +67,22 @@ export function AlertDialogCancel({ children, onClick }: { children: React.React
   );
 }
 
-export function AlertDialogAction({ children, onClick, variant = 'default' }: { children: React.ReactNode; onClick?: () => void; variant?: 'default' | 'destructive' }) {
+export function AlertDialogAction({
+  children,
+  onClick,
+  variant = 'default'
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: 'default' | 'destructive';
+}) {
   return (
     <button
       onClick={onClick}
       className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-        variant === 'destructive'
-          ? 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800'
-          : 'bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300'
+        variant === 'destructive' ?
+          'bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800'
+        : 'bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300'
       }`}
     >
       {children}

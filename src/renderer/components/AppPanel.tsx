@@ -1,13 +1,4 @@
-import {
-  Code,
-  Copy,
-  Database,
-  ExternalLink,
-  Hammer,
-  Loader2,
-  Play,
-  Square
-} from 'lucide-react';
+import { Code, Copy, Database, ExternalLink, Hammer, Loader2, Play, Square } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { AppInfo } from '@/electron';
@@ -18,7 +9,11 @@ interface AppPanelProps {
   onAppsChanged?: () => void;
 }
 
-export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsChanged }: AppPanelProps) {
+export default function AppPanel({
+  onOpenDbViewer,
+  apps: externalApps,
+  onAppsChanged
+}: AppPanelProps) {
   const [internalApps, setInternalApps] = useState<AppInfo[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -112,10 +107,7 @@ export default function AppPanel({ onOpenDbViewer, apps: externalApps, onAppsCha
   return (
     <div className="space-y-1 px-1.5 pb-1">
       {apps.map((app) => (
-        <div
-          key={app.id}
-          className="rounded-lg bg-white px-2.5 py-2 shadow-sm dark:bg-neutral-800"
-        >
+        <div key={app.id} className="rounded-lg bg-white px-2.5 py-2 shadow-sm dark:bg-neutral-800">
           <div className="flex items-center gap-1.5">
             <span className="text-sm">{app.icon}</span>
             <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-800 dark:text-neutral-200">

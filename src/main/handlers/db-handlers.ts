@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-
 import { ipcMain } from 'electron';
 
 import { getWorkspaceDir } from '../lib/config';
@@ -61,9 +60,10 @@ function isRecordsTable(db: SqliteDatabase, tableName: string): boolean {
 }
 
 /** Expand records table rows: parse the JSON `data` column into virtual columns */
-function expandRecordRows(
-  rows: Record<string, unknown>[]
-): { expandedRows: Record<string, unknown>[]; virtualColumns: string[] } {
+function expandRecordRows(rows: Record<string, unknown>[]): {
+  expandedRows: Record<string, unknown>[];
+  virtualColumns: string[];
+} {
   const virtualColumnSet = new Set<string>();
   const expandedRows = rows.map((row) => {
     const result: Record<string, unknown> = {
@@ -274,9 +274,9 @@ export function registerDbHandlers(): void {
         const rows = db.prepare(safeSql).all() as Record<string, unknown>[];
 
         const columns =
-          rows.length > 0
-            ? Object.keys(rows[0]).map((name) => ({ name, type: '', pk: false }))
-            : [];
+          rows.length > 0 ?
+            Object.keys(rows[0]).map((name) => ({ name, type: '', pk: false }))
+          : [];
 
         return { success: true, rows, columns, total: rows.length };
       });

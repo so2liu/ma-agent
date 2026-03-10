@@ -72,7 +72,7 @@ export function createScheduledTask(data: {
     ...data,
     enabled: true,
     createdAt: now,
-    updatedAt: now,
+    updatedAt: now
   };
   tasks.push(task);
   writeAll(tasks);

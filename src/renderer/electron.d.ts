@@ -1,13 +1,15 @@
+import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
 import type {
+  AgentProvider,
   ChatModelPreference,
   CustomModelIds,
   GetChatModelPreferenceResponse,
+  OpenAIConfig,
   SendMessagePayload,
   SendMessageResponse,
   SetChatModelPreferenceResponse
 } from '../shared/types/ipc';
 import type { SkillManifest } from '../shared/types/skill-manifest';
-import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
 
 export type ChatResponse = SendMessageResponse;
 
@@ -381,11 +383,28 @@ export interface ElectronAPI {
       success: boolean;
       customModelIds: CustomModelIds;
     }>;
-    testApi: (params?: {
-      apiKey?: string;
-      baseUrl?: string;
-      modelId?: string;
-    }) => Promise<{
+    testApi: (params?: { apiKey?: string; baseUrl?: string; modelId?: string }) => Promise<{
+      success: boolean;
+      model?: string;
+      message?: string;
+      error?: string;
+    }>;
+    getAgentProvider: () => Promise<{ provider: AgentProvider }>;
+    setAgentProvider: (provider: AgentProvider) => Promise<{
+      success: boolean;
+      provider: AgentProvider;
+    }>;
+    getOpenAIConfig: () => Promise<{
+      config: OpenAIConfig;
+      apiKeyConfigured: boolean;
+      apiKeySource: 'env' | 'local' | null;
+      apiKeyLastFour: string | null;
+    }>;
+    setOpenAIConfig: (config: OpenAIConfig) => Promise<{
+      success: boolean;
+      config: OpenAIConfig;
+    }>;
+    testOpenAIApi: (params?: { apiKey?: string; baseUrl?: string; modelId?: string }) => Promise<{
       success: boolean;
       model?: string;
       message?: string;
@@ -437,12 +456,27 @@ export interface ElectronAPI {
   };
   skill: {
     list: () => Promise<SkillListResponse>;
-    toggleShared: (skillName: string) => Promise<{ success: boolean; shared?: boolean; error?: string }>;
-    updateTags: (skillName: string, tags: string[]) => Promise<{ success: boolean; error?: string }>;
-    export: (skillName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
-    import: () => Promise<{ success: boolean; manifest?: SkillManifest; canceled?: boolean; error?: string }>;
+    toggleShared: (
+      skillName: string
+    ) => Promise<{ success: boolean; shared?: boolean; error?: string }>;
+    updateTags: (
+      skillName: string,
+      tags: string[]
+    ) => Promise<{ success: boolean; error?: string }>;
+    export: (
+      skillName: string
+    ) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
+    import: () => Promise<{
+      success: boolean;
+      manifest?: SkillManifest;
+      canceled?: boolean;
+      error?: string;
+    }>;
     discover: () => Promise<SkillDiscoverResponse>;
-    install: (peerInstanceId: string, skillName: string) => Promise<{ success: boolean; manifest?: SkillManifest; error?: string }>;
+    install: (
+      peerInstanceId: string,
+      skillName: string
+    ) => Promise<{ success: boolean; manifest?: SkillManifest; error?: string }>;
     startDiscovery: () => Promise<{ success: boolean; error?: string }>;
     stopDiscovery: () => Promise<{ success: boolean; error?: string }>;
   };

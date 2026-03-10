@@ -112,8 +112,7 @@ export default function ChatHistoryDrawer({
       } catch {
         acc[conversation.id] = '';
       }
-      acc[conversation.id] =
-        acc[conversation.id] || '点击继续之前的对话';
+      acc[conversation.id] = acc[conversation.id] || '点击继续之前的对话';
       return acc;
     }, {});
   }, [conversations]);
