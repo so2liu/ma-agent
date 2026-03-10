@@ -62,7 +62,7 @@ export async function startViteDevServer(
 
   return new Promise<ViteDevServer>((resolve, reject) => {
     const child: ChildProcess = spawn(
-      'npx',
+      'bunx',
       ['vite', '--port', String(port), '--strictPort', '--host'],
       {
         cwd: appDir,

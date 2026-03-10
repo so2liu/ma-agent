@@ -17,6 +17,7 @@ export default function AppPanel({
   const [internalApps, setInternalApps] = useState<AppInfo[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const apps = externalApps ?? internalApps;
 
@@ -45,14 +46,17 @@ export default function AppPanel({
   const handleStartDev = async (appId: string) => {
     setBusyId(appId);
     setBusyAction('正在启动...');
+    setErrorMsg(null);
     try {
       const result = await window.electron.app.startDev(appId);
       if (!result.success) {
         console.error('Start dev failed:', result.error);
+        setErrorMsg(result.error ?? '启动开发服务失败');
       }
       await loadApps();
     } catch (error) {
       console.error('Error starting dev:', error);
+      setErrorMsg(String(error));
     } finally {
       setBusyId(null);
       setBusyAction(null);
@@ -71,14 +75,17 @@ export default function AppPanel({
   const handlePublish = async (appId: string) => {
     setBusyId(appId);
     setBusyAction('正在发布...');
+    setErrorMsg(null);
     try {
       const result = await window.electron.app.publish(appId);
       if (!result.success) {
         console.error('Publish failed:', result.error);
+        setErrorMsg(result.error ?? '发布失败');
       }
       await loadApps();
     } catch (error) {
       console.error('Error publishing app:', error);
+      setErrorMsg(String(error));
     } finally {
       setBusyId(null);
       setBusyAction(null);
@@ -106,6 +113,17 @@ export default function AppPanel({
 
   return (
     <div className="space-y-1 px-1.5 pb-1">
+      {errorMsg && (
+        <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">
+          <span className="min-w-0 flex-1 whitespace-pre-wrap break-all">{errorMsg}</span>
+          <button
+            onClick={() => setErrorMsg(null)}
+            className="shrink-0 text-red-400 hover:text-red-600 dark:hover:text-red-200"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {apps.map((app) => (
         <div key={app.id} className="rounded-lg bg-white px-2.5 py-2 shadow-sm dark:bg-neutral-800">
           <div className="flex items-center gap-1.5">

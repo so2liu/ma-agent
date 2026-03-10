@@ -1,5 +1,5 @@
 {
-  "name": "claude-agent-desktop",
+  "name": "ma-agent",
   "description": "Open-source desktop client for Claude Agent SDK",
   "type": "module",
   "version": "0.1.2",
