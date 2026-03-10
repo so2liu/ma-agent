@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Sparkles, Settings2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { Switch } from '@/components/ui/switch';
@@ -8,7 +8,8 @@ import type {
   AgentProvider,
   ChatModelPreference,
   CustomModelIds,
-  OpenAIConfig
+  OpenAIConfig,
+  ParsedApiConfig
 } from '../../shared/types/ipc';
 import {
   DEFAULT_MODEL_NAMES,
@@ -16,6 +17,9 @@ import {
   MODEL_LABELS,
   MODEL_TOOLTIPS
 } from '../../shared/types/ipc';
+
+type ConfigMode = 'auto' | 'manual';
+type AutoConfigStatus = 'idle' | 'parsing' | 'parsed' | 'detecting' | 'saving' | 'success' | 'error';
 
 type ApiKeyStatus = {
   configured: boolean;
@@ -111,6 +115,15 @@ function Settings() {
   const [openaiTestResult, setOpenaiTestResult] = useState<TestResult>({ status: 'idle' });
 
   const [testResult, setTestResult] = useState<TestResult>({ status: 'idle' });
+
+  // Auto config state
+  const [configMode, setConfigMode] = useState<ConfigMode>('auto');
+  const [autoConfigText, setAutoConfigText] = useState('');
+  const [autoConfigStatus, setAutoConfigStatus] = useState<AutoConfigStatus>('idle');
+  const [parsedConfig, setParsedConfig] = useState<ParsedApiConfig | null>(null);
+  const [detectedProvider, setDetectedProvider] = useState<AgentProvider | null>(null);
+  const [detectedModel, setDetectedModel] = useState<string | null>(null);
+  const [autoConfigError, setAutoConfigError] = useState<string | null>(null);
 
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>('stable');
   const [isLoadingChannel, setIsLoadingChannel] = useState(true);
@@ -442,6 +455,112 @@ function Settings() {
     }
   };
 
+  const handleAutoConfig = async () => {
+    if (!autoConfigText.trim()) return;
+
+    setAutoConfigStatus('parsing');
+    setAutoConfigError(null);
+    setParsedConfig(null);
+    setDetectedProvider(null);
+    setDetectedModel(null);
+
+    try {
+      // Step 1: Parse text via server
+      const parsed = await window.electron.config.parseApiConfig({
+        text: autoConfigText.trim()
+      });
+
+      if (parsed.error) {
+        setAutoConfigStatus('error');
+        setAutoConfigError(
+          parsed.error === 'no_valid_info'
+            ? '未能从文本中识别出有效的 API 配置信息，请检查内容或切换到手动模式'
+            : `解析失败: ${parsed.error}`
+        );
+        return;
+      }
+
+      if (!parsed.apiKey) {
+        setAutoConfigStatus('error');
+        setAutoConfigError('未能从文本中识别出 API Key，请检查内容或切换到手动模式');
+        return;
+      }
+
+      setParsedConfig(parsed);
+      setAutoConfigStatus('detecting');
+
+      // Step 2: Auto-detect provider type
+      const detectResult = await window.electron.config.autoDetectProvider({
+        apiKey: parsed.apiKey,
+        baseUrl: parsed.baseUrl,
+        modelId: parsed.modelId
+      });
+
+      if (detectResult.success && detectResult.provider) {
+        setDetectedProvider(detectResult.provider);
+        setDetectedModel(detectResult.model || null);
+        setAutoConfigStatus('parsed');
+      } else {
+        setAutoConfigStatus('error');
+        setAutoConfigError(detectResult.error || '无法连接 API，请检查信息是否正确');
+      }
+    } catch {
+      setAutoConfigStatus('error');
+      setAutoConfigError('智能识别过程出错，请重试或切换到手动模式');
+    }
+  };
+
+  const handleConfirmAutoConfig = async () => {
+    if (!parsedConfig?.apiKey || !detectedProvider) return;
+
+    setAutoConfigStatus('saving');
+    try {
+      if (detectedProvider === 'anthropic') {
+        await window.electron.config.setApiKey(parsedConfig.apiKey);
+        // Always clear then set — avoid stale values from previous config
+        await window.electron.config.setApiBaseUrl(parsedConfig.baseUrl || null);
+        await window.electron.config.setCustomModelIds(
+          parsedConfig.modelId ?
+            {
+              fast: parsedConfig.modelId,
+              'smart-sonnet': parsedConfig.modelId,
+              'smart-opus': parsedConfig.modelId
+            }
+          : {}
+        );
+      } else {
+        // setOpenAIConfig replaces the entire openai config object
+        await window.electron.config.setOpenAIConfig({
+          apiKey: parsedConfig.apiKey,
+          baseUrl: parsedConfig.baseUrl,
+          modelId: parsedConfig.modelId
+        });
+      }
+
+      await window.electron.config.setAgentProvider(detectedProvider);
+      await window.electron.chat.resetSession();
+
+      // Refresh UI state
+      setAgentProvider(detectedProvider);
+      const keyStatus = await window.electron.config.getApiKeyStatus();
+      setApiKeyStatus(keyStatus.status);
+
+      setAutoConfigStatus('success');
+      setAutoConfigText('');
+    } catch {
+      setAutoConfigStatus('error');
+      setAutoConfigError('保存配置失败，请重试');
+    }
+  };
+
+  const resetAutoConfig = () => {
+    setAutoConfigStatus('idle');
+    setAutoConfigError(null);
+    setParsedConfig(null);
+    setDetectedProvider(null);
+    setDetectedModel(null);
+  };
+
   const handleToggleUpdateChannel = async () => {
     setIsSavingChannel(true);
     const newChannel: UpdateChannel = updateChannel === 'stable' ? 'nightly' : 'stable';
@@ -523,45 +642,221 @@ function Settings() {
             加载中...
           </div>
         : <div className="mx-auto max-w-2xl space-y-6">
-            {/* Agent Provider Selector */}
+            {/* Config Mode Selector */}
             <section className="space-y-3">
               <div>
                 <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                  AI 服务商
+                  AI 服务配置
                 </h2>
                 <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                  选择使用的 AI 模型接口，切换后需要开始新对话
+                  配置 AI 模型的连接信息，支持兼容 Anthropic 或 OpenAI 接口的服务
                 </p>
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleSwitchProvider('anthropic')}
-                  disabled={isSavingProvider}
-                  className={`rounded-lg px-4 py-2 text-xs font-medium transition ${
-                    agentProvider === 'anthropic' ?
+                  onClick={() => { setConfigMode('auto'); resetAutoConfig(); }}
+                  className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium transition ${
+                    configMode === 'auto' ?
                       'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
                     : 'border border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
                   }`}
                 >
-                  Anthropic (Claude)
+                  <Sparkles className="h-3 w-3" />
+                  智能配置
                 </button>
                 <button
-                  onClick={() => handleSwitchProvider('openai')}
-                  disabled={isSavingProvider}
-                  className={`rounded-lg px-4 py-2 text-xs font-medium transition ${
-                    agentProvider === 'openai' ?
+                  onClick={() => setConfigMode('manual')}
+                  className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium transition ${
+                    configMode === 'manual' ?
                       'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
                     : 'border border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
                   }`}
                 >
-                  OpenAI
+                  <Settings2 className="h-3 w-3" />
+                  手动配置
                 </button>
               </div>
             </section>
 
             <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
-            {agentProvider === 'openai' ?
+            {configMode === 'auto' ?
+              /* Smart Auto Config */
+              <section className="space-y-4">
+                {autoConfigStatus === 'success' ?
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+                    <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                      配置成功
+                    </p>
+                    <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+                      已检测到{detectedProvider === 'anthropic' ? ' Anthropic' : ' OpenAI'} 兼容接口
+                      {detectedModel ? `，模型: ${detectedModel}` : ''}，配置已保存
+                    </p>
+                    <button
+                      onClick={resetAutoConfig}
+                      className={`mt-3 ${secondaryBtnClass}`}
+                    >
+                      重新配置
+                    </button>
+                  </div>
+                : <>
+                    <div>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                        将服务商提供的 API 信息粘贴到下方，我们会自动识别并配置
+                      </p>
+                      <p className="mt-1 text-[11px] text-neutral-400 dark:text-neutral-500">
+                        您的 API Key 会在本地自动提取，不会发送到任何外部服务
+                      </p>
+                    </div>
+                    <textarea
+                      value={autoConfigText}
+                      onChange={(e) => setAutoConfigText(e.target.value)}
+                      placeholder={'将 API 配置信息粘贴到这里...\n\n例如：\n您的 API Key 是 sk-xxxx\n请求地址：https://api.example.com\n模型：deepseek-chat'}
+                      rows={5}
+                      disabled={autoConfigStatus === 'parsing' || autoConfigStatus === 'detecting' || autoConfigStatus === 'saving'}
+                      className={`${inputClass} resize-none`}
+                    />
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-2">
+                      {autoConfigStatus === 'parsed' || autoConfigStatus === 'saving' ?
+                        <>
+                          <button
+                            onClick={handleConfirmAutoConfig}
+                            disabled={autoConfigStatus === 'saving'}
+                            className={primaryBtnClass}
+                          >
+                            {autoConfigStatus === 'saving' ?
+                              <span className="flex items-center gap-1.5">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                保存中...
+                              </span>
+                            : '确认保存'}
+                          </button>
+                          <button
+                            onClick={resetAutoConfig}
+                            className={secondaryBtnClass}
+                          >
+                            重新识别
+                          </button>
+                        </>
+                      : <button
+                          onClick={handleAutoConfig}
+                          disabled={!autoConfigText.trim() || autoConfigStatus === 'parsing' || autoConfigStatus === 'detecting'}
+                          className={primaryBtnClass}
+                        >
+                          {autoConfigStatus === 'parsing' ?
+                            <span className="flex items-center gap-1.5">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              识别中...
+                            </span>
+                          : autoConfigStatus === 'detecting' ?
+                            <span className="flex items-center gap-1.5">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              测试连接...
+                            </span>
+                          : '智能识别'}
+                        </button>
+                      }
+                    </div>
+
+                    {/* Parsed result preview */}
+                    {parsedConfig && (autoConfigStatus === 'parsed' || autoConfigStatus === 'saving') && (
+                      <div className="space-y-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800">
+                        <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                          识别结果
+                        </p>
+                        <div className="space-y-1.5 text-xs text-neutral-600 dark:text-neutral-400">
+                          {parsedConfig.apiKey && (
+                            <div className="flex gap-2">
+                              <span className="shrink-0 font-medium">API Key:</span>
+                              <span className="font-mono">
+                                {parsedConfig.apiKey.slice(0, 8)}••••{parsedConfig.apiKey.slice(-4)}
+                              </span>
+                            </div>
+                          )}
+                          {parsedConfig.baseUrl && (
+                            <div className="flex gap-2">
+                              <span className="shrink-0 font-medium">API 地址:</span>
+                              <span className="font-mono break-all">{parsedConfig.baseUrl}</span>
+                            </div>
+                          )}
+                          {parsedConfig.modelId && (
+                            <div className="flex gap-2">
+                              <span className="shrink-0 font-medium">模型:</span>
+                              <span className="font-mono">{parsedConfig.modelId}</span>
+                            </div>
+                          )}
+                          {detectedProvider && (
+                            <div className="flex gap-2">
+                              <span className="shrink-0 font-medium">接口类型:</span>
+                              <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-medium dark:bg-neutral-700">
+                                {detectedProvider === 'anthropic' ? 'Anthropic 兼容' : 'OpenAI 兼容'}
+                              </span>
+                            </div>
+                          )}
+                          {detectedModel && (
+                            <div className="flex gap-2">
+                              <span className="shrink-0 font-medium">响应模型:</span>
+                              <span className="font-mono">{detectedModel}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Error message */}
+                    {autoConfigStatus === 'error' && autoConfigError && (
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                        {autoConfigError}
+                      </div>
+                    )}
+                  </>
+                }
+              </section>
+            : /* Manual Config Mode */
+              <>
+                {/* Agent Provider Selector */}
+                <section className="space-y-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                      接口类型
+                    </h2>
+                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                      选择 API 兼容的接口类型，切换后需要开始新对话
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleSwitchProvider('anthropic')}
+                      disabled={isSavingProvider}
+                      className={`rounded-lg px-4 py-2 text-xs font-medium transition ${
+                        agentProvider === 'anthropic' ?
+                          'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                        : 'border border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                      }`}
+                    >
+                      Anthropic 兼容
+                    </button>
+                    <button
+                      onClick={() => handleSwitchProvider('openai')}
+                      disabled={isSavingProvider}
+                      className={`rounded-lg px-4 py-2 text-xs font-medium transition ${
+                        agentProvider === 'openai' ?
+                          'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                        : 'border border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                      }`}
+                    >
+                      OpenAI 兼容
+                    </button>
+                  </div>
+                </section>
+
+                <div className="border-t border-neutral-100 dark:border-neutral-800" />
+              </>
+            }
+
+            {configMode === 'manual' && (agentProvider === 'openai' ?
               <>
                 {/* OpenAI Configuration */}
                 <section className="space-y-3">
@@ -912,7 +1207,7 @@ function Settings() {
                   }
                 </section>
               </>
-            }
+            )}
 
             <div className="border-t border-neutral-100 dark:border-neutral-800" />
 

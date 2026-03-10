@@ -395,6 +395,212 @@ export function registerConfigHandlers(): void {
     }
   );
 
+  // Injected at build time via electron.vite.config.ts define
+  // Build with PARSE_SERVER_URL=https://your-server.com to override
+  const PARSE_SERVER_URL: string = __PARSE_SERVER_URL__;
+
+  // Extract API keys locally via regex before sending text to server
+  // This prevents leaking third-party API keys to our parse service
+  const API_KEY_PATTERNS = [
+    /\b(sk-[a-zA-Z0-9_-]{20,})\b/g, // OpenAI, Anthropic, DeepSeek etc.
+    /\b(key-[a-zA-Z0-9_-]{20,})\b/g,
+    /\b([a-f0-9]{32,})\b/g // hex keys (e.g. some providers)
+  ];
+
+  function extractApiKeysLocally(
+    text: string
+  ): { apiKey: string | undefined; sanitizedText: string } {
+    let apiKey: string | undefined;
+    let sanitizedText = text;
+    for (const pattern of API_KEY_PATTERNS) {
+      const match = pattern.exec(text);
+      if (match && !apiKey) {
+        apiKey = match[1];
+      }
+      // Reset lastIndex for global regex
+      pattern.lastIndex = 0;
+      // Replace all matches with placeholder so they never leave the client
+      sanitizedText = sanitizedText.replace(pattern, '[REDACTED]');
+    }
+    return { apiKey, sanitizedText };
+  }
+
+  // Parse API config from text via server-side NLP
+  // API keys are extracted locally and never sent to the server
+  ipcMain.handle('config:parse-api-config', async (_event, params: { text: string }) => {
+    // Step 1: Extract API key locally
+    const { apiKey, sanitizedText } = extractApiKeysLocally(params.text);
+
+    try {
+      // Step 2: Send sanitized text (no secrets) to server for baseUrl/modelId extraction
+      const response = await fetch(`${PARSE_SERVER_URL}/api/parse-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: sanitizedText }),
+        signal: AbortSignal.timeout(15_000)
+      });
+      // Always try to parse JSON body for structured errors (e.g. no_valid_info, text_too_long)
+      const body = await response.json().catch(() => null);
+      if (!body) {
+        return { error: `服务请求失败 (${response.status})` };
+      }
+
+      // Step 3: Merge locally-extracted apiKey with server-extracted baseUrl/modelId
+      // Server may also return apiKey as "[REDACTED]" — ignore that, use our local one
+      return {
+        ...(apiKey ? { apiKey } : {}),
+        ...(body.baseUrl ? { baseUrl: body.baseUrl } : {}),
+        ...(body.modelId ? { modelId: body.modelId } : {}),
+        ...(body.error && !apiKey && !body.baseUrl && !body.modelId ?
+          { error: body.error }
+        : {})
+      };
+    } catch (err: unknown) {
+      // If server is unreachable but we got a key locally, return what we have
+      if (apiKey) {
+        return { apiKey };
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('AbortError') || message.includes('timeout')) {
+        return { error: '解析服务响应超时' };
+      }
+      return { error: `无法连接解析服务: ${message}` };
+    }
+  });
+
+  // Normalize baseUrl: strip known API path suffixes so probes don't build malformed URLs
+  function normalizeBaseUrl(url: string): string {
+    return url.replace(/\/v1\/(chat\/completions|completions|models|messages)\/?$/i, '');
+  }
+
+  // Auto-detect provider type by probing both Anthropic and OpenAI endpoints
+  ipcMain.handle(
+    'config:auto-detect-provider',
+    async (
+      _event,
+      params: { apiKey: string; baseUrl?: string; modelId?: string }
+    ) => {
+      const { apiKey, modelId } = params;
+      const baseUrl = params.baseUrl ? normalizeBaseUrl(params.baseUrl) : undefined;
+
+      if (!apiKey) {
+        return { success: false, error: '未找到 API Key' };
+      }
+
+      // Determine probe order based on URL hints
+      const url = baseUrl?.toLowerCase() || '';
+      const tryAnthropicFirst = url.includes('anthropic');
+
+      const probeOpenAI = async (): Promise<{
+        success: boolean;
+        model?: string;
+        error?: string;
+      }> => {
+        try {
+          const base = baseUrl || 'https://api.openai.com';
+
+          // If no modelId, try GET /v1/models first (lighter, doesn't require a specific model)
+          if (!modelId) {
+            const modelsResp = await fetch(`${base}/v1/models`, {
+              headers: { Authorization: `Bearer ${apiKey}` },
+              signal: AbortSignal.timeout(10_000)
+            });
+            if (modelsResp.ok) {
+              const data = await modelsResp.json();
+              const firstModel = data.data?.[0]?.id;
+              return { success: true, model: firstModel || undefined };
+            }
+          }
+
+          // If modelId provided, or /v1/models failed, try a completion
+          const endpoint = `${base}/v1/chat/completions`;
+          const resp = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              model: modelId || 'gpt-4.1-mini',
+              max_tokens: 16,
+              messages: [{ role: 'user', content: 'Hi' }]
+            }),
+            signal: AbortSignal.timeout(15_000)
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            return { success: true, model: data.model };
+          }
+          return { success: false, error: `HTTP ${resp.status}` };
+        } catch (err: unknown) {
+          return {
+            success: false,
+            error: err instanceof Error ? err.message : String(err)
+          };
+        }
+      };
+
+      const probeAnthropic = async (): Promise<{
+        success: boolean;
+        model?: string;
+        error?: string;
+      }> => {
+        try {
+          const client = new Anthropic({
+            apiKey,
+            ...(baseUrl ? { baseURL: baseUrl } : {})
+          });
+          const resp = await client.messages.create({
+            model: modelId || 'claude-haiku-4-5-20251001',
+            max_tokens: 16,
+            messages: [{ role: 'user', content: 'Hi' }]
+          });
+          return { success: true, model: resp.model };
+        } catch (err: unknown) {
+          return {
+            success: false,
+            error: err instanceof Error ? err.message : String(err)
+          };
+        }
+      };
+
+      // Try in order
+      const [first, second] =
+        tryAnthropicFirst ?
+          [
+            { probe: probeAnthropic, provider: 'anthropic' as const },
+            { probe: probeOpenAI, provider: 'openai' as const }
+          ]
+        : [
+            { probe: probeOpenAI, provider: 'openai' as const },
+            { probe: probeAnthropic, provider: 'anthropic' as const }
+          ];
+
+      const firstResult = await first.probe();
+      if (firstResult.success) {
+        return {
+          success: true,
+          provider: first.provider,
+          model: firstResult.model
+        };
+      }
+
+      const secondResult = await second.probe();
+      if (secondResult.success) {
+        return {
+          success: true,
+          provider: second.provider,
+          model: secondResult.model
+        };
+      }
+
+      return {
+        success: false,
+        error: `两种接口均连接失败。${firstResult.error || ''}`
+      };
+    }
+  );
+
   // Get app diagnostic metadata (versions, platform info, etc.)
   ipcMain.handle('config:get-diagnostic-metadata', () => {
     return {

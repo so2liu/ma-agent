@@ -1,10 +1,12 @@
 import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
 import type {
   AgentProvider,
+  AutoDetectResult,
   ChatModelPreference,
   CustomModelIds,
   GetChatModelPreferenceResponse,
   OpenAIConfig,
+  ParsedApiConfig,
   SendMessagePayload,
   SendMessageResponse,
   SetChatModelPreferenceResponse
@@ -410,6 +412,12 @@ export interface ElectronAPI {
       message?: string;
       error?: string;
     }>;
+    parseApiConfig: (params: { text: string }) => Promise<ParsedApiConfig>;
+    autoDetectProvider: (params: {
+      apiKey: string;
+      baseUrl?: string;
+      modelId?: string;
+    }) => Promise<AutoDetectResult>;
   };
   shell: {
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;

@@ -73,6 +73,23 @@ Adding a new IPC channel requires changes in 3 places:
 
 Skills live in `.claude/skills/<name>/` with `SKILL.md` + TypeScript tools in `scripts/`. Built via `scripts/buildSkills.js` using `bun --compile`. On launch, bundled skills are synced to the workspace.
 
+### Build-time Environment Variables
+
+通过 `electron.vite.config.ts` 的 `define` 注入到 main process，编译时替换：
+
+| 变量 | 用途 | 默认值 |
+|------|------|--------|
+| `PARSE_SERVER_URL` | 智能配置 NLP 解析服务地址 | `http://localhost:3456` |
+
+生产构建示例：`PARSE_SERVER_URL=https://your-server.com bun run build`
+
+运行时环境变量（main process 直接读取 `process.env`）：
+
+| 变量 | 用途 | 默认值 |
+|------|------|--------|
+| `POSTHOG_API_KEY` | PostHog analytics key | 硬编码默认值 |
+| `POSTHOG_HOST` | PostHog host | `https://eu.i.posthog.com` |
+
 ## Key Conventions
 
 - **TypeScript strict mode** with no explicit `any`
