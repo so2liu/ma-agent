@@ -395,8 +395,9 @@ export function registerConfigHandlers(): void {
     }
   );
 
-  // TODO: 部署后替换为正式的 HK 服务器地址
-  const PARSE_SERVER_URL = 'http://localhost:3456';
+  // Injected at build time via electron.vite.config.ts define
+  // Build with PARSE_SERVER_URL=https://your-server.com to override
+  const PARSE_SERVER_URL: string = __PARSE_SERVER_URL__;
 
   // Extract API keys locally via regex before sending text to server
   // This prevents leaking third-party API keys to our parse service

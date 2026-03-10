@@ -6,6 +6,11 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    define: {
+      __PARSE_SERVER_URL__: JSON.stringify(
+        process.env.PARSE_SERVER_URL || 'http://localhost:3456'
+      )
+    },
     build: {
       outDir: 'out/main',
       rollupOptions: {
