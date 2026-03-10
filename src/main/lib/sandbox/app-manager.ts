@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { basename, join } from 'node:path';
 
+import { createBunSandbox } from './bun-sandbox';
 import { startAppServer, startStaticAppServer, type AppServer } from './http-server';
 import { createSandboxApp } from './quickjs-runtime';
 import { migrateJsonToSqlite } from './sandbox-api';
@@ -48,6 +49,34 @@ function getTemplatePath(): string {
 /** Check if an app uses the React + Vite architecture (has src/App.tsx) */
 function isViteApp(appDir: string): boolean {
   return existsSync(join(appDir, 'src', 'App.tsx'));
+}
+
+/** Check if an app uses the Hono backend (has src/server/index.ts) */
+function isHonoApp(appDir: string): boolean {
+  return existsSync(join(appDir, 'src', 'server', 'index.ts'));
+}
+
+/** Push Drizzle schema to SQLite database, with backup */
+function pushSchema(appDir: string): void {
+  const dbPath = join(appDir, 'data.sqlite');
+  const backupPath = join(appDir, 'data.sqlite.bak');
+  // Snapshot existing DB before applying schema changes
+  if (existsSync(dbPath)) {
+    copyFileSync(dbPath, backupPath);
+  }
+  try {
+    execSync('bunx drizzle-kit push --force', {
+      cwd: appDir,
+      stdio: 'pipe',
+      timeout: 30_000
+    });
+  } catch (err) {
+    // Restore backup on push failure
+    if (existsSync(backupPath)) {
+      copyFileSync(backupPath, dbPath);
+    }
+    throw err;
+  }
 }
 
 /** Check if an app has been scaffolded (has package.json from template) */
@@ -186,16 +215,17 @@ class AppManager {
     await this.stop(appId);
 
     const appDir = join(workspaceDir, 'apps', appId);
-    const serverPath = join(appDir, 'server.js');
-    const dataPath = join(appDir, 'data.sqlite');
 
     if (!isViteApp(appDir)) {
       throw new Error(`App "${appId}" is not a Vite app (missing src/App.tsx)`);
     }
 
+    // Detect app type: Hono (new) vs QuickJS (legacy)
+    const honoApp = isHonoApp(appDir);
+
     try {
-      // Scaffold if needed
-      if (!isScaffolded(appDir)) {
+      // Scaffold if needed (legacy apps only — Hono apps are created by crud CLI)
+      if (!honoApp && !isScaffolded(appDir)) {
         this.appStatuses.set(appId, 'scaffolding');
         const meta = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
         scaffoldApp(appDir, meta);
@@ -207,37 +237,48 @@ class AppManager {
         installDeps(appDir);
       }
 
-      // Migrate from data.json if needed
-      migrateJsonToSqlite(join(appDir, 'data.json'), dataPath);
-
-      // Start sandbox for API routes (if server.js exists)
       let sandbox: SandboxApp;
-      if (existsSync(serverPath)) {
-        const backendJs = readFileSync(serverPath, 'utf-8');
-        sandbox = await createSandboxApp(backendJs, appId, dataPath);
+      let sandboxServer: AppServer | null = null;
+      let apiPort: number;
+
+      if (honoApp) {
+        // Hono mode: push Drizzle schema, start Bun subprocess
+        // The Bun subprocess is already an HTTP server, so no extra wrapper needed
+        pushSchema(appDir);
+        const bunSandbox = await createBunSandbox(appDir);
+        sandbox = bunSandbox;
+        apiPort = bunSandbox.port;
       } else {
-        // No backend — create a no-op sandbox
-        sandbox = {
-          handleRequest: async () => ({
-            status: 404,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: 'No server.js backend' })
-          }),
-          dispose: () => {}
-        };
+        // Legacy mode: QuickJS sandbox wrapped in an HTTP server
+        const serverPath = join(appDir, 'server.js');
+        const dataPath = join(appDir, 'data.sqlite');
+        migrateJsonToSqlite(join(appDir, 'data.json'), dataPath);
+
+        if (existsSync(serverPath)) {
+          const backendJs = readFileSync(serverPath, 'utf-8');
+          sandbox = await createSandboxApp(backendJs, appId, dataPath);
+        } else {
+          sandbox = {
+            handleRequest: async () => ({
+              status: 404,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ error: 'No server.js backend' })
+            }),
+            dispose: () => {}
+          };
+        }
+        sandboxServer = await startAppServer('', sandbox);
+        apiPort = sandboxServer.port;
       }
 
-      // Start sandbox HTTP server (for API proxy target)
-      const sandboxServer = await startAppServer('', sandbox);
-
-      // Start Vite dev server with proxy to sandbox
+      // Start Vite dev server with proxy to API backend
       this.appStatuses.set(appId, 'developing');
       let viteServer: ViteDevServer;
       try {
-        viteServer = await startViteDevServer(appDir, sandboxServer.port);
+        viteServer = await startViteDevServer(appDir, apiPort);
       } catch (err) {
-        // Clean up sandbox on Vite startup failure
-        await sandboxServer.stop();
+        // Clean up on Vite startup failure
+        if (sandboxServer) await sandboxServer.stop();
         sandbox.dispose();
         throw err;
       }
@@ -245,7 +286,12 @@ class AppManager {
       this.appStatuses.delete(appId);
       this.developingApps.set(appId, {
         sandbox,
-        sandboxServer,
+        sandboxServer: sandboxServer ?? ({
+          port: apiPort,
+          lanUrl: '',
+          localUrl: '',
+          stop: async () => {}
+        } as AppServer),
         viteServer,
         lanUrl: viteServer.lanUrl,
         localUrl: viteServer.localUrl,
@@ -301,14 +347,15 @@ class AppManager {
     const dataPath = join(appDir, 'data.sqlite');
 
     const viteApp = isViteApp(appDir);
+    const honoApp = isHonoApp(appDir);
 
     if (viteApp) {
       // Stop dev server if running
       await this.stopDev(appId);
 
       try {
-        // Ensure scaffolded and installed
-        if (!isScaffolded(appDir)) {
+        // Ensure scaffolded and installed (scaffold is legacy-only)
+        if (!honoApp && !isScaffolded(appDir)) {
           this.appStatuses.set(appId, 'scaffolding');
           const meta = JSON.parse(readFileSync(join(appDir, 'app.json'), 'utf-8')) as AppManifest;
           scaffoldApp(appDir, meta);
@@ -316,6 +363,11 @@ class AppManager {
         if (!hasNodeModules(appDir)) {
           this.appStatuses.set(appId, 'installing');
           installDeps(appDir);
+        }
+
+        // Push Drizzle schema for Hono apps
+        if (honoApp) {
+          pushSchema(appDir);
         }
 
         // Build for production
@@ -327,27 +379,37 @@ class AppManager {
           throw new Error(`Build failed: dist/ directory not found for app "${appId}"`);
         }
 
-        // Migrate from data.json if needed
-        migrateJsonToSqlite(join(appDir, 'data.json'), dataPath);
-
-        // Create sandbox for API routes
+        // Create sandbox/backend for API routes
         let sandbox: SandboxApp;
-        if (existsSync(serverPath)) {
-          const backendJs = readFileSync(serverPath, 'utf-8');
-          sandbox = await createSandboxApp(backendJs, appId, dataPath);
+        if (honoApp) {
+          sandbox = await createBunSandbox(appDir);
         } else {
-          sandbox = {
-            handleRequest: async () => ({
-              status: 404,
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ error: 'No server.js backend' })
-            }),
-            dispose: () => {}
-          };
+          // Legacy QuickJS mode
+          migrateJsonToSqlite(join(appDir, 'data.json'), dataPath);
+          if (existsSync(serverPath)) {
+            const backendJs = readFileSync(serverPath, 'utf-8');
+            sandbox = await createSandboxApp(backendJs, appId, dataPath);
+          } else {
+            sandbox = {
+              handleRequest: async () => ({
+                status: 404,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 'No server.js backend' })
+              }),
+              dispose: () => {}
+            };
+          }
         }
 
-        // Start static server serving dist/ with sandbox API
-        const server = await startStaticAppServer(distDir, sandbox);
+        // Start static server serving dist/ with API backend
+        let server: AppServer;
+        try {
+          server = await startStaticAppServer(distDir, sandbox);
+        } catch (err) {
+          // Clean up Bun subprocess if static server fails to start
+          sandbox.dispose();
+          throw err;
+        }
 
         // Stop old running instance after new one is ready
         if (this.runningApps.has(appId)) {
