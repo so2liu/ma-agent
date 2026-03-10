@@ -377,7 +377,14 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
           if (response.success && response.conversation) {
             setCurrentConversationId(response.conversation.id);
             track('conversation_created');
-            const projectId = projectIdForNewChatRef.current;
+            // Always assign to a project: selected project or default project
+            let projectId = projectIdForNewChatRef.current;
+            if (!projectId) {
+              const projResponse = await window.electron.project.list();
+              if (projResponse.success && projResponse.projects) {
+                projectId = projResponse.projects.find((p) => p.isDefault)?.id ?? null;
+              }
+            }
             if (projectId) {
               await window.electron.conversation.setProject(response.conversation.id, projectId);
             }
@@ -470,6 +477,13 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
         isInitialLoadRef.current = true;
         if (response.conversation.projectId) {
           setSelectedProjectId(response.conversation.projectId);
+        } else {
+          // Legacy ungrouped conversation — select default project
+          const projResponse = await window.electron.project.list();
+          if (projResponse.success && projResponse.projects) {
+            const defaultId = projResponse.projects.find((p) => p.isDefault)?.id ?? null;
+            if (defaultId) setSelectedProjectId(defaultId);
+          }
         }
       }
     } catch (error) {

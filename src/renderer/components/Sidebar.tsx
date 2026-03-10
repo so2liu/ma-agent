@@ -97,7 +97,6 @@ export default function Sidebar({
     projectId: string;
   } | null>(null);
   const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null);
-  const [dragOverUngrouped, setDragOverUngrouped] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null);
@@ -257,18 +256,6 @@ export default function Sidebar({
     }
   };
 
-  const handleDropOnUngrouped = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOverUngrouped(false);
-    const conversationId = e.dataTransfer.getData('text/plain');
-    if (!conversationId) return;
-    try {
-      await window.electron.conversation.setProject(conversationId, null);
-      await loadData();
-    } catch (error) {
-      console.error('Error removing conversation from project:', error);
-    }
-  };
 
   const toggleProjectCollapsed = (projectId: string) => {
     setCollapsedProjects((prev) => {
@@ -361,19 +348,25 @@ export default function Sidebar({
 
   const projectIds = useMemo(() => new Set(projects.map((p) => p.id)), [projects]);
 
-  const { grouped, ungrouped } = useMemo(() => {
-    const grouped: Record<string, Conversation[]> = {};
-    const ungrouped: Conversation[] = [];
+  const defaultProjectId = useMemo(
+    () => projects.find((p) => p.isDefault)?.id ?? null,
+    [projects]
+  );
+
+  const grouped = useMemo(() => {
+    const result: Record<string, Conversation[]> = {};
     for (const conv of conversations) {
       if (conv.projectId && projectIds.has(conv.projectId)) {
-        if (!grouped[conv.projectId]) grouped[conv.projectId] = [];
-        grouped[conv.projectId].push(conv);
-      } else {
-        ungrouped.push(conv);
+        if (!result[conv.projectId]) result[conv.projectId] = [];
+        result[conv.projectId].push(conv);
+      } else if (defaultProjectId) {
+        // Ungrouped conversations go into the default project
+        if (!result[defaultProjectId]) result[defaultProjectId] = [];
+        result[defaultProjectId].push(conv);
       }
     }
-    return { grouped, ungrouped };
-  }, [conversations, projectIds]);
+    return result;
+  }, [conversations, projectIds, defaultProjectId]);
 
   // Filter by search query
   const filteredScheduledTasks = useMemo(() => {
@@ -396,15 +389,6 @@ export default function Sidebar({
     [grouped, searchQuery, conversationPreviews]
   );
 
-  const filteredUngrouped = useMemo(() => {
-    if (!searchQuery.trim()) return ungrouped;
-    const q = searchQuery.toLowerCase();
-    return ungrouped.filter(
-      (conv) =>
-        conv.title.toLowerCase().includes(q) ||
-        (conversationPreviews[conv.id] ?? '').toLowerCase().includes(q)
-    );
-  }, [ungrouped, searchQuery, conversationPreviews]);
 
   const renderConversationItem = (conversation: Conversation) => {
     const isActive = conversation.id === currentConversationId;
@@ -716,28 +700,6 @@ export default function Sidebar({
               );
             })}
 
-          {/* Ungrouped conversations (not assigned to any project) */}
-          {!isProjectsCollapsed && filteredUngrouped.length > 0 && (
-            <div
-              className={`mt-1 border-t border-neutral-200/50 pt-1 transition-all duration-150 dark:border-neutral-700/50 ${
-                dragOverUngrouped ?
-                  'rounded-lg bg-blue-50/50 ring-1 ring-blue-200/50 dark:bg-blue-900/10 dark:ring-blue-800/30'
-                : ''
-              }`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                setDragOverUngrouped(true);
-              }}
-              onDragLeave={() => setDragOverUngrouped(false)}
-              onDrop={handleDropOnUngrouped}
-            >
-              <div className="px-2.5 py-1 text-[10px] text-neutral-400 dark:text-neutral-500">
-                未归类
-              </div>
-              {filteredUngrouped.map(renderConversationItem)}
-            </div>
-          )}
 
           {/* Scheduled Tasks sub-section */}
           {!isProjectsCollapsed && filteredScheduledTasks.length > 0 && (
@@ -806,7 +768,6 @@ export default function Sidebar({
 
           {/* Search no results */}
           {searchQuery.trim() &&
-            filteredUngrouped.length === 0 &&
             projects.every((p) => getFilteredConversationsForProject(p.id).length === 0) &&
             filteredScheduledTasks.length === 0 && (
               <div className="py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">
