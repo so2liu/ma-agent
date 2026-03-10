@@ -1,6 +1,6 @@
 import { watch, type FSWatcher } from 'fs';
 import { readdir, readFile, rm, stat } from 'fs/promises';
-import { join, relative, resolve, sep } from 'path';
+import { isAbsolute, join, relative, resolve, sep } from 'path';
 import { ipcMain, shell, type BrowserWindow } from 'electron';
 
 import { ALL_TEXT_EXTENSIONS, MAX_PREVIEW_FILE_SIZE } from '../../shared/file-extensions';
@@ -177,7 +177,8 @@ export function registerWorkspaceHandlers(getMainWindow: () => BrowserWindow | n
 
   ipcMain.handle('workspace:read-file', async (_event, relativePath: string) => {
     const workspaceDir = getWorkspaceDir();
-    const fullPath = resolve(join(workspaceDir, relativePath));
+    // Handle both absolute and relative paths
+    const fullPath = isAbsolute(relativePath) ? resolve(relativePath) : resolve(join(workspaceDir, relativePath));
 
     // Security: prevent path traversal
     if (!isWithinWorkspace(fullPath, workspaceDir)) {
@@ -213,7 +214,7 @@ export function registerWorkspaceHandlers(getMainWindow: () => BrowserWindow | n
     'workspace:delete-file',
     async (_event, relativePath: string, isDirectory: boolean) => {
       const workspaceDir = getWorkspaceDir();
-      const fullPath = resolve(join(workspaceDir, relativePath));
+      const fullPath = isAbsolute(relativePath) ? resolve(relativePath) : resolve(join(workspaceDir, relativePath));
 
       if (!isWithinWorkspace(fullPath, workspaceDir)) {
         return { success: false, error: 'Path traversal not allowed' };
@@ -237,7 +238,7 @@ export function registerWorkspaceHandlers(getMainWindow: () => BrowserWindow | n
 
   ipcMain.handle('workspace:open-file', async (_event, relativePath: string) => {
     const workspaceDir = getWorkspaceDir();
-    const fullPath = resolve(join(workspaceDir, relativePath));
+    const fullPath = isAbsolute(relativePath) ? resolve(relativePath) : resolve(join(workspaceDir, relativePath));
 
     if (!isWithinWorkspace(fullPath, workspaceDir)) {
       return { success: false, error: 'Path traversal not allowed' };

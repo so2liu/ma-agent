@@ -28,7 +28,8 @@ export function extractArtifacts(messages: Message[]): Artifact[] {
       const ext = getFileExtension(input.file_path);
       const type = getArtifactType(ext);
 
-      if (!type) continue;
+      // Skip unsupported types and code files (auto-preview is distracting for code)
+      if (!type || type === 'code') continue;
 
       // Only inline content for HTML types (rendered in iframe)
       const inlineContent = type === 'html' ? input.content : undefined;
