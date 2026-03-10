@@ -1,8 +1,6 @@
 import { existsSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { release, type, version } from 'os';
-import { app, ipcMain } from 'electron';
-
 import Anthropic, {
   APIConnectionError,
   APIConnectionTimeoutError,
@@ -11,27 +9,33 @@ import Anthropic, {
   PermissionDeniedError,
   RateLimitError
 } from '@anthropic-ai/sdk';
+import { app, ipcMain } from 'electron';
 
-import type { CustomModelIds } from '../../shared/types/ipc';
+import type { AgentProvider, CustomModelIds, OpenAIConfig } from '../../shared/types/ipc';
+import { getModelIdForPreference } from '../lib/claude-session';
 import {
   buildClaudeSessionEnv,
   buildEnhancedPath,
   ensureWorkspaceDir,
+  getAgentProvider,
   getApiBaseUrl,
   getApiKey,
   getApiKeyStatus,
   getCustomModelId,
   getCustomModelIds,
   getDebugMode,
+  getOpenAIApiKey,
+  getOpenAIConfig,
   getWorkspaceDir,
   loadConfig,
   saveConfig,
+  setAgentProvider,
   setApiBaseUrl,
   setApiKey,
   setCustomModelId,
-  setCustomModelIds
+  setCustomModelIds,
+  setOpenAIConfig
 } from '../lib/config';
-import { getModelIdForPreference } from '../lib/claude-session';
 import { restartFileWatcher } from './workspace-handlers';
 
 const requireModule = createRequire(import.meta.url);
@@ -211,10 +215,7 @@ export function registerConfigHandlers(): void {
   // Test API connection using form values (not persisted config)
   ipcMain.handle(
     'config:test-api',
-    async (
-      _event,
-      params?: { apiKey?: string; baseUrl?: string; modelId?: string }
-    ) => {
+    async (_event, params?: { apiKey?: string; baseUrl?: string; modelId?: string }) => {
       // Use form values if provided, fall back to persisted config
       const apiKey = params?.apiKey?.trim() || getApiKey();
       if (!apiKey) {
@@ -282,6 +283,113 @@ export function registerConfigHandlers(): void {
         }
 
         const message = err instanceof Error ? err.message : String(err);
+        return { success: false, error: `连接失败: ${message}` };
+      }
+    }
+  );
+
+  // Get active agent provider
+  ipcMain.handle('config:get-agent-provider', () => {
+    return { provider: getAgentProvider() };
+  });
+
+  // Set active agent provider
+  ipcMain.handle('config:set-agent-provider', (_event, provider: AgentProvider) => {
+    setAgentProvider(provider);
+    return { success: true, provider: getAgentProvider() };
+  });
+
+  // Get OpenAI configuration
+  ipcMain.handle('config:get-openai-config', () => {
+    const config = getOpenAIConfig();
+    // Don't expose the full API key
+    const apiKey = getOpenAIApiKey();
+    return {
+      config: {
+        ...config,
+        apiKey: undefined // Don't send the key itself
+      },
+      apiKeyConfigured: Boolean(apiKey),
+      apiKeySource:
+        process.env.OPENAI_API_KEY?.trim() ? 'env'
+        : apiKey ? 'local'
+        : null,
+      apiKeyLastFour: apiKey ? apiKey.slice(-4) : null
+    };
+  });
+
+  // Set OpenAI configuration
+  ipcMain.handle('config:set-openai-config', (_event, openaiConfig: OpenAIConfig) => {
+    setOpenAIConfig(openaiConfig);
+    return { success: true, config: getOpenAIConfig() };
+  });
+
+  // Test OpenAI API connection
+  ipcMain.handle(
+    'config:test-openai-api',
+    async (_event, params?: { apiKey?: string; baseUrl?: string; modelId?: string }) => {
+      const apiKey = params?.apiKey?.trim() || getOpenAIApiKey();
+      if (!apiKey) {
+        return { success: false, error: '请先配置 OpenAI API Key' };
+      }
+
+      const baseUrl = params?.baseUrl?.trim() || getOpenAIConfig().baseUrl;
+      const modelId = params?.modelId?.trim() || getOpenAIConfig().modelId || 'gpt-4.1-mini';
+
+      try {
+        // Simple chat completion test using fetch (avoid adding openai npm dependency)
+        const url = `${baseUrl || 'https://api.openai.com'}/v1/chat/completions`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: modelId,
+            max_tokens: 16,
+            messages: [{ role: 'user', content: 'Hi' }]
+          })
+        });
+
+        if (!response.ok) {
+          const status = response.status;
+          if (status === 401) {
+            return { success: false, error: 'OpenAI API Key 无效或已过期' };
+          }
+          if (status === 403) {
+            return { success: false, error: '没有访问权限，请检查 API Key 的权限设置' };
+          }
+          if (status === 404) {
+            return {
+              success: false,
+              error: `找不到模型 "${modelId}"，请检查模型 ID 或 API 地址`
+            };
+          }
+          if (status === 429) {
+            return { success: false, error: '请求过于频繁，请稍后再试' };
+          }
+          if (status >= 500) {
+            return { success: false, error: 'API 服务暂时不可用，请稍后再试' };
+          }
+          const body = await response.text().catch(() => '');
+          return { success: false, error: `连接失败 (${status}): ${body.slice(0, 200)}` };
+        }
+
+        const data = await response.json();
+        return {
+          success: true,
+          model: data.model || modelId,
+          message: '连接成功，OpenAI API 可用'
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('ECONNREFUSED') || message.includes('ETIMEDOUT')) {
+          return {
+            success: false,
+            error: `无法连接到 API 服务器${baseUrl ? ` (${baseUrl})` : ''}，请检查网络连接或 API 地址`
+          };
+        }
         return { success: false, error: `连接失败: ${message}` };
       }
     }

@@ -3,7 +3,12 @@ import { cp, mkdir, rename, rm } from 'fs/promises';
 import { join, resolve } from 'path';
 import { app } from 'electron';
 
-import type { ChatModelPreference, CustomModelIds } from '../../shared/types/ipc';
+import type {
+  AgentProvider,
+  ChatModelPreference,
+  CustomModelIds,
+  OpenAIConfig
+} from '../../shared/types/ipc';
 import type { SkillManifest } from '../../shared/types/skill-manifest';
 import { syncManifest } from './skill-manifest';
 
@@ -18,6 +23,10 @@ export interface AppConfig {
   updateChannel?: UpdateChannel;
   customModelId?: string; // Legacy single override — migrated to customModelIds
   customModelIds?: CustomModelIds;
+  /** Active agent provider: 'anthropic' (default) or 'openai' */
+  agentProvider?: AgentProvider;
+  /** OpenAI provider configuration */
+  openai?: OpenAIConfig;
 }
 
 const DEFAULT_MODEL_PREFERENCE: ChatModelPreference = 'fast';
@@ -488,6 +497,55 @@ export function setCustomModelIds(ids: CustomModelIds): void {
     delete config.customModelIds;
   }
   saveConfig(config);
+}
+
+export function getAgentProvider(): AgentProvider {
+  const config = loadConfig();
+  return config.agentProvider === 'openai' ? 'openai' : 'anthropic';
+}
+
+export function setAgentProvider(provider: AgentProvider): void {
+  const config = loadConfig();
+  config.agentProvider = provider;
+  saveConfig(config);
+}
+
+export function getOpenAIConfig(): OpenAIConfig {
+  const config = loadConfig();
+  return config.openai ?? {};
+}
+
+export function setOpenAIConfig(openaiConfig: OpenAIConfig): void {
+  const config = loadConfig();
+  const cleaned: OpenAIConfig = {};
+  if (openaiConfig.apiKey?.trim()) cleaned.apiKey = openaiConfig.apiKey.trim();
+  if (openaiConfig.baseUrl?.trim()) cleaned.baseUrl = openaiConfig.baseUrl.trim();
+  if (openaiConfig.modelId?.trim()) cleaned.modelId = openaiConfig.modelId.trim();
+  if (Object.keys(cleaned).length > 0) {
+    config.openai = cleaned;
+  } else {
+    delete config.openai;
+  }
+  saveConfig(config);
+}
+
+export function getOpenAIApiKey(): string | null {
+  const envApiKey = process.env.OPENAI_API_KEY?.trim();
+  if (envApiKey) return envApiKey;
+  const storedKey = loadConfig().openai?.apiKey?.trim();
+  return storedKey || null;
+}
+
+export function getOpenAIBaseUrl(): string | null {
+  const envBaseUrl = process.env.OPENAI_BASE_URL?.trim();
+  if (envBaseUrl) return envBaseUrl;
+  const storedUrl = loadConfig().openai?.baseUrl?.trim();
+  return storedUrl || null;
+}
+
+export function getOpenAIModelId(): string | null {
+  const storedId = loadConfig().openai?.modelId?.trim();
+  return storedId || null;
 }
 
 export function getUpdateChannel(): UpdateChannel {

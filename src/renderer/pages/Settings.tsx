@@ -4,8 +4,18 @@ import { useEffect, useState } from 'react';
 import { Switch } from '@/components/ui/switch';
 import type { UpdateChannel } from '@/electron';
 
-import type { ChatModelPreference, CustomModelIds } from '../../shared/types/ipc';
-import { DEFAULT_MODEL_NAMES, MODEL_LABELS, MODEL_TOOLTIPS } from '../../shared/types/ipc';
+import type {
+  AgentProvider,
+  ChatModelPreference,
+  CustomModelIds,
+  OpenAIConfig
+} from '../../shared/types/ipc';
+import {
+  DEFAULT_MODEL_NAMES,
+  DEFAULT_OPENAI_MODEL_NAMES,
+  MODEL_LABELS,
+  MODEL_TOOLTIPS
+} from '../../shared/types/ipc';
 
 type ApiKeyStatus = {
   configured: boolean;
@@ -85,6 +95,21 @@ function Settings() {
   const [isSavingModelIds, setIsSavingModelIds] = useState(false);
   const [modelIdsSaveState, setModelIdsSaveState] = useState<'idle' | 'success' | 'error'>('idle');
 
+  const [agentProvider, setAgentProvider] = useState<AgentProvider>('anthropic');
+  const [isLoadingProvider, setIsLoadingProvider] = useState(true);
+  const [isSavingProvider, setIsSavingProvider] = useState(false);
+
+  const [openaiApiKeyInput, setOpenaiApiKeyInput] = useState('');
+  const [openaiApiKeyConfigured, setOpenaiApiKeyConfigured] = useState(false);
+  const [openaiApiKeySource, setOpenaiApiKeySource] = useState<'env' | 'local' | null>(null);
+  const [openaiApiKeyLastFour, setOpenaiApiKeyLastFour] = useState<string | null>(null);
+  const [openaiBaseUrl, setOpenaiBaseUrl] = useState('');
+  const [openaiModelId, setOpenaiModelId] = useState('');
+  const [isLoadingOpenAI, setIsLoadingOpenAI] = useState(true);
+  const [isSavingOpenAI, setIsSavingOpenAI] = useState(false);
+  const [openaiSaveState, setOpenaiSaveState] = useState<'idle' | 'success' | 'error'>('idle');
+  const [openaiTestResult, setOpenaiTestResult] = useState<TestResult>({ status: 'idle' });
+
   const [testResult, setTestResult] = useState<TestResult>({ status: 'idle' });
 
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>('stable');
@@ -136,6 +161,26 @@ function Settings() {
         setIsLoadingModelIds(false);
       })
       .catch(() => setIsLoadingModelIds(false));
+
+    window.electron.config
+      .getAgentProvider()
+      .then((response) => {
+        setAgentProvider(response.provider);
+        setIsLoadingProvider(false);
+      })
+      .catch(() => setIsLoadingProvider(false));
+
+    window.electron.config
+      .getOpenAIConfig()
+      .then((response) => {
+        setOpenaiApiKeyConfigured(response.apiKeyConfigured);
+        setOpenaiApiKeySource(response.apiKeySource);
+        setOpenaiApiKeyLastFour(response.apiKeyLastFour);
+        setOpenaiBaseUrl(response.config.baseUrl || '');
+        setOpenaiModelId(response.config.modelId || '');
+        setIsLoadingOpenAI(false);
+      })
+      .catch(() => setIsLoadingOpenAI(false));
 
     window.electron.update
       .getChannel()
@@ -198,7 +243,6 @@ function Settings() {
       if (!diagnosticMetadata) loadDiagnosticMetadata();
     }
   }, [isDebugExpanded, pathInfo, envVars, diagnosticMetadata]);
-
 
   const handleSaveWorkspace = async () => {
     setIsSavingWorkspace(true);
@@ -307,9 +351,7 @@ function Settings() {
     setIsSavingModelId(true);
     setModelIdSaveState('idle');
     try {
-      const response = await window.electron.config.setCustomModelId(
-        customModelId.trim() || null
-      );
+      const response = await window.electron.config.setCustomModelId(customModelId.trim() || null);
       setCustomModelId(response.customModelId || '');
       setModelIdSaveState('success');
       setTimeout(() => setModelIdSaveState('idle'), 2000);
@@ -318,6 +360,66 @@ function Settings() {
       setTimeout(() => setModelIdSaveState('idle'), 2500);
     } finally {
       setIsSavingModelId(false);
+    }
+  };
+
+  const handleSwitchProvider = async (provider: AgentProvider) => {
+    setIsSavingProvider(true);
+    try {
+      const response = await window.electron.config.setAgentProvider(provider);
+      setAgentProvider(response.provider);
+      // Reset session when switching providers
+      await window.electron.chat.resetSession();
+    } catch {
+      // Revert on error
+    } finally {
+      setIsSavingProvider(false);
+    }
+  };
+
+  const handleSaveOpenAI = async () => {
+    setIsSavingOpenAI(true);
+    setOpenaiSaveState('idle');
+    try {
+      const config: OpenAIConfig = {};
+      if (openaiApiKeyInput.trim()) config.apiKey = openaiApiKeyInput.trim();
+      if (openaiBaseUrl.trim()) config.baseUrl = openaiBaseUrl.trim();
+      if (openaiModelId.trim()) config.modelId = openaiModelId.trim();
+      await window.electron.config.setOpenAIConfig(config);
+
+      // Refresh status
+      const status = await window.electron.config.getOpenAIConfig();
+      setOpenaiApiKeyConfigured(status.apiKeyConfigured);
+      setOpenaiApiKeySource(status.apiKeySource);
+      setOpenaiApiKeyLastFour(status.apiKeyLastFour);
+      setOpenaiBaseUrl(status.config.baseUrl || '');
+      setOpenaiModelId(status.config.modelId || '');
+      setOpenaiApiKeyInput('');
+      setOpenaiSaveState('success');
+      setTimeout(() => setOpenaiSaveState('idle'), 2000);
+    } catch {
+      setOpenaiSaveState('error');
+      setTimeout(() => setOpenaiSaveState('idle'), 2500);
+    } finally {
+      setIsSavingOpenAI(false);
+    }
+  };
+
+  const handleTestOpenAI = async () => {
+    setOpenaiTestResult({ status: 'testing' });
+    try {
+      const response = await window.electron.config.testOpenAIApi({
+        apiKey: openaiApiKeyInput.trim() || undefined,
+        baseUrl: openaiBaseUrl.trim() || undefined,
+        modelId: openaiModelId.trim() || undefined
+      });
+      if (response.success) {
+        setOpenaiTestResult({ status: 'success', message: response.message });
+      } else {
+        setOpenaiTestResult({ status: 'error', message: response.error });
+      }
+    } catch {
+      setOpenaiTestResult({ status: 'error', message: '测试请求失败，请检查网络连接' });
     }
   };
 
@@ -382,7 +484,13 @@ function Settings() {
   };
 
   const isFormLoading =
-    isLoadingWorkspace || isLoadingDebugMode || isLoadingBaseUrl || isLoadingChannel || isLoadingAnalytics;
+    isLoadingWorkspace ||
+    isLoadingDebugMode ||
+    isLoadingBaseUrl ||
+    isLoadingChannel ||
+    isLoadingAnalytics ||
+    isLoadingProvider ||
+    isLoadingOpenAI;
   const apiKeyPlaceholder = apiKeyStatus.lastFour ? `...${apiKeyStatus.lastFour}` : 'sk-ant-...';
 
   // Shared styles
@@ -410,218 +518,401 @@ function Settings() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 pb-12">
-        {isFormLoading ? (
+        {isFormLoading ?
           <div className="flex items-center justify-center py-12 text-xs text-neutral-500 dark:text-neutral-400">
             加载中...
           </div>
-        ) : (
-          <div className="mx-auto max-w-2xl space-y-6">
-            {/* API Key */}
+        : <div className="mx-auto max-w-2xl space-y-6">
+            {/* Agent Provider Selector */}
             <section className="space-y-3">
               <div>
                 <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                  API Key
+                  AI 服务商
                 </h2>
                 <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                  在此处设置 API Key，或通过 <code className="text-[11px]">ANTHROPIC_API_KEY</code>{' '}
-                  环境变量配置
+                  选择使用的 AI 模型接口，切换后需要开始新对话
                 </p>
               </div>
-
-              <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-                <span
-                  className={
-                    apiKeyStatus.configured
-                      ? 'font-medium text-neutral-800 dark:text-neutral-200'
-                      : 'text-neutral-500'
-                  }
-                >
-                  {apiKeyStatus.configured
-                    ? apiKeyStatus.source === 'env'
-                      ? '使用环境变量'
-                      : '本地存储'
-                    : '未配置'}
-                </span>
-                {apiKeyStatus.lastFour && apiKeyStatus.configured && (
-                  <span className="font-mono text-[11px] text-neutral-400">
-                    ...{apiKeyStatus.lastFour}
-                  </span>
-                )}
-                {apiKeyStatus.source === 'env' && (
-                  <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-                    ENV
-                  </span>
-                )}
-              </div>
-
-              <input
-                type="password"
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                placeholder={apiKeyPlaceholder}
-                className={inputClass}
-              />
-
-              <div className="flex items-center gap-2">
-                {apiKeyStatus.source === 'local' && (
-                  <button
-                    onClick={handleClearStoredApiKey}
-                    disabled={isSavingApiKey}
-                    className={dangerBtnClass}
-                  >
-                    清除
-                  </button>
-                )}
+              <div className="flex gap-2">
                 <button
-                  onClick={handleSaveApiKey}
-                  disabled={!apiKeyInput.trim() || isSavingApiKey}
-                  className={primaryBtnClass}
+                  onClick={() => handleSwitchProvider('anthropic')}
+                  disabled={isSavingProvider}
+                  className={`rounded-lg px-4 py-2 text-xs font-medium transition ${
+                    agentProvider === 'anthropic' ?
+                      'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                    : 'border border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                  }`}
                 >
-                  {isSavingApiKey ? '保存中...' : '保存'}
+                  Anthropic (Claude)
                 </button>
-                {apiKeySaveState === 'success' && (
-                  <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
-                )}
-                {apiKeySaveState === 'error' && (
-                  <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
-                )}
+                <button
+                  onClick={() => handleSwitchProvider('openai')}
+                  disabled={isSavingProvider}
+                  className={`rounded-lg px-4 py-2 text-xs font-medium transition ${
+                    agentProvider === 'openai' ?
+                      'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                    : 'border border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                  }`}
+                >
+                  OpenAI
+                </button>
               </div>
             </section>
 
             <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
-            {/* API Base URL */}
-            <section className="space-y-3">
-              <div>
-                <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                  API 地址
-                </h2>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                  兼容 Anthropic 的 API 端点地址，留空使用默认地址
-                </p>
-              </div>
-              <input
-                type="text"
-                value={apiBaseUrl}
-                onChange={(e) => setApiBaseUrl(e.target.value)}
-                placeholder="https://api.example.com/anthropic"
-                className={inputClass}
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSaveBaseUrl}
-                  disabled={isSavingBaseUrl}
-                  className={primaryBtnClass}
-                >
-                  {isSavingBaseUrl ? '保存中...' : '保存'}
-                </button>
-                {baseUrlSaveState === 'success' && (
-                  <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
-                )}
-                {baseUrlSaveState === 'error' && (
-                  <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
-                )}
-              </div>
-            </section>
+            {agentProvider === 'openai' ?
+              <>
+                {/* OpenAI Configuration */}
+                <section className="space-y-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                      OpenAI API Key
+                    </h2>
+                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                      在此处设置 OpenAI API Key，或通过{' '}
+                      <code className="text-[11px]">OPENAI_API_KEY</code> 环境变量配置
+                    </p>
+                  </div>
 
-            <div className="border-t border-neutral-100 dark:border-neutral-800" />
-
-            {/* Test Connection */}
-            <section className="space-y-3">
-              <div>
-                <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                  连接测试
-                </h2>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                  测试当前配置的 API Key、地址和模型是否可用
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleTestApi}
-                  disabled={testResult.status === 'testing'}
-                  className={secondaryBtnClass}
-                >
-                  {testResult.status === 'testing' ? (
-                    <span className="flex items-center gap-1.5">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      测试中...
+                  <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                    <span
+                      className={
+                        openaiApiKeyConfigured ?
+                          'font-medium text-neutral-800 dark:text-neutral-200'
+                        : 'text-neutral-500'
+                      }
+                    >
+                      {openaiApiKeyConfigured ?
+                        openaiApiKeySource === 'env' ?
+                          '使用环境变量'
+                        : '本地存储'
+                      : '未配置'}
                     </span>
-                  ) : (
-                    '测试连接'
-                  )}
-                </button>
-                {testResult.status === 'success' && testResult.message && (
-                  <span className="text-[11px] text-green-600 dark:text-green-400">
-                    {testResult.message}
-                  </span>
-                )}
-              </div>
-              {testResult.status === 'error' && testResult.message && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-                  {testResult.message}
-                </div>
-              )}
-            </section>
+                    {openaiApiKeyLastFour && openaiApiKeyConfigured && (
+                      <span className="font-mono text-[11px] text-neutral-400">
+                        ...{openaiApiKeyLastFour}
+                      </span>
+                    )}
+                    {openaiApiKeySource === 'env' && (
+                      <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                        ENV
+                      </span>
+                    )}
+                  </div>
 
-            <div className="border-t border-neutral-100 dark:border-neutral-800" />
+                  <input
+                    type="password"
+                    value={openaiApiKeyInput}
+                    onChange={(e) => setOpenaiApiKeyInput(e.target.value)}
+                    placeholder={openaiApiKeyLastFour ? `...${openaiApiKeyLastFour}` : 'sk-...'}
+                    className={inputClass}
+                  />
+                </section>
 
-            {/* Per-tier Model Configuration */}
-            <section className="space-y-3">
-              <div>
-                <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                  模型配置
-                </h2>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                  {'分别设置「快速」「均衡」「强力」三个档位使用的 AI 模型，留空则使用默认模型'}
-                </p>
-              </div>
-              {isLoadingModelIds ? (
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">加载中...</p>
-              ) : (
-                <div className="space-y-3">
-                  {(['fast', 'smart-sonnet', 'smart-opus'] as ChatModelPreference[]).map((pref) => (
-                    <div key={pref} className="space-y-1.5">
-                      <div className="flex items-baseline gap-2">
-                        <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                          {MODEL_LABELS[pref]}
-                        </label>
-                        <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
-                          {MODEL_TOOLTIPS[pref].description}
-                        </span>
-                      </div>
-                      <input
-                        type="text"
-                        value={customModelIds[pref] || ''}
-                        onChange={(e) =>
-                          setCustomModelIds((prev) => ({ ...prev, [pref]: e.target.value }))
-                        }
-                        placeholder={`默认：${DEFAULT_MODEL_NAMES[pref]}`}
-                        className={inputClass}
-                      />
-                      <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
-                        推荐：{MODEL_TOOLTIPS[pref].suggestions.join('、')}
-                      </p>
-                    </div>
-                  ))}
+                <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+                {/* OpenAI Base URL */}
+                <section className="space-y-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                      OpenAI API 地址
+                    </h2>
+                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                      兼容 OpenAI 的 API 端点地址，留空使用默认地址
+                    </p>
+                  </div>
+                  <input
+                    type="text"
+                    value={openaiBaseUrl}
+                    onChange={(e) => setOpenaiBaseUrl(e.target.value)}
+                    placeholder="https://api.openai.com"
+                    className={inputClass}
+                  />
+                </section>
+
+                <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+                {/* OpenAI Model */}
+                <section className="space-y-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                      OpenAI 模型
+                    </h2>
+                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                      {'指定使用的模型 ID，留空使用默认模型（快速: '}
+                      {DEFAULT_OPENAI_MODEL_NAMES.fast}
+                      {'、均衡: '}
+                      {DEFAULT_OPENAI_MODEL_NAMES['smart-sonnet']}
+                      {'、强力: '}
+                      {DEFAULT_OPENAI_MODEL_NAMES['smart-opus']}
+                      {'）'}
+                    </p>
+                  </div>
+                  <input
+                    type="text"
+                    value={openaiModelId}
+                    onChange={(e) => setOpenaiModelId(e.target.value)}
+                    placeholder={`默认按档位自动选择`}
+                    className={inputClass}
+                  />
+                </section>
+
+                <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+                {/* Save & Test OpenAI */}
+                <section className="space-y-3">
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={handleSaveModelIds}
-                      disabled={isSavingModelIds}
+                      onClick={handleSaveOpenAI}
+                      disabled={isSavingOpenAI}
                       className={primaryBtnClass}
                     >
-                      {isSavingModelIds ? '保存中...' : '保存'}
+                      {isSavingOpenAI ? '保存中...' : '保存'}
                     </button>
-                    {modelIdsSaveState === 'success' && (
+                    <button
+                      onClick={handleTestOpenAI}
+                      disabled={openaiTestResult.status === 'testing'}
+                      className={secondaryBtnClass}
+                    >
+                      {openaiTestResult.status === 'testing' ?
+                        <span className="flex items-center gap-1.5">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          测试中...
+                        </span>
+                      : '测试连接'}
+                    </button>
+                    {openaiSaveState === 'success' && (
                       <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
                     )}
-                    {modelIdsSaveState === 'error' && (
+                    {openaiSaveState === 'error' && (
+                      <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
+                    )}
+                    {openaiTestResult.status === 'success' && openaiTestResult.message && (
+                      <span className="text-[11px] text-green-600 dark:text-green-400">
+                        {openaiTestResult.message}
+                      </span>
+                    )}
+                  </div>
+                  {openaiTestResult.status === 'error' && openaiTestResult.message && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                      {openaiTestResult.message}
+                    </div>
+                  )}
+                </section>
+              </>
+            : <>
+                {/* API Key */}
+                <section className="space-y-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                      API Key
+                    </h2>
+                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                      在此处设置 API Key，或通过{' '}
+                      <code className="text-[11px]">ANTHROPIC_API_KEY</code> 环境变量配置
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                    <span
+                      className={
+                        apiKeyStatus.configured ?
+                          'font-medium text-neutral-800 dark:text-neutral-200'
+                        : 'text-neutral-500'
+                      }
+                    >
+                      {apiKeyStatus.configured ?
+                        apiKeyStatus.source === 'env' ?
+                          '使用环境变量'
+                        : '本地存储'
+                      : '未配置'}
+                    </span>
+                    {apiKeyStatus.lastFour && apiKeyStatus.configured && (
+                      <span className="font-mono text-[11px] text-neutral-400">
+                        ...{apiKeyStatus.lastFour}
+                      </span>
+                    )}
+                    {apiKeyStatus.source === 'env' && (
+                      <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                        ENV
+                      </span>
+                    )}
+                  </div>
+
+                  <input
+                    type="password"
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    placeholder={apiKeyPlaceholder}
+                    className={inputClass}
+                  />
+
+                  <div className="flex items-center gap-2">
+                    {apiKeyStatus.source === 'local' && (
+                      <button
+                        onClick={handleClearStoredApiKey}
+                        disabled={isSavingApiKey}
+                        className={dangerBtnClass}
+                      >
+                        清除
+                      </button>
+                    )}
+                    <button
+                      onClick={handleSaveApiKey}
+                      disabled={!apiKeyInput.trim() || isSavingApiKey}
+                      className={primaryBtnClass}
+                    >
+                      {isSavingApiKey ? '保存中...' : '保存'}
+                    </button>
+                    {apiKeySaveState === 'success' && (
+                      <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
+                    )}
+                    {apiKeySaveState === 'error' && (
                       <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
                     )}
                   </div>
-                </div>
-              )}
-            </section>
+                </section>
+
+                <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+                {/* API Base URL */}
+                <section className="space-y-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                      API 地址
+                    </h2>
+                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                      兼容 Anthropic 的 API 端点地址，留空使用默认地址
+                    </p>
+                  </div>
+                  <input
+                    type="text"
+                    value={apiBaseUrl}
+                    onChange={(e) => setApiBaseUrl(e.target.value)}
+                    placeholder="https://api.example.com/anthropic"
+                    className={inputClass}
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleSaveBaseUrl}
+                      disabled={isSavingBaseUrl}
+                      className={primaryBtnClass}
+                    >
+                      {isSavingBaseUrl ? '保存中...' : '保存'}
+                    </button>
+                    {baseUrlSaveState === 'success' && (
+                      <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
+                    )}
+                    {baseUrlSaveState === 'error' && (
+                      <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
+                    )}
+                  </div>
+                </section>
+
+                <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+                {/* Test Connection */}
+                <section className="space-y-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                      连接测试
+                    </h2>
+                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                      测试当前配置的 API Key、地址和模型是否可用
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleTestApi}
+                      disabled={testResult.status === 'testing'}
+                      className={secondaryBtnClass}
+                    >
+                      {testResult.status === 'testing' ?
+                        <span className="flex items-center gap-1.5">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          测试中...
+                        </span>
+                      : '测试连接'}
+                    </button>
+                    {testResult.status === 'success' && testResult.message && (
+                      <span className="text-[11px] text-green-600 dark:text-green-400">
+                        {testResult.message}
+                      </span>
+                    )}
+                  </div>
+                  {testResult.status === 'error' && testResult.message && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                      {testResult.message}
+                    </div>
+                  )}
+                </section>
+
+                <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+                {/* Per-tier Model Configuration */}
+                <section className="space-y-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                      模型配置
+                    </h2>
+                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                      {'分别设置「快速」「均衡」「强力」三个档位使用的 AI 模型，留空则使用默认模型'}
+                    </p>
+                  </div>
+                  {isLoadingModelIds ?
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">加载中...</p>
+                  : <div className="space-y-3">
+                      {(['fast', 'smart-sonnet', 'smart-opus'] as ChatModelPreference[]).map(
+                        (pref) => (
+                          <div key={pref} className="space-y-1.5">
+                            <div className="flex items-baseline gap-2">
+                              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                                {MODEL_LABELS[pref]}
+                              </label>
+                              <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                                {MODEL_TOOLTIPS[pref].description}
+                              </span>
+                            </div>
+                            <input
+                              type="text"
+                              value={customModelIds[pref] || ''}
+                              onChange={(e) =>
+                                setCustomModelIds((prev) => ({ ...prev, [pref]: e.target.value }))
+                              }
+                              placeholder={`默认：${DEFAULT_MODEL_NAMES[pref]}`}
+                              className={inputClass}
+                            />
+                            <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                              推荐：{MODEL_TOOLTIPS[pref].suggestions.join('、')}
+                            </p>
+                          </div>
+                        )
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleSaveModelIds}
+                          disabled={isSavingModelIds}
+                          className={primaryBtnClass}
+                        >
+                          {isSavingModelIds ? '保存中...' : '保存'}
+                        </button>
+                        {modelIdsSaveState === 'success' && (
+                          <span className="text-[11px] text-green-600 dark:text-green-400">
+                            已保存
+                          </span>
+                        )}
+                        {modelIdsSaveState === 'error' && (
+                          <span className="text-[11px] text-red-600 dark:text-red-400">
+                            保存失败
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  }
+                </section>
+              </>
+            }
 
             <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
@@ -674,9 +965,9 @@ function Settings() {
                     更新通道
                   </h2>
                   <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                    {updateChannel === 'stable'
-                      ? '仅接收稳定版本更新'
-                      : '接收 main 分支的每日构建（可能不稳定）'}
+                    {updateChannel === 'stable' ?
+                      '仅接收稳定版本更新'
+                    : '接收 main 分支的每日构建（可能不稳定）'}
                   </p>
                 </div>
                 <Switch
@@ -741,9 +1032,7 @@ function Settings() {
                     调试模式
                   </h2>
                   <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                    {debugMode
-                      ? '调试输出会随对话内容一同显示'
-                      : '关闭后对话界面更简洁'}
+                    {debugMode ? '调试输出会随对话内容一同显示' : '关闭后对话界面更简洁'}
                   </p>
                 </div>
                 <Switch
@@ -770,11 +1059,9 @@ function Settings() {
                 className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-medium text-neutral-600 transition hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-800"
               >
                 <span>开发者信息</span>
-                {isDebugExpanded ? (
+                {isDebugExpanded ?
                   <ChevronUp className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                )}
+                : <ChevronDown className="h-3.5 w-3.5" />}
               </button>
               {isDebugExpanded && (
                 <div className="mt-2 space-y-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-800/50">
@@ -803,7 +1090,9 @@ function Settings() {
                         {isSavingModelId ? '保存中...' : '保存'}
                       </button>
                       {modelIdSaveState === 'success' && (
-                        <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
+                        <span className="text-[11px] text-green-600 dark:text-green-400">
+                          已保存
+                        </span>
                       )}
                       {modelIdSaveState === 'error' && (
                         <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
@@ -818,9 +1107,9 @@ function Settings() {
                     <p className="text-[10px] font-semibold tracking-widest text-neutral-400 uppercase dark:text-neutral-500">
                       应用信息
                     </p>
-                    {isLoadingDiagnosticMetadata ? (
+                    {isLoadingDiagnosticMetadata ?
                       <p className="text-xs text-neutral-500">加载中...</p>
-                    ) : diagnosticMetadata ? (
+                    : diagnosticMetadata ?
                       <div className="grid grid-cols-2 gap-2">
                         {[
                           ['版本', diagnosticMetadata.appVersion],
@@ -829,10 +1118,7 @@ function Settings() {
                           ['Node.js', diagnosticMetadata.nodeVersion],
                           ['V8', diagnosticMetadata.v8Version],
                           ['SDK', diagnosticMetadata.claudeAgentSdkVersion],
-                          [
-                            '平台',
-                            `${diagnosticMetadata.platform} (${diagnosticMetadata.arch})`
-                          ],
+                          ['平台', `${diagnosticMetadata.platform} (${diagnosticMetadata.arch})`],
                           ['系统', diagnosticMetadata.osType],
                           ['系统版本', diagnosticMetadata.osRelease]
                         ].map(([label, value]) => (
@@ -846,9 +1132,7 @@ function Settings() {
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <p className="text-xs text-neutral-500">加载失败</p>
-                    )}
+                    : <p className="text-xs text-neutral-500">加载失败</p>}
                   </div>
 
                   <div className="border-t border-neutral-200 dark:border-neutral-700" />
@@ -858,9 +1142,9 @@ function Settings() {
                     <p className="text-[10px] font-semibold tracking-widest text-neutral-400 uppercase dark:text-neutral-500">
                       PATH
                     </p>
-                    {isLoadingPathInfo ? (
+                    {isLoadingPathInfo ?
                       <p className="text-xs text-neutral-500">加载中...</p>
-                    ) : pathInfo ? (
+                    : pathInfo ?
                       <div className="space-y-1">
                         <p className="text-[10px] text-neutral-400">
                           {pathInfo.platform} -- {pathInfo.pathCount} 条
@@ -879,9 +1163,7 @@ function Settings() {
                           ))}
                         </div>
                       </div>
-                    ) : (
-                      <p className="text-xs text-neutral-500">加载失败</p>
-                    )}
+                    : <p className="text-xs text-neutral-500">加载失败</p>}
                   </div>
 
                   <div className="border-t border-neutral-200 dark:border-neutral-700" />
@@ -891,9 +1173,9 @@ function Settings() {
                     <p className="text-[10px] font-semibold tracking-widest text-neutral-400 uppercase dark:text-neutral-500">
                       环境变量
                     </p>
-                    {isLoadingEnvVars ? (
+                    {isLoadingEnvVars ?
                       <p className="text-xs text-neutral-500">加载中...</p>
-                    ) : envVars ? (
+                    : envVars ?
                       <div className="space-y-1">
                         <p className="text-[10px] text-neutral-400">{envVars.length} 条</p>
                         <div className="max-h-48 overflow-y-auto rounded border border-neutral-200 bg-white px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900">
@@ -910,15 +1192,13 @@ function Settings() {
                           ))}
                         </div>
                       </div>
-                    ) : (
-                      <p className="text-xs text-neutral-500">加载失败</p>
-                    )}
+                    : <p className="text-xs text-neutral-500">加载失败</p>}
                   </div>
                 </div>
               )}
             </section>
           </div>
-        )}
+        }
       </div>
     </div>
   );
