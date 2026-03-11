@@ -180,6 +180,11 @@ export interface Conversation {
   projectId?: string | null;
 }
 
+/** Lightweight version returned by conversation:list — no full messages payload */
+export interface ConversationSummary extends Omit<Conversation, 'messages'> {
+  preview: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -210,7 +215,7 @@ export interface ProjectUpdateResponse {
 
 export interface ConversationListResponse {
   success: boolean;
-  conversations?: Conversation[];
+  conversations?: ConversationSummary[];
   error?: string;
 }
 
