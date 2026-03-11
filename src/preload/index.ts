@@ -175,7 +175,9 @@ contextBridge.exposeInMainWorld('electron', {
     parseApiConfig: (params: { text: string }) =>
       ipcRenderer.invoke('config:parse-api-config', params),
     autoDetectProvider: (params: { apiKey: string; baseUrl?: string; modelId?: string }) =>
-      ipcRenderer.invoke('config:auto-detect-provider', params)
+      ipcRenderer.invoke('config:auto-detect-provider', params),
+    recommendModels: (params: { models: string[] }) =>
+      ipcRenderer.invoke('config:recommend-models', params)
   },
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)

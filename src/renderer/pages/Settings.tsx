@@ -18,6 +18,13 @@ import {
   MODEL_TOOLTIPS
 } from '../../shared/types/ipc';
 
+const TIER_KEYS: ChatModelPreference[] = ['fast', 'smart-sonnet', 'smart-opus'];
+const TIER_LABELS: Record<ChatModelPreference, string> = {
+  fast: '快速',
+  'smart-sonnet': '均衡',
+  'smart-opus': '强力'
+};
+
 type ConfigMode = 'auto' | 'manual';
 type AutoConfigStatus = 'idle' | 'parsing' | 'parsed' | 'detecting' | 'saving' | 'success' | 'error';
 
@@ -132,6 +139,9 @@ function Settings() {
   const [detectedModel, setDetectedModel] = useState<string | null>(null);
   const [autoConfigError, setAutoConfigError] = useState<string | null>(null);
   const [autoConfigSteps, setAutoConfigSteps] = useState<AutoConfigStep[]>([]);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [tierModels, setTierModels] = useState<Partial<Record<ChatModelPreference, string>>>({});
+  const [isRecommending, setIsRecommending] = useState(false);
 
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>('stable');
   const [isLoadingChannel, setIsLoadingChannel] = useState(true);
@@ -555,18 +565,24 @@ function Settings() {
       // Add individual probe results as sub-steps
       for (const probe of detectResult.probes || []) {
         const name = probe.provider === 'anthropic' ? 'Anthropic 接口' : 'OpenAI 接口';
-        pushStep({
-          label: name,
-          status: probe.success ? 'done' : 'error',
-          detail: probe.success
-            ? `连接成功${probe.model ? ` — 模型: ${probe.model}` : ''}`
-            : probe.error || '连接失败'
-        });
+        let detail: string;
+        if (probe.success) {
+          if (probe.modelCount) {
+            detail = `连接成功（${probe.modelCount} 个模型可用）`;
+          } else {
+            detail = `连接成功${probe.model ? ` — 模型: ${probe.model}` : ''}`;
+          }
+        } else {
+          detail = probe.error || '连接失败';
+        }
+        pushStep({ label: name, status: probe.success ? 'done' : 'error', detail });
       }
 
       if (detectResult.success && detectResult.provider) {
         setDetectedProvider(detectResult.provider);
         setDetectedModel(detectResult.model || null);
+        setAvailableModels(detectResult.availableModels || []);
+        setTierModels({});
         setAutoConfigStatus('parsed');
       } else {
         setAutoConfigStatus('error');
@@ -584,25 +600,27 @@ function Settings() {
 
     setAutoConfigStatus('saving');
     try {
+      // Resolve per-tier model IDs: user-selected tierModels > parsed modelId > empty
+      const resolvedModelIds: Partial<Record<ChatModelPreference, string>> = {};
+      for (const tier of TIER_KEYS) {
+        const selected = tierModels[tier];
+        if (selected) {
+          resolvedModelIds[tier] = selected;
+        } else if (parsedConfig.modelId) {
+          resolvedModelIds[tier] = parsedConfig.modelId;
+        }
+      }
+
       if (detectedProvider === 'anthropic') {
         await window.electron.config.setApiKey(parsedConfig.apiKey);
-        // Always clear then set — avoid stale values from previous config
         await window.electron.config.setApiBaseUrl(parsedConfig.baseUrl || null);
-        await window.electron.config.setCustomModelIds(
-          parsedConfig.modelId ?
-            {
-              fast: parsedConfig.modelId,
-              'smart-sonnet': parsedConfig.modelId,
-              'smart-opus': parsedConfig.modelId
-            }
-          : {}
-        );
+        await window.electron.config.setCustomModelIds(resolvedModelIds);
       } else {
-        // setOpenAIConfig replaces the entire openai config object
         await window.electron.config.setOpenAIConfig({
           apiKey: parsedConfig.apiKey,
           baseUrl: parsedConfig.baseUrl,
-          modelId: parsedConfig.modelId
+          // Use fast tier model as the single modelId for OpenAI
+          modelId: resolvedModelIds.fast || parsedConfig.modelId
         });
       }
 
@@ -622,6 +640,34 @@ function Settings() {
     }
   };
 
+  const handleRecommendModels = async () => {
+    if (availableModels.length === 0) return;
+    setIsRecommending(true);
+    try {
+      const result = await window.electron.config.recommendModels({
+        models: availableModels
+      });
+      if (result.error) {
+        setAutoConfigError(
+          result.error === 'rate_limit_exceeded'
+            ? 'AI 推荐请求过于频繁，请稍后再试'
+            : `AI 推荐失败: ${result.error}`
+        );
+      } else {
+        setTierModels({
+          fast: result.fast,
+          'smart-sonnet': result['smart-sonnet'],
+          'smart-opus': result['smart-opus']
+        });
+        setAutoConfigError(null);
+      }
+    } catch {
+      setAutoConfigError('AI 推荐失败，请手动选择');
+    } finally {
+      setIsRecommending(false);
+    }
+  };
+
   const resetAutoConfig = () => {
     setAutoConfigStatus('idle');
     setAutoConfigError(null);
@@ -629,6 +675,8 @@ function Settings() {
     setDetectedProvider(null);
     setDetectedModel(null);
     setAutoConfigSteps([]);
+    setAvailableModels([]);
+    setTierModels({});
   };
 
   const handleToggleUpdateChannel = async () => {
@@ -859,7 +907,7 @@ function Settings() {
 
                     {/* Parsed result preview */}
                     {parsedConfig && (autoConfigStatus === 'parsed' || autoConfigStatus === 'saving') && (
-                      <div className="space-y-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800">
+                      <div className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800">
                         <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                           识别结果
                         </p>
@@ -878,12 +926,6 @@ function Settings() {
                               <span className="font-mono break-all">{parsedConfig.baseUrl}</span>
                             </div>
                           )}
-                          {parsedConfig.modelId && (
-                            <div className="flex gap-2">
-                              <span className="shrink-0 font-medium">模型:</span>
-                              <span className="font-mono">{parsedConfig.modelId}</span>
-                            </div>
-                          )}
                           {detectedProvider && (
                             <div className="flex gap-2">
                               <span className="shrink-0 font-medium">接口类型:</span>
@@ -892,12 +934,57 @@ function Settings() {
                               </span>
                             </div>
                           )}
-                          {detectedModel && (
-                            <div className="flex gap-2">
-                              <span className="shrink-0 font-medium">响应模型:</span>
-                              <span className="font-mono">{detectedModel}</span>
+                        </div>
+
+                        {/* Model tier selection */}
+                        <div className="space-y-2 border-t border-neutral-200 pt-2 dark:border-neutral-700">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                              模型配置
+                            </p>
+                            {availableModels.length > 0 && (
+                              <button
+                                onClick={handleRecommendModels}
+                                disabled={isRecommending}
+                                className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium text-neutral-600 transition-colors hover:bg-neutral-200 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                              >
+                                {isRecommending ?
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                : <Sparkles className="h-3 w-3" />}
+                                AI 推荐
+                              </button>
+                            )}
+                          </div>
+                          {TIER_KEYS.map((tier) => (
+                            <div key={tier} className="flex items-center gap-2">
+                              <label className="w-16 shrink-0 text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                                {TIER_LABELS[tier]}
+                              </label>
+                              {availableModels.length > 0 ?
+                                <select
+                                  value={tierModels[tier] || ''}
+                                  onChange={(e) =>
+                                    setTierModels((prev) => ({ ...prev, [tier]: e.target.value || undefined }))
+                                  }
+                                  className="flex-1 rounded border border-neutral-300 bg-white px-2 py-1 font-mono text-[11px] text-neutral-700 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-300"
+                                >
+                                  <option value="">未指定（使用默认）</option>
+                                  {availableModels.map((m) => (
+                                    <option key={m} value={m}>{m}</option>
+                                  ))}
+                                </select>
+                              : <input
+                                  type="text"
+                                  value={tierModels[tier] || ''}
+                                  onChange={(e) =>
+                                    setTierModels((prev) => ({ ...prev, [tier]: e.target.value || undefined }))
+                                  }
+                                  placeholder={parsedConfig.modelId || '使用默认模型'}
+                                  className="flex-1 rounded border border-neutral-300 bg-white px-2 py-1 font-mono text-[11px] text-neutral-700 placeholder:text-neutral-400 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-300 dark:placeholder:text-neutral-500"
+                                />
+                              }
                             </div>
-                          )}
+                          ))}
                         </div>
                       </div>
                     )}

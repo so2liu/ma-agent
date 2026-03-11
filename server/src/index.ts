@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { hmacAuth } from './middleware/hmac-auth';
 import { rateLimiter } from './middleware/rate-limit';
 import { parseRoute } from './routes/parse';
+import { recommendRoute } from './routes/recommend';
 
 const HMAC_SECRET = process.env.HMAC_SECRET || 'kfy7-1oO-1oo-OcQ-XxG-t9W-odp-LSm';
 
@@ -18,10 +19,15 @@ app.use(
   })
 );
 
-app.use('/api/*', rateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/api/*', hmacAuth(HMAC_SECRET));
 
+// General rate limit for parse endpoints
+app.use('/api/parse-config', rateLimiter({ windowMs: 60_000, max: 10 }));
+// Stricter rate limit for AI recommend (prevent abuse)
+app.use('/api/recommend-models', rateLimiter({ windowMs: 60_000, max: 3 }));
+
 app.route('/api', parseRoute);
+app.route('/api', recommendRoute);
 
 app.get('/health', (c) => c.json({ ok: true }));
 

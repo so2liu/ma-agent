@@ -540,6 +540,8 @@ export function registerConfigHandlers(): void {
         success: boolean;
         model?: string;
         error?: string;
+        availableModels?: string[];
+        modelCount?: number;
       }> => {
         try {
           const base = baseUrl || 'https://api.openai.com';
@@ -552,8 +554,13 @@ export function registerConfigHandlers(): void {
             });
             if (modelsResp.ok) {
               const data = await modelsResp.json();
-              const firstModel = data.data?.[0]?.id;
-              return { success: true, model: firstModel || undefined };
+              const modelIds: string[] =
+                (data.data as Array<{ id: string }>)?.map((m) => m.id) || [];
+              return {
+                success: true,
+                modelCount: modelIds.length,
+                availableModels: modelIds
+              };
             }
           }
 
@@ -589,6 +596,8 @@ export function registerConfigHandlers(): void {
         success: boolean;
         model?: string;
         error?: string;
+        availableModels?: string[];
+        modelCount?: number;
       }> => {
         try {
           const client = new Anthropic({
@@ -624,24 +633,38 @@ export function registerConfigHandlers(): void {
       const probes: ProbeDetail[] = [];
 
       const firstResult = await first.probe();
-      probes.push({ provider: first.provider, ...firstResult });
+      probes.push({
+        provider: first.provider,
+        success: firstResult.success,
+        model: firstResult.model,
+        error: firstResult.error,
+        modelCount: firstResult.modelCount
+      });
       if (firstResult.success) {
         return {
           success: true,
           provider: first.provider,
           model: firstResult.model,
-          probes
+          probes,
+          availableModels: firstResult.availableModels
         };
       }
 
       const secondResult = await second.probe();
-      probes.push({ provider: second.provider, ...secondResult });
+      probes.push({
+        provider: second.provider,
+        success: secondResult.success,
+        model: secondResult.model,
+        error: secondResult.error,
+        modelCount: secondResult.modelCount
+      });
       if (secondResult.success) {
         return {
           success: true,
           provider: second.provider,
           model: secondResult.model,
-          probes
+          probes,
+          availableModels: secondResult.availableModels
         };
       }
 
@@ -650,6 +673,35 @@ export function registerConfigHandlers(): void {
         error: `两种接口均连接失败`,
         probes
       };
+    }
+  );
+
+  // Recommend models for 3 tiers via server-side AI
+  ipcMain.handle(
+    'config:recommend-models',
+    async (_event, params: { models: string[] }) => {
+      try {
+        const requestBody = JSON.stringify({ models: params.models });
+        const { timestamp, signature } = await signRequest(requestBody);
+        const response = await fetch(`${PARSE_SERVER_URL}/api/recommend-models`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-App-Timestamp': timestamp,
+            'X-App-Signature': signature
+          },
+          body: requestBody,
+          signal: AbortSignal.timeout(30_000)
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          return { error: body?.error || `HTTP ${response.status}` };
+        }
+        return await response.json();
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
     }
   );
 

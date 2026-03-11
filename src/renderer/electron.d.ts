@@ -6,6 +6,7 @@ import type {
   ChatModelPreference,
   CustomModelIds,
   GetChatModelPreferenceResponse,
+  ModelRecommendation,
   OpenAIConfig,
   ParsedApiConfig,
   SendMessagePayload,
@@ -420,6 +421,9 @@ export interface ElectronAPI {
       baseUrl?: string;
       modelId?: string;
     }) => Promise<AutoDetectResult>;
+    recommendModels: (params: {
+      models: string[];
+    }) => Promise<ModelRecommendation & { error?: string }>;
   };
   shell: {
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
