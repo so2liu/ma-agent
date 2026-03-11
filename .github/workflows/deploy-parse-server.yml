@@ -1,0 +1,87 @@
+name: Deploy Parse Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-parse-server.yml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/ma-agent-parse-server
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy docker-compose to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: server/docker-compose.yml
+          target: /opt/ma-agent-parse-server
+          strip_components: 1
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /opt/ma-agent-parse-server
+
+            # Pull latest image
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            # Deploy with docker compose
+            ANTHROPIC_API_KEY="${{ secrets.PARSE_SERVER_ANTHROPIC_KEY }}" \
+            HMAC_SECRET="${{ secrets.PARSE_SERVER_HMAC_SECRET }}" \
+            docker compose up -d --force-recreate
+
+            # Update Caddy config to add parse server route if not present
+            docker exec caddy sh -c 'cat /etc/caddy/Caddyfile' | grep -q 'ma-agent.yangl.com.cn' || {
+              docker exec caddy sh -c 'cat >> /etc/caddy/Caddyfile <<EOF
+
+            ma-agent.yangl.com.cn {
+            	reverse_proxy localhost:3460
+            }
+            EOF'
+              docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+            }
+
+            # Verify
+            sleep 2
+            curl -sf http://localhost:3460/health || exit 1
+            echo "Deploy successful"

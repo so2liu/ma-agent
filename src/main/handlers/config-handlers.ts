@@ -395,9 +395,30 @@ export function registerConfigHandlers(): void {
     }
   );
 
-  // Injected at build time via electron.vite.config.ts define
-  // Build with PARSE_SERVER_URL=https://your-server.com to override
-  const PARSE_SERVER_URL: string = __PARSE_SERVER_URL__;
+  // Build-time default from electron.vite.config.ts, runtime env var overrides
+  const PARSE_SERVER_URL: string = process.env.PARSE_SERVER_URL || __PARSE_SERVER_URL__;
+  const HMAC_SECRET = __HMAC_SECRET__;
+
+  async function signRequest(body: string): Promise<{ timestamp: string; signature: string }> {
+    const timestamp = String(Date.now());
+    const message = `${timestamp}.${body}`;
+    const key = await globalThis.crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(HMAC_SECRET),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const sig = await globalThis.crypto.subtle.sign(
+      'HMAC',
+      key,
+      new TextEncoder().encode(message)
+    );
+    const signature = Array.from(new Uint8Array(sig))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    return { timestamp, signature };
+  }
 
   // Extract API keys locally via regex before sending text to server
   // This prevents leaking third-party API keys to our parse service
@@ -433,10 +454,16 @@ export function registerConfigHandlers(): void {
 
     try {
       // Step 2: Send sanitized text (no secrets) to server for baseUrl/modelId extraction
+      const requestBody = JSON.stringify({ text: sanitizedText });
+      const { timestamp, signature } = await signRequest(requestBody);
       const response = await fetch(`${PARSE_SERVER_URL}/api/parse-config`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: sanitizedText }),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-App-Timestamp': timestamp,
+          'X-App-Signature': signature
+        },
+        body: requestBody,
         signal: AbortSignal.timeout(15_000)
       });
       // Always try to parse JSON body for structured errors (e.g. no_valid_info, text_too_long)

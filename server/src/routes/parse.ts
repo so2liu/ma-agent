@@ -5,8 +5,9 @@ import { extractApiConfig } from '../lib/extractor';
 export const parseRoute = new Hono();
 
 parseRoute.post('/parse-config', async (c) => {
-  const body = await c.req.json<{ text?: string }>().catch(() => ({}));
-  const text = body.text?.trim();
+  // Body already parsed by hmac-auth middleware (it consumes the stream for signing)
+  const body = c.get('parsedBody') as { text?: string } | undefined;
+  const text = body?.text?.trim();
 
   if (!text) {
     return c.json({ error: 'no_valid_info' }, 400);
