@@ -11,7 +11,7 @@ import Anthropic, {
 } from '@anthropic-ai/sdk';
 import { app, ipcMain } from 'electron';
 
-import type { AgentProvider, CustomModelIds, OpenAIConfig } from '../../shared/types/ipc';
+import type { AgentProvider, CustomModelIds, OpenAIConfig, ProbeDetail } from '../../shared/types/ipc';
 import { getModelIdForPreference } from '../lib/claude-session';
 import {
   buildClaudeSessionEnv,
@@ -452,6 +452,8 @@ export function registerConfigHandlers(): void {
     // Step 1: Extract API key locally
     const { apiKey, sanitizedText } = extractApiKeysLocally(params.text);
 
+    let serverDetail: { success: boolean; baseUrl?: string; modelId?: string; error?: string };
+
     try {
       // Step 2: Send sanitized text (no secrets) to server for baseUrl/modelId extraction
       const requestBody = JSON.stringify({ text: sanitizedText });
@@ -466,33 +468,49 @@ export function registerConfigHandlers(): void {
         body: requestBody,
         signal: AbortSignal.timeout(15_000)
       });
-      // Always try to parse JSON body for structured errors (e.g. no_valid_info, text_too_long)
       const body = await response.json().catch(() => null);
-      if (!body) {
-        return { error: `服务请求失败 (${response.status})` };
+      if (!response.ok || !body) {
+        serverDetail = {
+          success: false,
+          error: body?.error || `HTTP ${response.status}`
+        };
+      } else if (body.error && !body.baseUrl && !body.modelId) {
+        serverDetail = { success: false, error: body.error };
+      } else {
+        serverDetail = {
+          success: true,
+          ...(body.baseUrl ? { baseUrl: body.baseUrl } : {}),
+          ...(body.modelId ? { modelId: body.modelId } : {})
+        };
       }
-
-      // Step 3: Merge locally-extracted apiKey with server-extracted baseUrl/modelId
-      // Server may also return apiKey as "[REDACTED]" — ignore that, use our local one
-      return {
-        ...(apiKey ? { apiKey } : {}),
-        ...(body.baseUrl ? { baseUrl: body.baseUrl } : {}),
-        ...(body.modelId ? { modelId: body.modelId } : {}),
-        ...(body.error && !apiKey && !body.baseUrl && !body.modelId ?
-          { error: body.error }
-        : {})
-      };
     } catch (err: unknown) {
-      // If server is unreachable but we got a key locally, return what we have
-      if (apiKey) {
-        return { apiKey };
-      }
       const message = err instanceof Error ? err.message : String(err);
-      if (message.includes('AbortError') || message.includes('timeout')) {
-        return { error: '解析服务响应超时' };
-      }
-      return { error: `无法连接解析服务: ${message}` };
+      serverDetail = {
+        success: false,
+        error:
+          message.includes('AbortError') || message.includes('timeout')
+            ? '响应超时'
+            : message
+      };
     }
+
+    // Merge locally-extracted apiKey with server-extracted baseUrl/modelId
+    const result = {
+      ...(apiKey ? { apiKey } : {}),
+      ...(serverDetail.baseUrl ? { baseUrl: serverDetail.baseUrl } : {}),
+      ...(serverDetail.modelId ? { modelId: serverDetail.modelId } : {}),
+      serverDetail
+    };
+
+    // If nothing useful was extracted at all, return an error
+    if (!apiKey && !serverDetail.baseUrl && !serverDetail.modelId) {
+      return {
+        ...result,
+        error: serverDetail.error || 'no_valid_info'
+      };
+    }
+
+    return result;
   });
 
   // Normalize baseUrl: strip known API path suffixes so probes don't build malformed URLs
@@ -603,27 +621,34 @@ export function registerConfigHandlers(): void {
             { probe: probeAnthropic, provider: 'anthropic' as const }
           ];
 
+      const probes: ProbeDetail[] = [];
+
       const firstResult = await first.probe();
+      probes.push({ provider: first.provider, ...firstResult });
       if (firstResult.success) {
         return {
           success: true,
           provider: first.provider,
-          model: firstResult.model
+          model: firstResult.model,
+          probes
         };
       }
 
       const secondResult = await second.probe();
+      probes.push({ provider: second.provider, ...secondResult });
       if (secondResult.success) {
         return {
           success: true,
           provider: second.provider,
-          model: secondResult.model
+          model: secondResult.model,
+          probes
         };
       }
 
       return {
         success: false,
-        error: `两种接口均连接失败。${firstResult.error || ''}`
+        error: `两种接口均连接失败`,
+        probes
       };
     }
   );

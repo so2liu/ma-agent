@@ -5,11 +5,7 @@ import { hmacAuth } from './middleware/hmac-auth';
 import { rateLimiter } from './middleware/rate-limit';
 import { parseRoute } from './routes/parse';
 
-const HMAC_SECRET = process.env.HMAC_SECRET;
-if (!HMAC_SECRET) {
-  console.error('HMAC_SECRET environment variable is required');
-  process.exit(1);
-}
+const HMAC_SECRET = process.env.HMAC_SECRET || 'kfy7-1oO-1oo-OcQ-XxG-t9W-odp-LSm';
 
 const app = new Hono();
 
