@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { Conversation, Project, ScheduledTask } from '@/electron';
+import type { ConversationSummary, Project, ScheduledTask } from '@/electron';
 
 import {
   AlertDialog,
@@ -28,11 +28,6 @@ import {
   AlertDialogFooter,
   AlertDialogTitle
 } from './ui/alert-dialog';
-
-const truncateText = (text: string, maxLength: number = 60) => {
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, maxLength).trim()}...`;
-};
 
 type View = 'home' | 'settings' | 'skills' | 'schedules' | 'db-viewer';
 
@@ -61,7 +56,7 @@ export default function Sidebar({
   selectedProjectId,
   onSelectProject
 }: SidebarProps) {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
   const [isSchedulesCollapsed, setIsSchedulesCollapsed] = useState(() => {
@@ -110,6 +105,17 @@ export default function Sidebar({
     []
   );
 
+  const loadConversations = useCallback(async () => {
+    try {
+      const response = await window.electron.conversation.list();
+      if (response.success && response.conversations) {
+        setConversations(response.conversations);
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -138,9 +144,14 @@ export default function Sidebar({
     loadData();
   }, [loadData]);
 
+  const prevConversationIdRef = useRef(currentConversationId);
   useEffect(() => {
-    if (currentConversationId) loadData();
-  }, [currentConversationId, loadData]);
+    // Refresh conversation list when the active conversation changes (including to null)
+    if (prevConversationIdRef.current !== currentConversationId) {
+      prevConversationIdRef.current = currentConversationId;
+      loadConversations();
+    }
+  }, [currentConversationId, loadConversations]);
 
   // Auto-select default project on first load
   useEffect(() => {
@@ -272,46 +283,9 @@ export default function Sidebar({
   };
 
   const conversationPreviews = useMemo(() => {
-    return conversations.reduce<Record<string, string>>((acc, conversation) => {
-      try {
-        const parsed = JSON.parse(conversation.messages) as Array<{
-          role: string;
-          content: string | { type: string; text?: string }[];
-        }>;
-        let preview = '';
-        for (let i = parsed.length - 1; i >= 0; i--) {
-          if (parsed[i].role !== 'assistant') continue;
-          const content = parsed[i].content;
-          if (typeof content === 'string') {
-            preview = truncateText(content);
-            break;
-          }
-          if (Array.isArray(content)) {
-            const textBlock = content.findLast(
-              (block) =>
-                typeof block === 'object' &&
-                block !== null &&
-                block.type === 'text' &&
-                'text' in block
-            );
-            if (
-              textBlock &&
-              typeof textBlock === 'object' &&
-              'text' in textBlock &&
-              typeof textBlock.text === 'string'
-            ) {
-              preview = truncateText(textBlock.text);
-              break;
-            }
-          }
-        }
-        acc[conversation.id] = preview;
-      } catch {
-        acc[conversation.id] = '';
-      }
-      acc[conversation.id] = acc[conversation.id] || '继续任务...';
-      return acc;
-    }, {});
+    return Object.fromEntries(
+      conversations.map((c) => [c.id, c.preview || '继续任务...'])
+    );
   }, [conversations]);
 
   const formatRelativeDate = useCallback(
@@ -354,7 +328,7 @@ export default function Sidebar({
   );
 
   const grouped = useMemo(() => {
-    const result: Record<string, Conversation[]> = {};
+    const result: Record<string, ConversationSummary[]> = {};
     for (const conv of conversations) {
       if (conv.projectId && projectIds.has(conv.projectId)) {
         if (!result[conv.projectId]) result[conv.projectId] = [];
@@ -390,7 +364,7 @@ export default function Sidebar({
   );
 
 
-  const renderConversationItem = (conversation: Conversation) => {
+  const renderConversationItem = (conversation: ConversationSummary) => {
     const isActive = conversation.id === currentConversationId;
     return (
       <div

@@ -432,18 +432,12 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     clearPendingAttachments();
 
     try {
+      // Fire-and-forget: save current conversation without blocking the switch
       if (currentConversationId && messages.length > 0) {
-        try {
-          const messagesToSave = serializeMessagesForStorage(messages);
-          await window.electron.conversation.update(
-            currentConversationId,
-            undefined,
-            messagesToSave,
-            currentSessionId ?? undefined
-          );
-        } catch (error) {
-          console.error('Error saving conversation before new chat:', error);
-        }
+        const messagesToSave = serializeMessagesForStorage(messages);
+        window.electron.conversation
+          .update(currentConversationId, undefined, messagesToSave, currentSessionId ?? undefined)
+          .catch((error) => console.error('Error saving conversation before new chat:', error));
       }
 
       await window.electron.chat.resetSession();
@@ -465,18 +459,14 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     clearPendingAttachments();
 
     try {
+      // Fire-and-forget: save current conversation without blocking the switch
       if (currentConversationId && messages.length > 0) {
-        try {
-          const messagesToSave = serializeMessagesForStorage(messages);
-          await window.electron.conversation.update(
-            currentConversationId,
-            undefined,
-            messagesToSave,
-            currentSessionId ?? undefined
+        const messagesToSave = serializeMessagesForStorage(messages);
+        window.electron.conversation
+          .update(currentConversationId, undefined, messagesToSave, currentSessionId ?? undefined)
+          .catch((error) =>
+            console.error('Error saving conversation before switching:', error)
           );
-        } catch (error) {
-          console.error('Error saving conversation before switching:', error);
-        }
       }
 
       const response = await window.electron.conversation.get(conversationId);

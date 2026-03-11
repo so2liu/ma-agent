@@ -80,6 +80,7 @@ let isInterruptingResponse = false;
 // Map stream index to tool ID for current message
 const streamIndexToToolId: Map<number, string> = new Map();
 let pendingResumeSessionId: string | null = null;
+let sessionGeneration = 0;
 
 export function getModelIdForPreference(
   preference: ChatModelPreference = currentModelPreference
@@ -152,6 +153,9 @@ export async function interruptCurrentResponse(mainWindow: BrowserWindow | null)
 }
 
 export async function resetSession(resumeSessionId?: string | null): Promise<void> {
+  // Increment generation to invalidate any zombie session's IPC emissions
+  sessionGeneration++;
+
   // Signal any running session to abort
   shouldAbortSession = true;
 
@@ -165,9 +169,12 @@ export async function resetSession(resumeSessionId?: string | null): Promise<voi
   regenerateSessionId(resumeSessionId ?? null);
   pendingResumeSessionId = resumeSessionId ?? null;
 
-  // Wait for the current session to fully terminate before proceeding
+  // Wait for the current session to fully terminate (with 3s timeout to avoid UI hang)
   if (sessionTerminationPromise) {
-    await sessionTerminationPromise;
+    await Promise.race([
+      sessionTerminationPromise,
+      new Promise<void>((resolve) => setTimeout(resolve, 3000))
+    ]);
   }
 
   // Clear session state
@@ -198,6 +205,8 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
   isProcessing = true;
   // Clear stream index mapping for new session
   streamIndexToToolId.clear();
+  // Capture generation so zombie sessions (from timeout) can't emit events
+  const myGeneration = sessionGeneration;
 
   // Create a promise that resolves when this session terminates
   let resolveTermination: () => void;
@@ -272,8 +281,8 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
 
     // Process streaming responses
     for await (const sdkMessage of querySession) {
-      // Check if session should be aborted
-      if (shouldAbortSession) {
+      // Check if session should be aborted or has been superseded by a newer session
+      if (shouldAbortSession || myGeneration !== sessionGeneration) {
         break;
       }
 

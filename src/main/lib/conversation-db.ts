@@ -12,6 +12,11 @@ export interface Conversation {
   projectId?: string | null;
 }
 
+/** Lightweight version returned by listConversations — no full messages payload */
+export interface ConversationSummary extends Omit<Conversation, 'messages'> {
+  preview: string;
+}
+
 interface ConversationFile {
   id: string;
   title: string;
@@ -146,7 +151,48 @@ export function getConversation(id: string): Conversation | null {
   };
 }
 
-export function listConversations(limit: number = 100): Conversation[] {
+function truncatePreview(text: string, maxLength: number): string {
+  return text.length > maxLength ? text.slice(0, maxLength).trim() + '...' : text;
+}
+
+function extractTextFromContent(content: unknown, maxLength: number): string | null {
+  if (typeof content === 'string') {
+    return truncatePreview(content, maxLength);
+  }
+  if (Array.isArray(content)) {
+    for (let j = content.length - 1; j >= 0; j--) {
+      const block = content[j];
+      if (
+        typeof block === 'object' &&
+        block !== null &&
+        'type' in block &&
+        block.type === 'text' &&
+        'text' in block &&
+        typeof block.text === 'string'
+      ) {
+        return truncatePreview(block.text as string, maxLength);
+      }
+    }
+  }
+  return null;
+}
+
+function extractPreview(messages: unknown[], maxLength: number = 90): string {
+  // Try last assistant message first, then fall back to last user message
+  for (const targetRole of ['assistant', 'user']) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (typeof msg !== 'object' || msg === null || !('role' in msg)) continue;
+      if ((msg as { role: string }).role !== targetRole) continue;
+
+      const text = extractTextFromContent((msg as { content?: unknown }).content, maxLength);
+      if (text) return text;
+    }
+  }
+  return '';
+}
+
+export function listConversations(limit: number = 100): ConversationSummary[] {
   const dir = getConversationsDir();
   const files = readdirSync(dir)
     .filter((file) => file.endsWith('.json'))
@@ -172,7 +218,7 @@ export function listConversations(limit: number = 100): Conversation[] {
   return files.map(({ conversationFile }) => ({
     id: conversationFile.id,
     title: conversationFile.title,
-    messages: JSON.stringify(conversationFile.messages),
+    preview: extractPreview(conversationFile.messages),
     createdAt: conversationFile.createdAt,
     updatedAt: conversationFile.updatedAt,
     sessionId: conversationFile.sessionId ?? null,

@@ -1,14 +1,7 @@
 import { Clock, MessageSquare, Plus, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { Conversation } from '@/electron';
-
-const truncateText = (text: string, maxLength: number = 90) => {
-  if (text.length <= maxLength) {
-    return text;
-  }
-  return `${text.slice(0, maxLength).trim()}...`;
-};
+import type { ConversationSummary } from '@/electron';
 
 interface ChatHistoryDrawerProps {
   isOpen: boolean;
@@ -25,7 +18,7 @@ export default function ChatHistoryDrawer({
   currentConversationId,
   onNewChat
 }: ChatHistoryDrawerProps) {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const relativeTimeFormatter = useMemo(
     () =>
@@ -80,41 +73,9 @@ export default function ChatHistoryDrawer({
   };
 
   const conversationPreviews = useMemo(() => {
-    return conversations.reduce<Record<string, string>>((acc, conversation) => {
-      try {
-        const parsed = JSON.parse(conversation.messages) as Array<{
-          role: string;
-          content: string | { type: string; text?: string }[];
-        }>;
-        // Find the last user message (iterate in reverse)
-        let lastUserMessage: (typeof parsed)[0] | undefined;
-        for (let i = parsed.length - 1; i >= 0; i--) {
-          if (parsed[i].role === 'user') {
-            lastUserMessage = parsed[i];
-            break;
-          }
-        }
-        if (lastUserMessage) {
-          if (typeof lastUserMessage.content === 'string') {
-            acc[conversation.id] = truncateText(lastUserMessage.content);
-          } else if (Array.isArray(lastUserMessage.content)) {
-            const textBlock = lastUserMessage.content.find(
-              (block) => typeof block === 'object' && block !== null && 'text' in block
-            );
-            if (textBlock && typeof textBlock === 'object' && textBlock !== null) {
-              acc[conversation.id] =
-                'text' in textBlock && typeof textBlock.text === 'string' ?
-                  truncateText(textBlock.text)
-                : '';
-            }
-          }
-        }
-      } catch {
-        acc[conversation.id] = '';
-      }
-      acc[conversation.id] = acc[conversation.id] || '点击继续之前的对话';
-      return acc;
-    }, {});
+    return Object.fromEntries(
+      conversations.map((c) => [c.id, c.preview || '点击继续之前的对话'])
+    );
   }, [conversations]);
 
   const formatRelativeDate = useCallback(
