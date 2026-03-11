@@ -67,6 +67,7 @@ jobs:
 
             # Deploy with docker compose
             ANTHROPIC_API_KEY="${{ secrets.PARSE_SERVER_ANTHROPIC_KEY }}" \
+            ANTHROPIC_BASE_URL="${{ secrets.PARSE_SERVER_BASE_URL }}" \
             HMAC_SECRET="${{ secrets.PARSE_SERVER_HMAC_SECRET }}" \
             docker compose up -d --force-recreate
 

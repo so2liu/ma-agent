@@ -7,5 +7,6 @@ services:
       - "127.0.0.1:3460:3456"
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-}
       - HMAC_SECRET=${HMAC_SECRET}
       - PORT=3456
