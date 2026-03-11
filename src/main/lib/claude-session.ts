@@ -18,6 +18,7 @@ import {
   abortGenerator,
   clearMessageQueue,
   messageGenerator,
+  messageQueue,
   regenerateSessionId,
   resetAbortFlag,
   setSessionId
@@ -456,6 +457,9 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
     }
   } catch (error) {
     console.error('Error in streaming session:', error);
+    // Clear the queue on error to prevent the finally block from retrying
+    // a failing session in an infinite loop.
+    clearMessageQueue();
     if (mainWindow && !mainWindow.isDestroyed()) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       mainWindow.webContents.send('chat:message-error', errorMessage);
@@ -467,5 +471,15 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
 
     // Resolve the termination promise to signal session has ended
     resolveTermination!();
+
+    // If messages were queued while the session was winding down (e.g. user sent
+    // a message right after stopping), start a new session to consume them.
+    // The queue is cleared in the catch block on error, so this only triggers
+    // after a normal session exit (e.g. interrupt / result).
+    if (messageQueue.length > 0) {
+      startStreamingSession(mainWindow).catch((error) => {
+        console.error('Failed to restart session for pending messages:', error);
+      });
+    }
   }
 }
