@@ -89,7 +89,7 @@ function init(appId: string): void {
           'dev:server': 'bun --hot run src/server/index.ts',
           'dev:client': 'vite',
           build: 'vite build',
-          'db:push': 'bunx drizzle-kit push',
+          'db:push': 'bun run src/db/push.ts',
         },
         dependencies: {
           react: '^19.2.0',
@@ -106,7 +106,6 @@ function init(appId: string): void {
           '@tailwindcss/vite': '^4.1.17',
           typescript: '^5.9.3',
           vite: '^7.1.12',
-          'drizzle-kit': '^0.31.9',
           '@types/bun': 'latest',
         },
       },
@@ -131,22 +130,6 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-  },
-})
-`
-  )
-
-  // drizzle.config.ts
-  writeFileSync(
-    join(appDir, 'drizzle.config.ts'),
-    `import { defineConfig } from 'drizzle-kit'
-
-export default defineConfig({
-  dialect: 'sqlite',
-  schema: './src/db/schema.ts',
-  out: './drizzle',
-  dbCredentials: {
-    url: './data.sqlite',
   },
 })
 `
@@ -242,6 +225,78 @@ createRoot(document.getElementById('root')!).render(
     `import { drizzle } from 'drizzle-orm/bun-sqlite'
 
 export const db = drizzle('./data.sqlite')
+`
+  )
+
+  // src/db/push.ts — schema push using bun:sqlite (replaces drizzle-kit push)
+  writeFileSync(
+    join(appDir, 'src', 'db', 'push.ts'),
+    `import { Database } from 'bun:sqlite'
+import { getTableConfig, type SQLiteColumn } from 'drizzle-orm/sqlite-core'
+
+import * as schema from './schema'
+
+function serializeDefault(col: SQLiteColumn): string {
+  const d = col.default
+  if (d === undefined || d === null) return ''
+  if (typeof d === 'object' && 'queryChunks' in d) {
+    const sql = (d as { queryChunks: { value: string[] }[] }).queryChunks
+      .map((c) => c.value.join(''))
+      .join('')
+    return \` DEFAULT \${sql}\`
+  }
+  if (typeof d === 'string') return \` DEFAULT '\${d.replace(/'/g, "''")}'\`
+  return \` DEFAULT \${d}\`
+}
+
+function colDef(col: SQLiteColumn, forAlter = false): string {
+  let def = \`"\${col.name}" \${col.getSQLType()}\`
+  if (col.primary) {
+    def += ' PRIMARY KEY'
+    if ((col as unknown as { autoIncrement: boolean }).autoIncrement) def += ' AUTOINCREMENT'
+  }
+  // SQLite ALTER TABLE ADD COLUMN rejects NOT NULL without a default
+  if (col.notNull && !col.primary && !(forAlter && !col.hasDefault)) def += ' NOT NULL'
+  if (col.hasDefault) def += serializeDefault(col)
+  return def
+}
+
+const db = new Database('./data.sqlite')
+db.run('BEGIN')
+try {
+  for (const value of Object.values(schema)) {
+    if (!value || typeof value !== 'object') continue
+    let config
+    try {
+      config = getTableConfig(value as Parameters<typeof getTableConfig>[0])
+    } catch {
+      continue
+    }
+    const exists = db
+      .query(\`SELECT name FROM sqlite_master WHERE type='table' AND name=?\`)
+      .get(config.name)
+    if (!exists) {
+      const cols = config.columns.map((c) => colDef(c)).join(', ')
+      db.run(\`CREATE TABLE "\${config.name}" (\${cols})\`)
+      console.log(\`Created table: \${config.name}\`)
+    } else {
+      const existing = db.query(\`PRAGMA table_info("\${config.name}")\`).all() as { name: string }[]
+      const existingNames = new Set(existing.map((c) => c.name))
+      for (const col of config.columns) {
+        if (!existingNames.has(col.name)) {
+          db.run(\`ALTER TABLE "\${config.name}" ADD COLUMN \${colDef(col, true)}\`)
+          console.log(\`Added column: \${config.name}.\${col.name}\`)
+        }
+      }
+    }
+  }
+  db.run('COMMIT')
+} catch (e) {
+  db.run('ROLLBACK')
+  throw e
+}
+
+console.log('Schema push complete.')
 `
   )
 

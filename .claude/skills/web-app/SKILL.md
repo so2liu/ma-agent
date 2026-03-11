@@ -108,8 +108,8 @@ Change the `<title>` tag to match your app name.
 
 ## What NOT to Do
 
-- Do NOT create `package.json`, `vite.config.ts`, `tsconfig.json`, `drizzle.config.ts` — these are created by `crud init`
-- Do NOT create `src/main.tsx`, `src/index.css`, `src/db/index.ts`, `src/server/index.ts` — these are managed by the CLI
+- Do NOT create `package.json`, `vite.config.ts`, `tsconfig.json` — these are created by `crud init`
+- Do NOT create `src/main.tsx`, `src/index.css`, `src/db/index.ts`, `src/db/push.ts`, `src/server/index.ts` — these are managed by the CLI
 - Do NOT modify files in `src/server/index.ts` imports section (the `// [crud:imports]` and `// [crud:routes]` markers are used by the CLI)
 
 ## Available Libraries
@@ -127,7 +127,7 @@ These are pre-installed and can be imported:
 Tell the user:
 
 - The app files have been generated
-- They can find the app card in the sidebar under "My Apps"
-- Click **"Dev"** to start the development server with hot reload
-- Click **"Build & Publish"** or **"Publish"** to build for production and share via LAN
+- They can点击聊天页面右上角的 🌐 图标，在下拉面板中找到该应用
+- Click **"开发"** to start the development server with hot reload
+- Click **"构建并发布"** or **"发布"** to build for production and share via LAN
 - Share the generated LAN URL with colleagues

@@ -31,7 +31,7 @@ function pushSchema(appDir: string): void {
     copyFileSync(dbPath, backupPath);
   }
   try {
-    execSync('bunx drizzle-kit push --force', {
+    execSync('bun run src/db/push.ts', {
       cwd: appDir,
       stdio: 'pipe',
       timeout: 30_000
