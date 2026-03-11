@@ -233,6 +233,21 @@ for (const skillName of skills) {
   }
 }
 
+// Copy .claude/tools/ directory (non-compiled TypeScript tools used by skills)
+const sourceToolsDir = join(sourceClaudeRoot, 'tools');
+const targetToolsDir = join(targetClaudeRoot, 'tools');
+if (existsSync(sourceToolsDir)) {
+  console.log('\nCopying .claude/tools/ directory...');
+  mkdirSync(targetToolsDir, { recursive: true });
+  const toolEntries = readdirSync(sourceToolsDir, { withFileTypes: true });
+  for (const entry of toolEntries) {
+    const sourcePath = join(sourceToolsDir, entry.name);
+    const targetPath = join(targetToolsDir, entry.name);
+    cpSync(sourcePath, targetPath, { recursive: true });
+    console.log(`  Copied tools/${entry.name}`);
+  }
+}
+
 // Clean up Bun build artifacts
 const bunBuildFiles = readdirSync(projectRoot).filter((f) => f.endsWith('.bun-build'));
 for (const file of bunBuildFiles) {

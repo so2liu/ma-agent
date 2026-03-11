@@ -50,7 +50,7 @@ export default function FloatingTaskPanel({ messages }: FloatingTaskPanelProps) 
 
   return (
     <div className="mx-auto w-full max-w-2xl px-2">
-      <div className="dark:bg-neutral-850/90 rounded-2xl border border-neutral-200/60 bg-white/95 shadow-lg shadow-black/5 backdrop-blur-xl dark:border-neutral-700/50 dark:shadow-black/30">
+      <div className="rounded-2xl border border-neutral-200/60 bg-white/95 shadow-lg shadow-black/5 backdrop-blur-xl dark:border-neutral-600/50 dark:bg-neutral-800/95 dark:shadow-black/30">
         {/* Header */}
         <button
           type="button"
@@ -62,7 +62,7 @@ export default function FloatingTaskPanel({ messages }: FloatingTaskPanelProps) 
             <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
               任务进度
             </span>
-            <span className="text-xs text-neutral-400 dark:text-neutral-500">
+            <span className="text-xs text-neutral-400 dark:text-neutral-400">
               {completedCount}/{totalCount}
             </span>
           </div>
@@ -75,14 +75,14 @@ export default function FloatingTaskPanel({ messages }: FloatingTaskPanelProps) 
               />
             </div>
             {isCollapsed ?
-              <ChevronDown className="size-3.5 text-neutral-400 dark:text-neutral-500" />
-            : <ChevronUp className="size-3.5 text-neutral-400 dark:text-neutral-500" />}
+              <ChevronDown className="size-3.5 text-neutral-400 dark:text-neutral-400" />
+            : <ChevronUp className="size-3.5 text-neutral-400 dark:text-neutral-400" />}
           </div>
         </button>
 
         {/* Task list */}
         {!isCollapsed && (
-          <div className="border-t border-neutral-100 px-4 pt-1.5 pb-3 dark:border-neutral-800">
+          <div className="border-t border-neutral-100 px-4 pt-1.5 pb-3 dark:border-neutral-700">
             <div className="space-y-1">
               {todos.map((todo, index) => (
                 <div key={index} className="flex items-start gap-2 py-0.5">
@@ -96,9 +96,9 @@ export default function FloatingTaskPanel({ messages }: FloatingTaskPanelProps) 
                   <span
                     className={`text-sm leading-snug ${
                       todo.status === 'completed' ?
-                        'text-neutral-400 line-through dark:text-neutral-500'
+                        'text-neutral-400 line-through dark:text-neutral-400'
                       : todo.status === 'in_progress' ? 'text-neutral-700 dark:text-neutral-200'
-                      : 'text-neutral-500 dark:text-neutral-400'
+                      : 'text-neutral-500 dark:text-neutral-300'
                     }`}
                   >
                     {todo.content}
