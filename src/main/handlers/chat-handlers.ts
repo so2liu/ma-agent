@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { join, relative } from 'path';
-import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { ipcMain, type BrowserWindow } from 'electron';
 
 import { ATTACHMENTS_DIR_NAME, MAX_ATTACHMENT_BYTES } from '../../shared/constants';
@@ -27,6 +26,7 @@ import {
   sendOpenAIMessage
 } from '../lib/openai-session';
 import { isScheduledTaskExecuting } from '../lib/schedule-state';
+import { buildPlainTextWithAttachments, buildUserMessage, sanitizeFileName } from './chat-helpers';
 
 export function registerChatHandlers(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle('chat:send-message', async (_event, payload: SendMessagePayload) => {
@@ -160,14 +160,6 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
   });
 }
 
-function sanitizeFileName(name: string): string {
-  const withoutIllegal = name.replace(/[<>:"/\\|?*]/g, '_');
-  const withoutControlChars = Array.from(withoutIllegal)
-    .map((char) => (char.charCodeAt(0) < 32 ? '_' : char))
-    .join('');
-  return withoutControlChars.replace(/\s+/g, ' ').trim() || 'attachment';
-}
-
 async function persistAttachments(
   attachments: SerializedAttachmentPayload[]
 ): Promise<SavedAttachmentInfo[]> {
@@ -213,60 +205,3 @@ async function persistAttachments(
   return saves;
 }
 
-function buildPlainTextWithAttachments(text: string, attachments: SavedAttachmentInfo[]): string {
-  const parts: string[] = [];
-  if (text) parts.push(text);
-  for (const attachment of attachments) {
-    const relativeSegment = attachment.relativePath;
-    const relativeWithinWorkspace =
-      relativeSegment && !relativeSegment.startsWith('..') ? relativeSegment : null;
-    const readTarget =
-      relativeWithinWorkspace ?
-        relativeWithinWorkspace.startsWith('.') ?
-          relativeWithinWorkspace
-        : `./${relativeWithinWorkspace}`
-      : attachment.savedPath;
-    const displayPath = relativeWithinWorkspace ? readTarget : attachment.savedPath;
-    parts.push(
-      `Attachment "${attachment.name}" is available at ${displayPath}. Please run Read("${readTarget}") when you need to inspect it.`
-    );
-  }
-  return parts.join('\n\n') || 'User uploaded files without additional context.';
-}
-
-function buildUserMessage(
-  text: string,
-  attachments: SavedAttachmentInfo[]
-): SDKUserMessage['message'] {
-  const contentBlocks: { type: 'text'; text: string }[] = [];
-  if (text) {
-    contentBlocks.push({ type: 'text', text });
-  }
-
-  attachments.forEach((attachment) => {
-    const relativeSegment = attachment.relativePath;
-    const relativeWithinWorkspace =
-      relativeSegment && !relativeSegment.startsWith('..') ? relativeSegment : null;
-    const readTarget =
-      relativeWithinWorkspace ?
-        relativeWithinWorkspace.startsWith('.') ?
-          relativeWithinWorkspace
-        : `./${relativeWithinWorkspace}`
-      : attachment.savedPath;
-    const displayPath = relativeWithinWorkspace ? readTarget : attachment.savedPath;
-    const instruction = `Attachment "${attachment.name}" is available at ${displayPath}. Please run Read("${readTarget}") when you need to inspect it.`;
-    contentBlocks.push({ type: 'text', text: instruction });
-  });
-
-  if (contentBlocks.length === 0) {
-    contentBlocks.push({
-      type: 'text',
-      text: 'User uploaded files without additional context.'
-    });
-  }
-
-  return {
-    role: 'user',
-    content: contentBlocks
-  };
-}
