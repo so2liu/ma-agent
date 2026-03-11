@@ -21,6 +21,13 @@ import {
 type ConfigMode = 'auto' | 'manual';
 type AutoConfigStatus = 'idle' | 'parsing' | 'parsed' | 'detecting' | 'saving' | 'success' | 'error';
 
+type StepStatus = 'running' | 'done' | 'error';
+interface AutoConfigStep {
+  label: string;
+  status: StepStatus;
+  detail?: string;
+}
+
 type ApiKeyStatus = {
   configured: boolean;
   source: 'env' | 'local' | null;
@@ -124,6 +131,7 @@ function Settings() {
   const [detectedProvider, setDetectedProvider] = useState<AgentProvider | null>(null);
   const [detectedModel, setDetectedModel] = useState<string | null>(null);
   const [autoConfigError, setAutoConfigError] = useState<string | null>(null);
+  const [autoConfigSteps, setAutoConfigSteps] = useState<AutoConfigStep[]>([]);
 
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>('stable');
   const [isLoadingChannel, setIsLoadingChannel] = useState(true);
@@ -464,13 +472,58 @@ function Settings() {
     setDetectedProvider(null);
     setDetectedModel(null);
 
+    const steps: AutoConfigStep[] = [{ label: '提取 API Key', status: 'running' }];
+    setAutoConfigSteps([...steps]);
+
+    const pushStep = (step: AutoConfigStep) => {
+      steps.push(step);
+      setAutoConfigSteps([...steps]);
+    };
+    const finishStep = (index: number, patch: Partial<AutoConfigStep>) => {
+      steps[index] = { ...steps[index], ...patch };
+      setAutoConfigSteps([...steps]);
+    };
+
     try {
-      // Step 1: Parse text via server
+      // Step 1 + 2: Parse text (local key extraction + server NLP)
       const parsed = await window.electron.config.parseApiConfig({
         text: autoConfigText.trim()
       });
 
-      if (parsed.error) {
+      // Step 1 result: API Key extraction
+      if (parsed.apiKey) {
+        finishStep(0, {
+          status: 'done',
+          detail: `${parsed.apiKey.slice(0, 8)}••••${parsed.apiKey.slice(-4)}`
+        });
+      } else {
+        finishStep(0, { status: 'error', detail: '未识别到 API Key' });
+        setAutoConfigStatus('error');
+        setAutoConfigError('未能从文本中识别出 API Key，请检查内容或切换到手动模式');
+        return;
+      }
+
+      // Step 2 result: Server NLP extraction
+      const sd = parsed.serverDetail;
+      if (sd?.success) {
+        const parts: string[] = [];
+        if (sd.baseUrl) parts.push(`地址: ${sd.baseUrl}`);
+        if (sd.modelId) parts.push(`模型: ${sd.modelId}`);
+        pushStep({
+          label: '解析服务识别配置',
+          status: 'done',
+          detail: parts.length ? parts.join(' | ') : '未识别到额外配置'
+        });
+      } else {
+        pushStep({
+          label: '解析服务识别配置',
+          status: 'error',
+          detail: sd?.error || '未知错误'
+        });
+        // Not fatal if we have apiKey — continue to probe
+      }
+
+      if (parsed.error && !parsed.apiKey) {
         setAutoConfigStatus('error');
         setAutoConfigError(
           parsed.error === 'no_valid_info'
@@ -480,21 +533,36 @@ function Settings() {
         return;
       }
 
-      if (!parsed.apiKey) {
-        setAutoConfigStatus('error');
-        setAutoConfigError('未能从文本中识别出 API Key，请检查内容或切换到手动模式');
-        return;
-      }
-
       setParsedConfig(parsed);
       setAutoConfigStatus('detecting');
 
-      // Step 2: Auto-detect provider type
+      pushStep({ label: '测试 API 连接', status: 'running' });
+      const detectStepIdx = steps.length - 1;
+
+      // Step 3: Auto-detect provider type
       const detectResult = await window.electron.config.autoDetectProvider({
         apiKey: parsed.apiKey,
         baseUrl: parsed.baseUrl,
         modelId: parsed.modelId
       });
+
+      // Replace the generic "测试 API 连接" with individual probe steps
+      finishStep(detectStepIdx, {
+        status: detectResult.success ? 'done' : 'error',
+        detail: detectResult.success ? '完成' : '失败'
+      });
+
+      // Add individual probe results as sub-steps
+      for (const probe of detectResult.probes || []) {
+        const name = probe.provider === 'anthropic' ? 'Anthropic 接口' : 'OpenAI 接口';
+        pushStep({
+          label: name,
+          status: probe.success ? 'done' : 'error',
+          detail: probe.success
+            ? `连接成功${probe.model ? ` — 模型: ${probe.model}` : ''}`
+            : probe.error || '连接失败'
+        });
+      }
 
       if (detectResult.success && detectResult.provider) {
         setDetectedProvider(detectResult.provider);
@@ -505,6 +573,7 @@ function Settings() {
         setAutoConfigError(detectResult.error || '无法连接 API，请检查信息是否正确');
       }
     } catch {
+      finishStep(steps.length - 1, { status: 'error', detail: '请求异常' });
       setAutoConfigStatus('error');
       setAutoConfigError('智能识别过程出错，请重试或切换到手动模式');
     }
@@ -559,6 +628,7 @@ function Settings() {
     setParsedConfig(null);
     setDetectedProvider(null);
     setDetectedModel(null);
+    setAutoConfigSteps([]);
   };
 
   const handleToggleUpdateChannel = async () => {
@@ -759,6 +829,33 @@ function Settings() {
                         </button>
                       }
                     </div>
+
+                    {/* Step-by-step progress log */}
+                    {autoConfigSteps.length > 0 && (
+                      <div className="space-y-1 text-xs">
+                        {autoConfigSteps.map((step, i) => (
+                          <div key={i} className="flex items-start gap-1.5">
+                            <span className="mt-0.5 shrink-0">
+                              {step.status === 'running' ?
+                                <Loader2 className="h-3 w-3 animate-spin text-neutral-400" />
+                              : step.status === 'done' ?
+                                <span className="text-green-500">&#10003;</span>
+                              : <span className="text-red-500">&#10007;</span>}
+                            </span>
+                            <div className="min-w-0">
+                              <span className="font-medium text-neutral-700 dark:text-neutral-300">
+                                {step.label}
+                              </span>
+                              {step.detail && (
+                                <p className="mt-0.5 break-all text-neutral-500 dark:text-neutral-400">
+                                  {step.detail}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Parsed result preview */}
                     {parsedConfig && (autoConfigStatus === 'parsed' || autoConfigStatus === 'saving') && (

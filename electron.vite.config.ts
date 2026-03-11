@@ -11,7 +11,7 @@ export default defineConfig({
         process.env.PARSE_SERVER_URL || 'https://ma-agent.yangl.com.cn'
       ),
       __HMAC_SECRET__: JSON.stringify(
-        process.env.HMAC_SECRET || 'ma-agent-parse-v1-default'
+        process.env.HMAC_SECRET || 'kfy7-1oO-1oo-OcQ-XxG-t9W-odp-LSm'
       )
     },
     build: {

@@ -100,11 +100,29 @@ export interface OpenAIConfig {
   modelId?: string;
 }
 
+/** Detail of the server-side NLP extraction step */
+export interface ServerExtractionDetail {
+  success: boolean;
+  baseUrl?: string;
+  modelId?: string;
+  error?: string;
+}
+
 /** Parsed API config from server-side NLP extraction */
 export interface ParsedApiConfig {
   apiKey?: string;
   baseUrl?: string;
   modelId?: string;
+  error?: string;
+  /** Verbose detail of what the server returned */
+  serverDetail?: ServerExtractionDetail;
+}
+
+/** Detail of a single provider probe attempt */
+export interface ProbeDetail {
+  provider: AgentProvider;
+  success: boolean;
+  model?: string;
   error?: string;
 }
 
@@ -114,6 +132,8 @@ export interface AutoDetectResult {
   provider?: AgentProvider;
   model?: string;
   error?: string;
+  /** Details of each probe attempt, in order tried */
+  probes?: ProbeDetail[];
 }
 
 /** Default OpenAI model IDs per preference tier */
