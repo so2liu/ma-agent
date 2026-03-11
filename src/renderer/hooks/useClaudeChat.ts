@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
+import type { BackgroundTask } from '../../shared/types/background-task';
 import type { ToolUse } from '@/electron';
 import type { Message, ToolInput } from '@/types/chat';
 import { friendlyError } from '@/utils/friendlyError';
@@ -11,9 +12,11 @@ export function useClaudeChat(): {
   setMessages: Dispatch<SetStateAction<Message[]>>;
   isLoading: boolean;
   setIsLoading: Dispatch<SetStateAction<boolean>>;
+  backgroundTasks: Map<string, BackgroundTask>;
 } {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [backgroundTasks, setBackgroundTasks] = useState<Map<string, BackgroundTask>>(new Map());
   const isStreamingRef = useRef(false);
   const debugMessagesRef = useRef<string[]>([]);
 
@@ -482,6 +485,8 @@ export function useClaudeChat(): {
     const unsubscribeMessageComplete = window.electron.chat.onMessageComplete(() => {
       isStreamingRef.current = false;
       setIsLoading(false);
+      // Clear background tasks — session turn is done
+      setBackgroundTasks(new Map());
       window.electron.analytics.trackEvent({ type: 'message_completed', timestamp: Date.now() });
 
       // Append all accumulated debug messages when response completes
@@ -538,6 +543,8 @@ export function useClaudeChat(): {
     const unsubscribeMessageStopped = window.electron.chat.onMessageStopped(() => {
       isStreamingRef.current = false;
       setIsLoading(false);
+      // Clear background tasks — session was interrupted
+      setBackgroundTasks(new Map());
       window.electron.analytics.trackEvent({ type: 'message_stopped', timestamp: Date.now() });
 
       // Get accumulated debug messages
@@ -608,6 +615,8 @@ export function useClaudeChat(): {
     // Listen for errors
     const unsubscribeMessageError = window.electron.chat.onMessageError((error: string) => {
       isStreamingRef.current = false;
+      // Clear background tasks — session errored
+      setBackgroundTasks(new Map());
       window.electron.analytics.trackEvent({ type: 'message_error', timestamp: Date.now() });
 
       // Append all accumulated debug messages when error occurs
@@ -670,6 +679,45 @@ export function useClaudeChat(): {
       }
     });
 
+    // Listen for background task progress
+    const unsubscribeTaskProgress = window.electron.chat.onTaskProgress((data) => {
+      setBackgroundTasks((prev) => {
+        const next = new Map(prev);
+        next.set(data.taskId, {
+          taskId: data.taskId,
+          toolUseId: data.toolUseId,
+          description: data.description,
+          status: 'running',
+          totalTokens: data.totalTokens,
+          toolUses: data.toolUses,
+          durationMs: data.durationMs,
+          lastToolName: data.lastToolName
+        });
+        return next;
+      });
+    });
+
+    // Listen for background task notifications (completed/failed/stopped)
+    const unsubscribeTaskNotification = window.electron.chat.onTaskNotification((data) => {
+      setBackgroundTasks((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(data.taskId);
+        next.set(data.taskId, {
+          taskId: data.taskId,
+          toolUseId: data.toolUseId,
+          description: existing?.description ?? '',
+          status: data.status,
+          totalTokens: data.totalTokens ?? existing?.totalTokens ?? 0,
+          toolUses: data.toolUses ?? existing?.toolUses ?? 0,
+          durationMs: data.durationMs ?? existing?.durationMs ?? 0,
+          lastToolName: existing?.lastToolName,
+          summary: data.summary,
+          outputFile: data.outputFile
+        });
+        return next;
+      });
+    });
+
     // Cleanup function to remove all event listeners
     return () => {
       unsubscribeMessageChunk();
@@ -685,6 +733,8 @@ export function useClaudeChat(): {
       unsubscribeMessageStopped();
       unsubscribeMessageError();
       unsubscribeDebugMessage();
+      unsubscribeTaskProgress();
+      unsubscribeTaskNotification();
     };
   }, []);
 
@@ -692,6 +742,7 @@ export function useClaudeChat(): {
     messages,
     setMessages,
     isLoading,
-    setIsLoading
+    setIsLoading,
+    backgroundTasks
   };
 }

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
+import type { TaskNotificationEvent, TaskProgressEvent } from '../shared/types/background-task';
 import type {
   AgentProvider,
   ChatModelPreference,
@@ -128,6 +129,18 @@ contextBridge.exposeInMainWorld('electron', {
       ) => callback(data);
       ipcRenderer.on('chat:session-updated', listener);
       return () => ipcRenderer.removeListener('chat:session-updated', listener);
+    },
+    onTaskProgress: (callback: (data: TaskProgressEvent) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: TaskProgressEvent) =>
+        callback(data);
+      ipcRenderer.on('chat:task-progress', listener);
+      return () => ipcRenderer.removeListener('chat:task-progress', listener);
+    },
+    onTaskNotification: (callback: (data: TaskNotificationEvent) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: TaskNotificationEvent) =>
+        callback(data);
+      ipcRenderer.on('chat:task-notification', listener);
+      return () => ipcRenderer.removeListener('chat:task-notification', listener);
     }
   },
   config: {

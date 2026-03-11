@@ -15,6 +15,7 @@ import type { Artifact } from '@/components/ArtifactPanel';
 import ArtifactPanel from '@/components/ArtifactPanel';
 import ChatInput from '@/components/ChatInput';
 import FileTree from '@/components/FileTree';
+import BackgroundTaskIndicator from '@/components/BackgroundTaskIndicator';
 import FloatingTaskPanel from '@/components/FloatingTaskPanel';
 import MessageList from '@/components/MessageList';
 import ResizeHandle from '@/components/ResizeHandle';
@@ -212,7 +213,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   const appsRef = useRef(apps);
   appsRef.current = apps;
   const projectIdForNewChatRef = useRef<string | null>(null);
-  const { messages, setMessages, isLoading, setIsLoading } = useClaudeChat();
+  const { messages, setMessages, isLoading, setIsLoading, backgroundTasks } = useClaudeChat();
   const { track } = useAnalytics();
   const messagesContainerRef = useAutoScroll(isLoading, messages);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -811,7 +812,12 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 isModelPreferenceUpdating={isModelPreferenceUpdating}
                 customModelActive={customModelActive}
                 customModelIds={customModelIds}
-                floatingPanel={<FloatingTaskPanel messages={messages} />}
+                floatingPanel={
+                  <>
+                    <BackgroundTaskIndicator backgroundTasks={backgroundTasks} />
+                    <FloatingTaskPanel messages={messages} />
+                  </>
+                }
               />
             </div>
           </>

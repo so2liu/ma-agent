@@ -1,4 +1,5 @@
 import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
+import type { TaskNotificationEvent, TaskProgressEvent } from '../shared/types/background-task';
 import type {
   AgentProvider,
   AutoDetectResult,
@@ -353,6 +354,8 @@ export interface ElectronAPI {
     onSessionUpdated: (
       callback: (data: { sessionId: string; resumed: boolean }) => void
     ) => () => void;
+    onTaskProgress: (callback: (data: TaskProgressEvent) => void) => () => void;
+    onTaskNotification: (callback: (data: TaskNotificationEvent) => void) => () => void;
   };
   config: {
     getWorkspaceDir: () => Promise<WorkspaceResponse>;
