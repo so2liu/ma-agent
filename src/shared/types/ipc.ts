@@ -124,6 +124,8 @@ export interface ProbeDetail {
   success: boolean;
   model?: string;
   error?: string;
+  /** Available model IDs (when probe lists models) */
+  modelCount?: number;
 }
 
 /** Result of auto-detecting provider type */
@@ -134,6 +136,15 @@ export interface AutoDetectResult {
   error?: string;
   /** Details of each probe attempt, in order tried */
   probes?: ProbeDetail[];
+  /** Available model IDs from successful provider */
+  availableModels?: string[];
+}
+
+/** AI-recommended models for the 3 preference tiers */
+export interface ModelRecommendation {
+  fast: string;
+  'smart-sonnet': string;
+  'smart-opus': string;
 }
 
 /** Default OpenAI model IDs per preference tier */
