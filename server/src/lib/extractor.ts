@@ -24,12 +24,14 @@ interface ParseResult {
   error?: string;
 }
 
+const EXTRACTOR_MODEL = process.env.EXTRACTOR_MODEL || 'anthropic/claude-haiku-4.5';
+
 const client = new Anthropic();
 
 export async function extractApiConfig(text: string): Promise<ParseResult> {
   try {
     const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: EXTRACTOR_MODEL,
       max_tokens: 256,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: text }],
