@@ -8,7 +8,10 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     define: {
       __PARSE_SERVER_URL__: JSON.stringify(
-        process.env.PARSE_SERVER_URL || 'http://localhost:3456'
+        process.env.PARSE_SERVER_URL || 'https://ma-agent.yangl.com.cn'
+      ),
+      __HMAC_SECRET__: JSON.stringify(
+        process.env.HMAC_SECRET || 'ma-agent-parse-v1-default'
       )
     },
     build: {

@@ -42,6 +42,8 @@ jobs:
         run: bun run test
 
       - name: Build Electron app
+        env:
+          HMAC_SECRET: ${{ secrets.PARSE_SERVER_HMAC_SECRET }}
         run: bun run build
 
       - name: Package for macOS (${{ matrix.arch }})

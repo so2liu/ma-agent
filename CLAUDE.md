@@ -79,9 +79,10 @@ Skills live in `.claude/skills/<name>/` with `SKILL.md` + TypeScript tools in `s
 
 | 变量 | 用途 | 默认值 |
 |------|------|--------|
-| `PARSE_SERVER_URL` | 智能配置 NLP 解析服务地址 | `http://localhost:3456` |
+| `PARSE_SERVER_URL` | 智能配置 NLP 解析服务地址 | `https://ma-agent.yangl.com.cn` |
+| `HMAC_SECRET` | 解析服务 HMAC 签名密钥 | `ma-agent-parse-v1-default` |
 
-生产构建示例：`PARSE_SERVER_URL=https://your-server.com bun run build`
+运行时环境变量 `PARSE_SERVER_URL` 可覆盖编译时默认值（方便本地开发）。
 
 运行时环境变量（main process 直接读取 `process.env`）：
 
