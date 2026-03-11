@@ -39,6 +39,10 @@ jobs:
     needs: check-changes
     if: needs.check-changes.outputs.has_changes == 'true'
     runs-on: macos-latest
+    outputs:
+      nightly_version: ${{ steps.nightly-version.outputs.nightly_version }}
+      nightly_tag: ${{ steps.nightly-version.outputs.nightly_tag }}
+      short_sha: ${{ steps.nightly-version.outputs.short_sha }}
     strategy:
       matrix:
         arch: [arm64]
@@ -73,6 +77,7 @@ jobs:
           NEXT_PATCH=$((PATCH + 1))
           NIGHTLY_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-nightly.${DATE}.${SHORT_SHA}"
           echo "nightly_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "nightly_tag=v${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Set nightly version in package.json
@@ -116,36 +121,36 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Get nightly version info
-        id: version
-        run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          NIGHTLY_VERSION=$(node -p "require('./package.json').version")
-          echo "nightly_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-
-      - name: Create nightly prerelease (replacing previous)
+      - name: Create nightly prerelease
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Create new release first, then delete old one to minimize downtime
-          TEMP_TAG="nightly-$(date -u +%s)"
-          gh release create "$TEMP_TAG" \
-            --title "Nightly Build (${{ steps.version.outputs.short_sha }})" \
+          gh release create "${{ needs.build-macos.outputs.nightly_tag }}" \
+            --title "Nightly Build (${{ needs.build-macos.outputs.short_sha }})" \
             --notes "Automated nightly build from \`main\` branch.
 
           **Commit:** ${{ github.sha }}
-          **Version:** ${{ steps.version.outputs.nightly_version }}
+          **Version:** ${{ needs.build-macos.outputs.nightly_version }}
           **Date:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
 
           > This is a pre-release build and may be unstable. Enable the nightly update channel in Settings to receive these updates automatically." \
             --prerelease \
             dist/*
 
-          # Delete old nightly release if it exists
+      - name: Delete old nightly releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete old nightly prereleases now that the new one is published
+          gh release list --limit 100 --json tagName,isPrerelease \
+            --jq '.[] | select(.isPrerelease) | select(.tagName | startswith("v") and contains("-nightly.")) | .tagName' \
+            | while read -r tag; do
+                # Skip the release we just created
+                if [ "$tag" = "${{ needs.build-macos.outputs.nightly_tag }}" ]; then
+                  continue
+                fi
+                echo "Deleting old nightly release: $tag"
+                gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+              done
+          # Also clean up legacy 'nightly' tag if it exists
           gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
-
-          # Rename the new release tag to 'nightly'
-          gh release edit "$TEMP_TAG" --tag nightly
-          git tag -d "$TEMP_TAG" 2>/dev/null || true
-          gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$TEMP_TAG" 2>/dev/null || true
