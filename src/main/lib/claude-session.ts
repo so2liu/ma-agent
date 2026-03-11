@@ -461,6 +461,44 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
               });
             }
           }
+        } else if ((sdkMessage.subtype as string) === 'task_progress') {
+          // SDK types may not yet include task_progress — cast to access fields
+          const msg = sdkMessage as unknown as {
+            task_id: string;
+            tool_use_id?: string;
+            description: string;
+            usage: { total_tokens: number; tool_uses: number; duration_ms: number };
+            last_tool_name?: string;
+          };
+          mainWindow.webContents.send('chat:task-progress', {
+            taskId: msg.task_id,
+            toolUseId: msg.tool_use_id,
+            description: msg.description,
+            totalTokens: msg.usage.total_tokens,
+            toolUses: msg.usage.tool_uses,
+            durationMs: msg.usage.duration_ms,
+            lastToolName: msg.last_tool_name
+          });
+        } else if ((sdkMessage.subtype as string) === 'task_notification') {
+          // SDK types may not yet include task_notification — cast to access fields
+          const msg = sdkMessage as unknown as {
+            task_id: string;
+            tool_use_id?: string;
+            status: 'completed' | 'failed' | 'stopped';
+            output_file: string;
+            summary: string;
+            usage?: { total_tokens: number; tool_uses: number; duration_ms: number };
+          };
+          mainWindow.webContents.send('chat:task-notification', {
+            taskId: msg.task_id,
+            toolUseId: msg.tool_use_id,
+            status: msg.status,
+            outputFile: msg.output_file,
+            summary: msg.summary,
+            totalTokens: msg.usage?.total_tokens,
+            toolUses: msg.usage?.tool_uses,
+            durationMs: msg.usage?.duration_ms
+          });
         }
       }
     }
