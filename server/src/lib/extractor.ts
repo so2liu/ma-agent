@@ -42,7 +42,9 @@ export async function extractApiConfig(text: string): Promise<ParseResult> {
       return { error: 'no_valid_info' };
     }
 
-    const parsed = JSON.parse(content.text) as ParseResult;
+    // Strip markdown code fences if present (e.g. ```json ... ```)
+    const jsonText = content.text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+    const parsed = JSON.parse(jsonText) as ParseResult;
 
     // Validate: must have at least one useful field
     if (!parsed.error && !parsed.baseUrl && !parsed.modelId) {
