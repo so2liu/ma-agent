@@ -172,16 +172,21 @@ function Settings() {
   const [activeSection, setActiveSection] = useState('ai-config');
   const contentRef = useRef<HTMLDivElement>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const isScrollingRef = useRef(false);
 
   const scrollToSection = useCallback((sectionId: string) => {
     const el = sectionRefs.current[sectionId];
     if (el && contentRef.current) {
+      isScrollingRef.current = true;
       const containerTop = contentRef.current.getBoundingClientRect().top;
       const elTop = el.getBoundingClientRect().top;
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       contentRef.current.scrollTo({
         top: contentRef.current.scrollTop + (elTop - containerTop) - 12,
-        behavior: 'smooth'
+        behavior: prefersReducedMotion ? 'auto' : 'smooth'
       });
+      // Re-enable scroll tracking after animation settles
+      setTimeout(() => { isScrollingRef.current = false; }, prefersReducedMotion ? 50 : 400);
     }
   }, []);
 
@@ -190,6 +195,7 @@ function Settings() {
     const container = contentRef.current;
     if (!container) return;
     const handleScroll = () => {
+      if (isScrollingRef.current) return;
       const containerTop = container.getBoundingClientRect().top;
       let current: string = NAV_ITEMS[0].id;
       for (const item of NAV_ITEMS) {
@@ -826,7 +832,8 @@ function Settings() {
                       setActiveSection(item.id);
                       scrollToSection(item.id);
                     }}
-                    className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition ${
+                    disabled={isFormLoading}
+                    className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition disabled:opacity-50 ${
                       isActive
                         ? 'bg-neutral-100 font-medium text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100'
                         : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-300'
@@ -842,7 +849,7 @@ function Settings() {
         </nav>
 
         {/* Right content area */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto p-6 pb-12">
+        <div ref={contentRef} className="min-w-0 flex-1 overflow-y-auto p-6 pb-12">
           {isFormLoading ?
             <div className="flex items-center justify-center py-12 text-xs text-neutral-500 dark:text-neutral-400">
               加载中...
