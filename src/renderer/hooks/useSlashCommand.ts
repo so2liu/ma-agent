@@ -9,36 +9,23 @@ export interface SlashCommandItem {
   name: string;
   displayName: string;
   description: string;
-  /** If set, selecting this item replaces the entire input with this prompt */
-  prefillPrompt: string | null;
 }
+
+/** Map from skill card id to its friendly metadata */
+const cardsByName = new Map(
+  skillCards.filter((c) => c.id !== 'more').map((c) => [c.id, c])
+);
 
 function buildSlashItems(installedSkills: SkillInfo[]): SlashCommandItem[] {
   const items: SlashCommandItem[] = [];
-  const seen = new Set<string>();
 
-  // Skill cards first (they have friendly Chinese titles and prefill prompts)
-  for (const card of skillCards) {
-    if (!card.prefillPrompt) continue;
-    seen.add(card.id);
-    items.push({
-      id: `card-${card.id}`,
-      name: card.id,
-      displayName: card.title,
-      description: card.description,
-      prefillPrompt: card.prefillPrompt
-    });
-  }
-
-  // Installed skills not already covered by cards
   for (const skill of installedSkills) {
-    if (seen.has(skill.name)) continue;
+    const card = cardsByName.get(skill.name);
     items.push({
-      id: `skill-${skill.name}`,
+      id: card ? `card-${card.id}` : `skill-${skill.name}`,
       name: skill.name,
-      displayName: skill.name,
-      description: skill.manifest?.description ?? '',
-      prefillPrompt: null
+      displayName: card?.title ?? skill.name,
+      description: card?.description ?? skill.manifest?.description ?? ''
     });
   }
 
