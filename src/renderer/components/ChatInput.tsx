@@ -113,11 +113,7 @@ export default function ChatInput({
 
   const handleSlashSelect = useCallback(
     (item: Parameters<typeof SlashCommandMenu>[0]['items'][number]) => {
-      if (item.prefillPrompt) {
-        onChange(item.prefillPrompt);
-      } else {
-        onChange(`/${item.name} `);
-      }
+      onChange(`/${item.name} `);
       textareaRef.current?.focus();
     },
     [onChange]

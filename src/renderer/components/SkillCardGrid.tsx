@@ -1,5 +1,5 @@
 import { ArrowRight, BarChart3, FileText, Globe, Palette, PenLine, Sparkles } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentType, SVGProps } from 'react';
 
 import type { SkillCard } from '@/constants/skillCards';
@@ -15,7 +15,7 @@ const iconMap: Record<SkillCard['icon'], ComponentType<SVGProps<SVGSVGElement>>>
 };
 
 interface SkillCardGridProps {
-  onSelectSkill: (prefillPrompt: string) => void;
+  onSelectSkill: (slashCommand: string) => void;
   onMoreClick?: () => void;
   currentInput?: string;
 }
@@ -27,8 +27,24 @@ export default function SkillCardGrid({
 }: SkillCardGridProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirmedInput, setConfirmedInput] = useState<string | null>(null);
+  const [installedSkillNames, setInstalledSkillNames] = useState<Set<string> | null>(null);
 
-  const selectedCard = skillCards.find((c) => c.id === selectedId);
+  useEffect(() => {
+    window.electron.skill
+      .list()
+      .then(({ skills }) => setInstalledSkillNames(new Set(skills.map((s) => s.name))))
+      .catch(() => {});
+  }, []);
+
+  const visibleCards = useMemo(
+    () =>
+      skillCards.filter(
+        (card) => card.id === 'more' || !installedSkillNames || installedSkillNames.has(card.id)
+      ),
+    [installedSkillNames]
+  );
+
+  const selectedCard = visibleCards.find((c) => c.id === selectedId);
   const isConfirmed = confirmedInput !== null && confirmedInput === currentInput;
 
   const handlePillClick = useCallback(
@@ -44,15 +60,15 @@ export default function SkillCardGrid({
     [onMoreClick]
   );
 
-  const handleUsePrompt = useCallback(() => {
-    if (!selectedCard?.prefillPrompt) return;
+  const handleUseSkill = useCallback(() => {
+    if (!selectedCard || selectedCard.id === 'more') return;
 
     if (currentInput.trim() && !isConfirmed) {
       setConfirmedInput(currentInput);
       return;
     }
 
-    onSelectSkill(selectedCard.prefillPrompt);
+    onSelectSkill(`/${selectedCard.id} `);
     setSelectedId(null);
     setConfirmedInput(null);
   }, [selectedCard, currentInput, isConfirmed, onSelectSkill]);
@@ -61,7 +77,7 @@ export default function SkillCardGrid({
     <div className="flex w-full max-w-2xl flex-col items-center gap-3 px-4">
       {/* Pill tags */}
       <div className="flex flex-wrap justify-center gap-2">
-        {skillCards.map((card) => {
+        {visibleCards.map((card) => {
           const Icon = iconMap[card.icon];
           const isSelected = card.id === selectedId;
           return (
@@ -133,10 +149,10 @@ export default function SkillCardGrid({
             </div>
 
             <button
-              onClick={handleUsePrompt}
+              onClick={handleUseSkill}
               className="flex items-center gap-1 rounded-lg bg-neutral-800 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-neutral-700 dark:bg-neutral-200 dark:text-neutral-800 dark:hover:bg-neutral-300"
             >
-              {isConfirmed ? '确认替换当前输入' : '使用此场景'}
+              {isConfirmed ? '确认替换当前输入' : '使用此技能'}
               <ArrowRight className="h-3 w-3" />
             </button>
           </div>

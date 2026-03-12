@@ -770,7 +770,18 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
               />
             </div>
             <SkillCardGrid
-              onSelectSkill={(prompt) => setInputValue(prompt)}
+              onSelectSkill={(cmd) => {
+                setInputValue(cmd);
+                requestAnimationFrame(() => {
+                  const textarea = document.querySelector<HTMLTextAreaElement>(
+                    'textarea[placeholder]'
+                  );
+                  if (textarea) {
+                    textarea.focus();
+                    textarea.setSelectionRange(cmd.length, cmd.length);
+                  }
+                });
+              }}
               onMoreClick={onSkillsClick}
               currentInput={inputValue}
             />
