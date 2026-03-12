@@ -1,5 +1,17 @@
-import { ChevronDown, ChevronUp, Loader2, Sparkles, Settings2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Cpu,
+  FolderOpen,
+  Loader2,
+  RefreshCw,
+  Shield,
+  Settings2,
+  Sparkles,
+  Terminal,
+  Wrench
+} from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Switch } from '@/components/ui/switch';
 import type { UpdateChannel } from '@/electron';
@@ -24,6 +36,15 @@ const TIER_LABELS: Record<ChatModelPreference, string> = {
   'smart-sonnet': '均衡',
   'smart-opus': '强力'
 };
+
+const NAV_ITEMS = [
+  { id: 'ai-config', label: 'AI 服务配置', icon: Cpu },
+  { id: 'workspace', label: '工作目录', icon: FolderOpen },
+  { id: 'update', label: '更新通道', icon: RefreshCw },
+  { id: 'privacy', label: '数据与隐私', icon: Shield },
+  { id: 'debug', label: '调试模式', icon: Terminal },
+  { id: 'developer', label: '开发者信息', icon: Wrench }
+] as const;
 
 type ConfigMode = 'auto' | 'manual';
 type AutoConfigStatus = 'idle' | 'parsing' | 'parsed' | 'detecting' | 'saving' | 'success' | 'error';
@@ -146,6 +167,43 @@ function Settings() {
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>('stable');
   const [isLoadingChannel, setIsLoadingChannel] = useState(true);
   const [isSavingChannel, setIsSavingChannel] = useState(false);
+
+  // Navigation sidebar
+  const [activeSection, setActiveSection] = useState('ai-config');
+  const contentRef = useRef<HTMLDivElement>(null);
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+
+  const scrollToSection = useCallback((sectionId: string) => {
+    const el = sectionRefs.current[sectionId];
+    if (el && contentRef.current) {
+      const containerTop = contentRef.current.getBoundingClientRect().top;
+      const elTop = el.getBoundingClientRect().top;
+      contentRef.current.scrollTo({
+        top: contentRef.current.scrollTop + (elTop - containerTop) - 12,
+        behavior: 'smooth'
+      });
+    }
+  }, []);
+
+  // Track active section on scroll
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const containerTop = container.getBoundingClientRect().top;
+      let current: string = NAV_ITEMS[0].id;
+      for (const item of NAV_ITEMS) {
+        const el = sectionRefs.current[item.id];
+        if (el) {
+          const elTop = el.getBoundingClientRect().top - containerTop;
+          if (elTop <= 40) current = item.id;
+        }
+      }
+      setActiveSection(current);
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     window.electron.config
@@ -753,15 +811,45 @@ function Settings() {
         <h1 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">设置</h1>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 pb-12">
-        {isFormLoading ?
-          <div className="flex items-center justify-center py-12 text-xs text-neutral-500 dark:text-neutral-400">
-            加载中...
-          </div>
-        : <div className="mx-auto max-w-2xl space-y-6">
-            {/* Config Mode Selector */}
-            <section className="space-y-3">
+      {/* Two-column layout */}
+      <div className="flex min-h-0 flex-1">
+        {/* Left navigation sidebar */}
+        <nav className="w-44 shrink-0 border-r border-neutral-200 p-3 dark:border-neutral-800">
+          <ul className="space-y-0.5">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeSection === item.id;
+              return (
+                <li key={item.id}>
+                  <button
+                    onClick={() => {
+                      setActiveSection(item.id);
+                      scrollToSection(item.id);
+                    }}
+                    className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition ${
+                      isActive
+                        ? 'bg-neutral-100 font-medium text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100'
+                        : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-300'
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    {item.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {/* Right content area */}
+        <div ref={contentRef} className="flex-1 overflow-y-auto p-6 pb-12">
+          {isFormLoading ?
+            <div className="flex items-center justify-center py-12 text-xs text-neutral-500 dark:text-neutral-400">
+              加载中...
+            </div>
+          : <div className="mx-auto max-w-2xl space-y-6">
+              {/* AI Service Configuration */}
+              <section ref={(el) => { sectionRefs.current['ai-config'] = el; }} className="space-y-3">
               <div>
                 <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
                   AI 服务配置
@@ -1396,7 +1484,7 @@ function Settings() {
             <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
             {/* Workspace Directory */}
-            <section className="space-y-3">
+            <section ref={(el) => { sectionRefs.current['workspace'] = el; }} className="space-y-3">
               <div>
                 <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
                   工作目录
@@ -1437,7 +1525,7 @@ function Settings() {
             <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
             {/* Update Channel */}
-            <section className="space-y-3">
+            <section ref={(el) => { sectionRefs.current['update'] = el; }} className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
@@ -1460,7 +1548,7 @@ function Settings() {
             <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
             {/* Analytics & Privacy */}
-            <section className="space-y-3">
+            <section ref={(el) => { sectionRefs.current['privacy'] = el; }} className="space-y-3">
               <div>
                 <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
                   数据与隐私
@@ -1504,7 +1592,7 @@ function Settings() {
             <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
             {/* Debug Mode */}
-            <section className="space-y-3">
+            <section ref={(el) => { sectionRefs.current['debug'] = el; }} className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
@@ -1525,7 +1613,7 @@ function Settings() {
             <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
             {/* Developer / Debug Info */}
-            <section>
+            <section ref={(el) => { sectionRefs.current['developer'] = el; }}>
               <button
                 onClick={() => {
                   setIsDebugExpanded(!isDebugExpanded);
@@ -1676,8 +1764,9 @@ function Settings() {
                 </div>
               )}
             </section>
-          </div>
-        }
+            </div>
+          }
+        </div>
       </div>
     </div>
   );
