@@ -23,6 +23,7 @@
     "@anthropic-ai/sdk": "^0.78.0",
     "@mariozechner/pi-ai": "^0.57.1",
     "@mariozechner/pi-coding-agent": "^0.57.1",
+    "@tanstack/react-virtual": "^3.13.22",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^12.6.2",
     "posthog-node": "^5.28.0"

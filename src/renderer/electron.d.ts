@@ -243,6 +243,34 @@ export interface ConversationDeleteResponse {
   error?: string;
 }
 
+export interface ConversationSearchTitleMatch {
+  conversationId: string;
+  title: string;
+  updatedAt: number;
+}
+
+export interface ConversationSearchResult {
+  conversationId: string;
+  title: string;
+  matchSnippet: string;
+  matchRole: 'user' | 'assistant';
+  updatedAt: number;
+}
+
+export interface ConversationSearchResponse {
+  success: boolean;
+  titleMatches?: ConversationSearchTitleMatch[];
+  contentMatches?: ConversationSearchResult[];
+  hasMore?: boolean;
+  error?: string;
+}
+
+export interface RetryStatus {
+  attempt: number;
+  maxAttempts: number;
+  retryInMs: number;
+}
+
 export interface SkillInfo {
   name: string;
   manifest: SkillManifest | null;
@@ -345,6 +373,7 @@ export interface ElectronAPI {
     onMessageComplete: (callback: () => void) => () => void;
     onMessageStopped: (callback: () => void) => () => void;
     onMessageError: (callback: (error: string) => void) => () => void;
+    onRetryStatus: (callback: (status: RetryStatus) => void) => () => void;
     onDebugMessage: (callback: (message: string) => void) => () => void;
     onToolUseStart: (callback: (tool: ToolUse) => void) => () => void;
     onToolInputDelta: (callback: (data: ToolInputDelta) => void) => () => void;
@@ -505,6 +534,7 @@ export interface ElectronAPI {
     list: () => Promise<ConversationListResponse>;
     create: (messages: unknown[], sessionId?: string | null) => Promise<ConversationCreateResponse>;
     get: (id: string) => Promise<ConversationGetResponse>;
+    search: (query: string) => Promise<ConversationSearchResponse>;
     update: (
       id: string,
       title?: string,

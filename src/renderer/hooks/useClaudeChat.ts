@@ -2,10 +2,25 @@ import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { BackgroundTask } from '../../shared/types/background-task';
-import type { ToolUse } from '@/electron';
+import type { RetryStatus, ToolUse } from '@/electron';
 import type { Message, ToolInput } from '@/types/chat';
-import { friendlyError } from '@/utils/friendlyError';
+import { classifyError } from '@/utils/friendlyError';
 import { parsePartialJson } from '@/utils/parsePartialJson';
+
+const RETRY_DELAYS_MS = [2000, 4000, 8000] as const;
+
+interface ActiveRetryStatus extends RetryStatus {
+  nextRetryAt: number;
+  secondsRemaining: number;
+}
+
+function createRetryStatus(status: RetryStatus): ActiveRetryStatus {
+  return {
+    ...status,
+    nextRetryAt: Date.now() + status.retryInMs,
+    secondsRemaining: Math.max(1, Math.ceil(status.retryInMs / 1000))
+  };
+}
 
 export function useClaudeChat(): {
   messages: Message[];
@@ -13,12 +28,50 @@ export function useClaudeChat(): {
   isLoading: boolean;
   setIsLoading: Dispatch<SetStateAction<boolean>>;
   backgroundTasks: Map<string, BackgroundTask>;
+  retryStatus: ActiveRetryStatus | null;
 } {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [backgroundTasks, setBackgroundTasks] = useState<Map<string, BackgroundTask>>(new Map());
+  const [retryStatus, setRetryStatus] = useState<ActiveRetryStatus | null>(null);
   const isStreamingRef = useRef(false);
   const debugMessagesRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    if (!retryStatus) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setRetryStatus((current) => {
+        if (!current) {
+          return null;
+        }
+
+        const remainingMs = current.nextRetryAt - Date.now();
+        if (remainingMs > 0) {
+          const nextSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
+          return nextSeconds === current.secondsRemaining ?
+              current
+            : { ...current, secondsRemaining: nextSeconds };
+        }
+
+        if (current.attempt >= current.maxAttempts) {
+          return current.secondsRemaining === 0 ? current : { ...current, secondsRemaining: 0 };
+        }
+
+        const nextAttempt = current.attempt + 1;
+        const nextDelay = RETRY_DELAYS_MS[nextAttempt - 1] ?? current.retryInMs;
+        return createRetryStatus({
+          attempt: nextAttempt,
+          maxAttempts: current.maxAttempts,
+          retryInMs: nextDelay
+        });
+      });
+    }, 250);
+
+    return () => window.clearInterval(timer);
+  }, [retryStatus]);
 
   useEffect(() => {
     // Listen for streaming message chunks
@@ -485,6 +538,7 @@ export function useClaudeChat(): {
     const unsubscribeMessageComplete = window.electron.chat.onMessageComplete(() => {
       isStreamingRef.current = false;
       setIsLoading(false);
+      setRetryStatus(null);
       // Clear background tasks — session turn is done
       setBackgroundTasks(new Map());
       window.electron.analytics.trackEvent({ type: 'message_completed', timestamp: Date.now() });
@@ -543,6 +597,7 @@ export function useClaudeChat(): {
     const unsubscribeMessageStopped = window.electron.chat.onMessageStopped(() => {
       isStreamingRef.current = false;
       setIsLoading(false);
+      setRetryStatus(null);
       // Clear background tasks — session was interrupted
       setBackgroundTasks(new Map());
       window.electron.analytics.trackEvent({ type: 'message_stopped', timestamp: Date.now() });
@@ -615,6 +670,7 @@ export function useClaudeChat(): {
     // Listen for errors
     const unsubscribeMessageError = window.electron.chat.onMessageError((error: string) => {
       isStreamingRef.current = false;
+      setRetryStatus(null);
       // Clear background tasks — session errored
       setBackgroundTasks(new Map());
       window.electron.analytics.trackEvent({ type: 'message_error', timestamp: Date.now() });
@@ -658,16 +714,25 @@ export function useClaudeChat(): {
         });
       }
 
+      const classification = classifyError(error);
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString(),
           role: 'assistant',
-          content: friendlyError(error),
-          timestamp: new Date()
+          content: classification.message,
+          timestamp: new Date(),
+          errorMeta: {
+            rawError: error,
+            actionType: classification.actionType
+          }
         }
       ]);
       setIsLoading(false);
+    });
+
+    const unsubscribeRetryStatus = window.electron.chat.onRetryStatus((status: RetryStatus) => {
+      setRetryStatus(createRetryStatus(status));
     });
 
     // Listen for debug messages (stderr from Claude Code process)
@@ -732,6 +797,7 @@ export function useClaudeChat(): {
       unsubscribeMessageComplete();
       unsubscribeMessageStopped();
       unsubscribeMessageError();
+      unsubscribeRetryStatus();
       unsubscribeDebugMessage();
       unsubscribeTaskProgress();
       unsubscribeTaskNotification();
@@ -743,6 +809,7 @@ export function useClaudeChat(): {
     setMessages,
     isLoading,
     setIsLoading,
-    backgroundTasks
+    backgroundTasks,
+    retryStatus
   };
 }

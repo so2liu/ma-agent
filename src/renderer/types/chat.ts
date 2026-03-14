@@ -14,6 +14,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk/sdk-tools';
 
 import type { ToolUse } from '@/electron';
+import type { ErrorActionType } from '@/utils/friendlyError';
 
 // Re-export SDK types with friendly names
 export type ReadInput = FileReadInput;
@@ -82,10 +83,16 @@ export interface MessageAttachment {
   isImage?: boolean;
 }
 
+export interface MessageErrorMeta {
+  rawError: string;
+  actionType?: ErrorActionType;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string | ContentBlock[];
   timestamp: Date;
   attachments?: MessageAttachment[];
+  errorMeta?: MessageErrorMeta;
 }

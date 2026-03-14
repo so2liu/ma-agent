@@ -10,7 +10,6 @@ import {
   Plus,
   Search,
   Settings,
-  SlidersHorizontal,
   Sparkles,
   SquarePen,
   Timer,
@@ -18,7 +17,13 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { ConversationSummary, Project, ScheduledTask } from '@/electron';
+import type {
+  ConversationSearchResult,
+  ConversationSearchTitleMatch,
+  ConversationSummary,
+  Project,
+  ScheduledTask
+} from '@/electron';
 
 import {
   AlertDialog,
@@ -94,11 +99,16 @@ export default function Sidebar({
   const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [titleMatches, setTitleMatches] = useState<ConversationSearchTitleMatch[]>([]);
+  const [contentMatches, setContentMatches] = useState<ConversationSearchResult[]>([]);
+  const [hasMoreSearchResults, setHasMoreSearchResults] = useState(false);
+  const [isSearchingConversations, setIsSearchingConversations] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null);
   const newProjectInputRef = useRef<HTMLInputElement>(null);
   const editProjectInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cancelledRef = useRef(false);
+  const searchRequestIdRef = useRef(0);
 
   const relativeTimeFormatter = useMemo(
     () => new Intl.RelativeTimeFormat(undefined, { numeric: 'always' }),
@@ -287,6 +297,8 @@ export default function Sidebar({
       conversations.map((c) => [c.id, c.preview || '继续任务...'])
     );
   }, [conversations]);
+  const normalizedSearchQuery = useMemo(() => searchQuery.trim(), [searchQuery]);
+  const isFullTextSearchActive = normalizedSearchQuery.length >= 2;
 
   const formatRelativeDate = useCallback(
     (timestamp: number) => {
@@ -342,25 +354,95 @@ export default function Sidebar({
     return result;
   }, [conversations, projectIds, defaultProjectId]);
 
+  useEffect(() => {
+    if (!isFullTextSearchActive) {
+      searchRequestIdRef.current += 1;
+      setTitleMatches([]);
+      setContentMatches([]);
+      setHasMoreSearchResults(false);
+      setIsSearchingConversations(false);
+      return;
+    }
+
+    const requestId = searchRequestIdRef.current + 1;
+    searchRequestIdRef.current = requestId;
+    setIsSearchingConversations(true);
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await window.electron.conversation.search(normalizedSearchQuery);
+        if (searchRequestIdRef.current !== requestId) return;
+
+        if (response.success) {
+          setTitleMatches(response.titleMatches ?? []);
+          setContentMatches(response.contentMatches ?? []);
+          setHasMoreSearchResults(Boolean(response.hasMore));
+        } else {
+          setTitleMatches([]);
+          setContentMatches([]);
+          setHasMoreSearchResults(false);
+        }
+      } catch (error) {
+        if (searchRequestIdRef.current !== requestId) return;
+        console.error('Error searching conversations:', error);
+        setTitleMatches([]);
+        setContentMatches([]);
+        setHasMoreSearchResults(false);
+      } finally {
+        if (searchRequestIdRef.current === requestId) {
+          setIsSearchingConversations(false);
+        }
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [isFullTextSearchActive, normalizedSearchQuery]);
+
   // Filter by search query
   const filteredScheduledTasks = useMemo(() => {
-    if (!searchQuery.trim()) return scheduledTasks;
-    const q = searchQuery.toLowerCase();
+    if (!normalizedSearchQuery || isFullTextSearchActive) return scheduledTasks;
+    const q = normalizedSearchQuery.toLowerCase();
     return scheduledTasks.filter((task) => task.name.toLowerCase().includes(q));
-  }, [scheduledTasks, searchQuery]);
+  }, [isFullTextSearchActive, normalizedSearchQuery, scheduledTasks]);
 
   const getFilteredConversationsForProject = useCallback(
     (projectId: string) => {
       const projectConvs = grouped[projectId] ?? [];
-      if (!searchQuery.trim()) return projectConvs;
-      const q = searchQuery.toLowerCase();
+      if (!normalizedSearchQuery || isFullTextSearchActive) return projectConvs;
+      const q = normalizedSearchQuery.toLowerCase();
       return projectConvs.filter(
         (conv) =>
           conv.title.toLowerCase().includes(q) ||
           (conversationPreviews[conv.id] ?? '').toLowerCase().includes(q)
       );
     },
-    [grouped, searchQuery, conversationPreviews]
+    [conversationPreviews, grouped, isFullTextSearchActive, normalizedSearchQuery]
+  );
+
+  const renderHighlightedText = useCallback(
+    (text: string) => {
+      if (!normalizedSearchQuery) {
+        return text;
+      }
+
+      const escapedQuery = normalizedSearchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const parts = text.split(new RegExp(`(${escapedQuery})`, 'gi'));
+
+      return parts.map((part, index) => {
+        if (part.toLowerCase() === normalizedSearchQuery.toLowerCase()) {
+          return (
+            <mark
+              key={`${part}-${index}`}
+              className="rounded bg-amber-200/80 px-0.5 text-inherit dark:bg-amber-400/30"
+            >
+              {part}
+            </mark>
+          );
+        }
+        return <span key={`${part}-${index}`}>{part}</span>;
+      });
+    },
+    [normalizedSearchQuery]
   );
 
 
@@ -406,6 +488,62 @@ export default function Sidebar({
           >
             <Trash2 className="h-3 w-3" />
           </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSearchResultItem = (
+    result: ConversationSearchTitleMatch | ConversationSearchResult,
+    kind: 'title' | 'content'
+  ) => {
+    const isActive = result.conversationId === currentConversationId;
+    const isContentResult = kind === 'content' && 'matchSnippet' in result && 'matchRole' in result;
+    const roleLabel =
+      isContentResult ?
+        result.matchRole === 'assistant' ? '助手回复'
+        : '你的消息'
+      : null;
+
+    return (
+      <div
+        key={`${kind}-${result.conversationId}-${result.updatedAt}-${isContentResult ? result.matchSnippet : result.title}`}
+        onClick={() => onLoadConversation(result.conversationId)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onLoadConversation(result.conversationId);
+          }
+        }}
+        tabIndex={0}
+        role="button"
+        className={`group rounded-xl px-2.5 py-2 transition-colors focus-visible:ring-2 focus-visible:ring-neutral-400/50 focus-visible:outline-none ${
+          isActive ?
+            'bg-white shadow-sm dark:bg-neutral-800'
+          : 'hover:bg-white/60 dark:hover:bg-neutral-800/50'
+        }`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] leading-tight text-neutral-800 dark:text-neutral-200">
+              {renderHighlightedText(result.title)}
+            </div>
+            {isContentResult && (
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-neutral-500 dark:text-neutral-400">
+                {renderHighlightedText(result.matchSnippet)}
+              </p>
+            )}
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
+              {formatRelativeDate(result.updatedAt)}
+            </div>
+            {roleLabel && (
+              <div className="mt-1 text-[10px] text-neutral-400 dark:text-neutral-500">
+                {roleLabel}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -530,7 +668,7 @@ export default function Sidebar({
                     }`}
                     title="搜索 / 筛选"
                   >
-                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    <Search className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => {
@@ -562,10 +700,56 @@ export default function Sidebar({
                       setSearchQuery('');
                     }
                   }}
-                  placeholder="搜索任务..."
+                  placeholder="搜索任务或内容..."
                   className="min-w-0 flex-1 bg-transparent text-xs text-neutral-800 placeholder-neutral-400 outline-none dark:text-neutral-200 dark:placeholder-neutral-500"
                 />
               </div>
+            </div>
+          )}
+
+          {!isProjectsCollapsed && isSearchOpen && isFullTextSearchActive && (
+            <div className="mb-2 space-y-2">
+              {isSearchingConversations && (
+                <div className="rounded-xl border border-neutral-200/70 bg-white/70 px-3 py-2 text-xs text-neutral-500 dark:border-neutral-700/70 dark:bg-neutral-800/70 dark:text-neutral-400">
+                  搜索中...
+                </div>
+              )}
+
+              {!isSearchingConversations && titleMatches.length > 0 && (
+                <div className="space-y-1">
+                  <div className="px-1 text-[10px] font-semibold tracking-[0.08em] text-neutral-400 uppercase dark:text-neutral-500">
+                    标题匹配
+                  </div>
+                  <div className="space-y-0.5">
+                    {titleMatches.map((result) => renderSearchResultItem(result, 'title'))}
+                  </div>
+                </div>
+              )}
+
+              {!isSearchingConversations && contentMatches.length > 0 && (
+                <div className="space-y-1">
+                  <div className="px-1 text-[10px] font-semibold tracking-[0.08em] text-neutral-400 uppercase dark:text-neutral-500">
+                    内容匹配
+                  </div>
+                  <div className="space-y-0.5">
+                    {contentMatches.map((result) => renderSearchResultItem(result, 'content'))}
+                  </div>
+                </div>
+              )}
+
+              {!isSearchingConversations &&
+                titleMatches.length === 0 &&
+                contentMatches.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-neutral-200/80 px-3 py-3 text-center text-xs text-neutral-400 dark:border-neutral-700/80 dark:text-neutral-500">
+                    未找到匹配的历史对话
+                  </div>
+                )}
+
+              {!isSearchingConversations && hasMoreSearchResults && (
+                <div className="px-1 text-[11px] text-neutral-400 dark:text-neutral-500">
+                  还有更多结果，请缩小搜索范围
+                </div>
+              )}
             </div>
           )}
 
@@ -594,6 +778,7 @@ export default function Sidebar({
 
           {/* Project list */}
           {!isProjectsCollapsed &&
+            !isFullTextSearchActive &&
             projects.map((project) => {
               const filteredConversations = getFilteredConversationsForProject(project.id);
               const isCollapsed = collapsedProjects.has(project.id);
@@ -676,7 +861,7 @@ export default function Sidebar({
 
 
           {/* Scheduled Tasks sub-section */}
-          {!isProjectsCollapsed && filteredScheduledTasks.length > 0 && (
+          {!isProjectsCollapsed && !isFullTextSearchActive && filteredScheduledTasks.length > 0 && (
             <div className="mt-1 border-t border-neutral-200/50 pt-1 dark:border-neutral-700/50">
               <button
                 onClick={() => {
@@ -741,7 +926,8 @@ export default function Sidebar({
           )}
 
           {/* Search no results */}
-          {searchQuery.trim() &&
+          {!isFullTextSearchActive &&
+            normalizedSearchQuery &&
             projects.every((p) => getFilteredConversationsForProject(p.id).length === 0) &&
             filteredScheduledTasks.length === 0 && (
               <div className="py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">
@@ -756,6 +942,7 @@ export default function Sidebar({
           {!isLoading &&
             conversations.length === 0 &&
             scheduledTasks.length === 0 &&
+            !isFullTextSearchActive &&
             !isProjectsCollapsed && (
               <div className="flex flex-col items-center gap-1.5 py-6 text-center">
                 <MessageSquare className="h-5 w-5 text-neutral-300 dark:text-neutral-600" />
