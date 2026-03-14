@@ -152,6 +152,7 @@ export default function App() {
                 onOpenDbViewer={openDbViewer}
                 onDebugApp={handleDebugApp}
                 onSkillsClick={() => navigate('skills')}
+                onSettingsClick={() => navigate('settings')}
               />
             </div>
             <div className={currentView === 'settings' ? 'block h-full' : 'hidden'}>

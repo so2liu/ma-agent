@@ -60,6 +60,16 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('chat:message-error', listener);
       return () => ipcRenderer.removeListener('chat:message-error', listener);
     },
+    onRetryStatus: (
+      callback: (status: { attempt: number; maxAttempts: number; retryInMs: number }) => void
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        status: { attempt: number; maxAttempts: number; retryInMs: number }
+      ) => callback(status);
+      ipcRenderer.on('chat:retry-status', listener);
+      return () => ipcRenderer.removeListener('chat:retry-status', listener);
+    },
     onDebugMessage: (callback: (message: string) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, message: string) => callback(message);
       ipcRenderer.on('chat:debug-message', listener);
@@ -187,6 +197,7 @@ contextBridge.exposeInMainWorld('electron', {
     create: (messages: unknown[], sessionId?: string | null) =>
       ipcRenderer.invoke('conversation:create', messages, sessionId),
     get: (id: string) => ipcRenderer.invoke('conversation:get', id),
+    search: (query: string) => ipcRenderer.invoke('conversation:search', query),
     update: (id: string, title?: string, messages?: unknown[], sessionId?: string | null) =>
       ipcRenderer.invoke('conversation:update', id, title, messages, sessionId),
     delete: (id: string) => ipcRenderer.invoke('conversation:delete', id),

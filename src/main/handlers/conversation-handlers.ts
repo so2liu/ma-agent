@@ -8,6 +8,7 @@ import {
   getConversation,
   initializeDatabase,
   listConversations,
+  searchConversations,
   setConversationProject,
   updateConversation
 } from '../lib/conversation-db';
@@ -55,6 +56,19 @@ export function registerConversationHandlers(): void {
       return { success: true, conversation };
     } catch (error) {
       console.error('Error getting conversation:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  });
+
+  ipcMain.handle('conversation:search', async (_event, query: string) => {
+    try {
+      const result = await searchConversations(query);
+      return { success: true, ...result };
+    } catch (error) {
+      console.error('Error searching conversations:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'

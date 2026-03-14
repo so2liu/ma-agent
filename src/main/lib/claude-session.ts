@@ -27,6 +27,8 @@ import { isScheduledTaskExecuting } from './schedule-state';
 import { endSessionLog, logSessionEvent, startSessionLog } from './session-logger';
 
 const requireModule = createRequire(import.meta.url);
+const RETRY_BACKOFF_MS = [2000, 4000, 8000] as const;
+const RATE_LIMIT_NOTICE_DEBOUNCE_MS = 5000;
 
 export const MODEL_BY_PREFERENCE = DEFAULT_MODEL_IDS;
 
@@ -82,6 +84,13 @@ let isInterruptingResponse = false;
 const streamIndexToToolId: Map<number, string> = new Map();
 let pendingResumeSessionId: string | null = null;
 let sessionGeneration = 0;
+let lastRateLimitNoticeAt = 0;
+let rateLimitAttempt = 0;
+
+function resetRateLimitTracking(): void {
+  lastRateLimitNoticeAt = 0;
+  rateLimitAttempt = 0;
+}
 
 export function getModelIdForPreference(
   preference: ChatModelPreference = currentModelPreference
@@ -206,6 +215,7 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
   isProcessing = true;
   // Clear stream index mapping for new session
   streamIndexToToolId.clear();
+  resetRateLimitTracking();
   // Capture generation so zombie sessions (from timeout) can't emit events
   const myGeneration = sessionGeneration;
 
@@ -257,7 +267,27 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
                 message
               );
             if (isError) {
-              mainWindow.webContents.send('chat:message-error', message.trim());
+              const trimmedMessage = message.trim();
+              const isRateLimit = /rate.?limit|429/i.test(trimmedMessage);
+
+              if (isRateLimit) {
+                const now = Date.now();
+                if (
+                  rateLimitAttempt === 0 ||
+                  now - lastRateLimitNoticeAt >= RATE_LIMIT_NOTICE_DEBOUNCE_MS
+                ) {
+                  rateLimitAttempt = Math.min(rateLimitAttempt + 1, RETRY_BACKOFF_MS.length);
+                  lastRateLimitNoticeAt = now;
+                  mainWindow.webContents.send('chat:retry-status', {
+                    attempt: rateLimitAttempt,
+                    maxAttempts: RETRY_BACKOFF_MS.length,
+                    retryInMs: RETRY_BACKOFF_MS[rateLimitAttempt - 1]
+                  });
+                }
+              } else {
+                resetRateLimitTracking();
+                mainWindow.webContents.send('chat:message-error', trimmedMessage);
+              }
             }
             // Send debug messages if debug mode is enabled
             if (getDebugMode()) {
@@ -507,11 +537,13 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
     // Clear the queue on error to prevent the finally block from retrying
     // a failing session in an infinite loop.
     clearMessageQueue();
+    resetRateLimitTracking();
     if (mainWindow && !mainWindow.isDestroyed()) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       mainWindow.webContents.send('chat:message-error', errorMessage);
     }
   } finally {
+    resetRateLimitTracking();
     endSessionLog();
     isProcessing = false;
     querySession = null;

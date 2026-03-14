@@ -1,3 +1,6 @@
+import { forwardRef } from 'react';
+import { Copy, RefreshCw, Settings } from 'lucide-react';
+
 import AttachmentPreviewList from '@/components/AttachmentPreviewList';
 import BlockGroup from '@/components/BlockGroup';
 import DeliverableCard from '@/components/DeliverableCard';
@@ -13,6 +16,8 @@ interface MessageProps {
   isLoading?: boolean;
   onDeliverablePreview?: (deliverable: Deliverable) => void;
   conversationId?: string | null;
+  onRetryMessage?: () => void;
+  onOpenSettings?: () => void;
 }
 
 function extractDeliverables(blocks: ContentBlock[]): Deliverable[] {
@@ -40,12 +45,17 @@ function extractDeliverables(blocks: ContentBlock[]): Deliverable[] {
   return deliverables;
 }
 
-export default function Message({
-  message,
-  isLoading = false,
-  onDeliverablePreview,
-  conversationId
-}: MessageProps) {
+const Message = forwardRef<HTMLDivElement, MessageProps>(function Message(
+  {
+    message,
+    isLoading = false,
+    onDeliverablePreview,
+    conversationId,
+    onRetryMessage,
+    onOpenSettings
+  },
+  ref
+) {
   if (message.role === 'user') {
     const userContent = typeof message.content === 'string' ? message.content : '';
     const hasText = userContent.trim().length > 0;
@@ -63,7 +73,7 @@ export default function Message({
       })) ?? [];
 
     return (
-      <div className="flex justify-end px-1">
+      <div ref={ref} className="flex justify-end px-1">
         <article className="relative max-w-[min(34rem,calc(100%-2rem))] rounded-2xl border border-neutral-200/70 bg-white px-3 py-2 text-base leading-relaxed text-neutral-900 shadow-sm shadow-black/5 dark:border-neutral-800/60 dark:bg-neutral-900/70 dark:text-neutral-50 dark:shadow-black/30">
           {hasText && (
             <div className="prose prose-base max-w-none prose-neutral dark:prose-invert">
@@ -83,11 +93,42 @@ export default function Message({
   // Assistant message
   if (typeof message.content === 'string') {
     return (
-      <div className="flex justify-start">
+      <div ref={ref} className="flex justify-start">
         <article className="w-full px-3 py-2">
           <div className="prose prose-base max-w-none text-base leading-relaxed prose-neutral dark:prose-invert">
             <Markdown>{message.content}</Markdown>
           </div>
+          {message.errorMeta && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {message.errorMeta.actionType === 'settings' && onOpenSettings && (
+                <button
+                  onClick={onOpenSettings}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  前往设置
+                </button>
+              )}
+              {message.errorMeta.actionType === 'retry' && onRetryMessage && (
+                <button
+                  onClick={onRetryMessage}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  手动重试
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(message.errorMeta?.rawError ?? '').catch(() => {});
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                复制错误详情
+              </button>
+            </div>
+          )}
           {!isLoading && (
             <MessageFeedbackComponent messageId={message.id} conversationId={conversationId} />
           )}
@@ -138,7 +179,7 @@ export default function Message({
   const isStreaming = isLoading && hasIncompleteBlocks;
 
   return (
-    <div className="flex justify-start">
+    <div ref={ref} className="flex justify-start">
       <article className="w-full px-3 py-2">
         <div className="space-y-3">
           {groupedBlocks.map((item, index) => {
@@ -188,4 +229,6 @@ export default function Message({
       </article>
     </div>
   );
-}
+});
+
+export default Message;

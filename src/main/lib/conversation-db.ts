@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
+import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { app } from 'electron';
 
@@ -15,6 +16,26 @@ export interface Conversation {
 /** Lightweight version returned by listConversations — no full messages payload */
 export interface ConversationSummary extends Omit<Conversation, 'messages'> {
   preview: string;
+}
+
+export interface ConversationSearchTitleMatch {
+  conversationId: string;
+  title: string;
+  updatedAt: number;
+}
+
+export interface ConversationSearchResult {
+  conversationId: string;
+  title: string;
+  matchSnippet: string;
+  matchRole: 'user' | 'assistant';
+  updatedAt: number;
+}
+
+export interface ConversationSearchResponse {
+  titleMatches: ConversationSearchTitleMatch[];
+  contentMatches: ConversationSearchResult[];
+  hasMore: boolean;
 }
 
 interface ConversationFile {
@@ -192,6 +213,50 @@ function extractPreview(messages: unknown[], maxLength: number = 90): string {
   return '';
 }
 
+function collectTextParts(content: unknown, parts: string[]): void {
+  if (typeof content === 'string') {
+    parts.push(content);
+    return;
+  }
+
+  if (Array.isArray(content)) {
+    content.forEach((item) => collectTextParts(item, parts));
+    return;
+  }
+
+  if (typeof content !== 'object' || content === null) {
+    return;
+  }
+
+  if ('text' in content && typeof content.text === 'string') {
+    parts.push(content.text);
+  }
+  // Exclude 'thinking' blocks — internal model reasoning should not be searchable
+  if ('content' in content) {
+    collectTextParts(content.content, parts);
+  }
+}
+
+function extractSearchableText(content: unknown): string {
+  const parts: string[] = [];
+  collectTextParts(content, parts);
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function createMatchSnippet(text: string, query: string, contextSize: number = 40): string {
+  const normalizedText = text.replace(/\s+/g, ' ').trim();
+  const matchIndex = normalizedText.toLowerCase().indexOf(query);
+  if (matchIndex === -1) {
+    return truncatePreview(normalizedText, contextSize * 2);
+  }
+
+  const start = Math.max(0, matchIndex - contextSize);
+  const end = Math.min(normalizedText.length, matchIndex + query.length + contextSize);
+  const prefix = start > 0 ? '...' : '';
+  const suffix = end < normalizedText.length ? '...' : '';
+  return `${prefix}${normalizedText.slice(start, end)}${suffix}`;
+}
+
 export function listConversations(limit: number = 100): ConversationSummary[] {
   const dir = getConversationsDir();
   const files = readdirSync(dir)
@@ -224,6 +289,91 @@ export function listConversations(limit: number = 100): ConversationSummary[] {
     sessionId: conversationFile.sessionId ?? null,
     projectId: conversationFile.projectId ?? null
   }));
+}
+
+export async function searchConversations(query: string): Promise<ConversationSearchResponse> {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.length < 2) {
+    return { titleMatches: [], contentMatches: [], hasMore: false };
+  }
+
+  const dir = getConversationsDir();
+  const files = (await readdir(dir)).filter((file) => file.endsWith('.json'));
+  const titleMatches: ConversationSearchTitleMatch[] = [];
+  const contentMatches: ConversationSearchResult[] = [];
+
+  await Promise.all(
+    files.map(async (file) => {
+      const filePath = join(dir, file);
+
+      try {
+        const fileContent = await readFile(filePath, 'utf-8');
+        const conversationFile = JSON.parse(fileContent) as ConversationFile;
+        const conversationId = conversationFile.id ?? file.replace('.json', '');
+
+        if (conversationFile.title.toLowerCase().includes(normalizedQuery)) {
+          titleMatches.push({
+            conversationId,
+            title: conversationFile.title,
+            updatedAt: conversationFile.updatedAt
+          });
+        }
+
+        for (const message of conversationFile.messages) {
+          if (
+            typeof message !== 'object' ||
+            message === null ||
+            !('content' in message) ||
+            !('role' in message)
+          ) {
+            continue;
+          }
+
+          const text = extractSearchableText(message.content);
+          if (!text || !text.toLowerCase().includes(normalizedQuery)) {
+            continue;
+          }
+
+          const role = message.role === 'assistant' ? 'assistant' : 'user';
+          contentMatches.push({
+            conversationId,
+            title: conversationFile.title,
+            matchSnippet: createMatchSnippet(text, normalizedQuery),
+            matchRole: role,
+            updatedAt: conversationFile.updatedAt
+          });
+        }
+      } catch (error) {
+        console.error(`Error searching conversation file ${file}:`, error);
+      }
+    })
+  );
+
+  titleMatches.sort((a, b) => b.updatedAt - a.updatedAt);
+  contentMatches.sort((a, b) => b.updatedAt - a.updatedAt);
+
+  const limitedTitleMatches: ConversationSearchTitleMatch[] = [];
+  const limitedContentMatches: ConversationSearchResult[] = [];
+  const combinedMatches = [
+    ...titleMatches.map((match) => ({ kind: 'title' as const, match })),
+    ...contentMatches.map((match) => ({ kind: 'content' as const, match }))
+  ]
+    .sort((a, b) => b.match.updatedAt - a.match.updatedAt)
+    .slice(0, 50);
+
+  combinedMatches.forEach((entry) => {
+    if (entry.kind === 'title') {
+      limitedTitleMatches.push(entry.match);
+      return;
+    }
+    limitedContentMatches.push(entry.match);
+  });
+
+  return {
+    titleMatches: limitedTitleMatches,
+    contentMatches: limitedContentMatches,
+    hasMore: titleMatches.length + contentMatches.length > combinedMatches.length
+  };
 }
 
 export function deleteConversation(id: string): void {

@@ -14,6 +14,7 @@ import AppPanel from '@/components/AppPanel';
 import type { Artifact } from '@/components/ArtifactPanel';
 import ArtifactPanel from '@/components/ArtifactPanel';
 import ChatInput from '@/components/ChatInput';
+import DropZoneOverlay from '@/components/DropZoneOverlay';
 import FileTree from '@/components/FileTree';
 import BackgroundTaskIndicator from '@/components/BackgroundTaskIndicator';
 import FloatingTaskPanel from '@/components/FloatingTaskPanel';
@@ -23,11 +24,12 @@ import SkillCardGrid from '@/components/SkillCardGrid';
 import DragRegion from '@/components/TitleBar';
 import type { AppInfo } from '@/electron';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import type { Message, MessageAttachment } from '@/types/chat';
 import { extractArtifacts } from '@/utils/artifacts';
-import { friendlyError } from '@/utils/friendlyError';
+import { suggestPromptForFiles } from '@/utils/filePromptSuggestion';
+import { classifyError } from '@/utils/friendlyError';
 
 import { MAX_ATTACHMENT_BYTES } from '../../shared/constants';
 import { getArtifactType, getFileExtension } from '../../shared/file-extensions';
@@ -134,6 +136,24 @@ interface ChatProps {
   onOpenDbViewer?: (appId: string, appName: string) => void;
   onDebugApp?: (conversationId: string, errorMsg: string) => void;
   onSkillsClick?: () => void;
+  onSettingsClick?: () => void;
+}
+
+interface LastSubmittedPayload {
+  text: string;
+  attachments: SerializedAttachmentPayload[];
+  hasAttachments: boolean;
+}
+
+/** Strip binary ArrayBuffer data from attachments to avoid memory leaks. */
+function clearPayloadBinaryData(payload: LastSubmittedPayload): LastSubmittedPayload {
+  return {
+    ...payload,
+    attachments: payload.attachments.map((a) => ({
+      ...a,
+      data: new ArrayBuffer(0)
+    }))
+  };
 }
 
 function TopBarDropdown({
@@ -192,7 +212,8 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     setSelectedProjectId,
     onOpenDbViewer,
     onDebugApp,
-    onSkillsClick
+    onSkillsClick,
+    onSettingsClick
   },
   ref
 ) {
@@ -201,6 +222,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   const [chatInputHeight, setChatInputHeight] = useState(0);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [isGlobalDragActive, setIsGlobalDragActive] = useState(false);
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
   const [modelPreference, setModelPreference] = useState<ChatModelPreference>('fast');
   const [isModelPreferenceUpdating, setIsModelPreferenceUpdating] = useState(false);
@@ -213,12 +235,15 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   const appsRef = useRef(apps);
   appsRef.current = apps;
   const projectIdForNewChatRef = useRef<string | null>(null);
-  const { messages, setMessages, isLoading, setIsLoading, backgroundTasks } = useClaudeChat();
+  const { messages, setMessages, isLoading, setIsLoading, backgroundTasks, retryStatus } =
+    useClaudeChat();
   const { track } = useAnalytics();
-  const messagesContainerRef = useAutoScroll(isLoading, messages);
+  const isOnline = useOnlineStatus();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef(true);
   const pendingAttachmentsRef = useRef<PendingAttachment[]>([]);
+  const lastSubmittedPayloadRef = useRef<LastSubmittedPayload | null>(null);
+  const globalDragCounterRef = useRef(0);
 
   // Extract artifacts from messages
   const artifacts = useMemo(() => extractArtifacts(messages), [messages]);
@@ -296,48 +321,123 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     return () => clearInterval(timer);
   }, [refreshApps]);
 
-  const handleFilesSelected = (fileList: FileList | File[]) => {
-    const files = Array.from(fileList || []);
-    if (files.length === 0) return;
+  const handleFilesSelected = useCallback(
+    (fileList: FileList | File[]) => {
+      const files = Array.from(fileList || []);
+      if (files.length === 0) return;
 
-    const processFiles = async () => {
-      const accepted: PendingAttachment[] = [];
-      let rejectionMessage: string | null = null;
+      const processFiles = async () => {
+        const accepted: PendingAttachment[] = [];
+        let rejectionMessage: string | null = null;
 
-      for (const file of files) {
-        if (file.size > MAX_ATTACHMENT_BYTES) {
-          const workspaceLabel = workspaceDir ?? WORKSPACE_FALLBACK_LABEL;
-          rejectionMessage =
-            `"${file.name}" 超过 ${MAX_ATTACHMENT_SIZE_MB} MB 大小限制，` +
-            `请将文件直接放到工作目录 ${workspaceLabel} 中。`;
-          continue;
-        }
-
-        const isImage = isLikelyImageFile(file);
-        let previewUrl: string | undefined;
-        let previewIsBlobUrl = false;
-
-        if (isImage) {
-          const preview = await createImagePreview(file);
-          if (preview?.url) {
-            previewUrl = preview.url;
-            previewIsBlobUrl = preview.isBlob;
+        for (const file of files) {
+          if (file.size > MAX_ATTACHMENT_BYTES) {
+            const workspaceLabel = workspaceDir ?? WORKSPACE_FALLBACK_LABEL;
+            rejectionMessage =
+              `"${file.name}" 超过 ${MAX_ATTACHMENT_SIZE_MB} MB 大小限制，` +
+              `请将文件直接放到工作目录 ${workspaceLabel} 中。`;
+            continue;
           }
+
+          const isImage = isLikelyImageFile(file);
+          let previewUrl: string | undefined;
+          let previewIsBlobUrl = false;
+
+          if (isImage) {
+            const preview = await createImagePreview(file);
+            if (preview?.url) {
+              previewUrl = preview.url;
+              previewIsBlobUrl = preview.isBlob;
+            }
+          }
+
+          accepted.push({ id: crypto.randomUUID(), file, previewUrl, previewIsBlobUrl, isImage });
         }
 
-        accepted.push({ id: crypto.randomUUID(), file, previewUrl, previewIsBlobUrl, isImage });
-      }
+        if (accepted.length > 0) {
+          setPendingAttachments((prev) => [...prev, ...accepted]);
+          track('attachment_added', { count: accepted.length });
+        }
+        if (rejectionMessage) setAttachmentError(rejectionMessage);
+        else if (accepted.length > 0) setAttachmentError(null);
+      };
 
-      if (accepted.length > 0) {
-        setPendingAttachments((prev) => [...prev, ...accepted]);
-        track('attachment_added', { count: accepted.length });
-      }
-      if (rejectionMessage) setAttachmentError(rejectionMessage);
-      else if (accepted.length > 0) setAttachmentError(null);
+      void processFiles();
+    },
+    [track, workspaceDir]
+  );
+
+  useEffect(() => {
+    const isFileDrag = (event: DragEvent) =>
+      Array.from(event.dataTransfer?.types ?? []).includes('Files');
+
+    const resetGlobalDragState = () => {
+      globalDragCounterRef.current = 0;
+      setIsGlobalDragActive(false);
     };
 
-    void processFiles();
-  };
+    const handleWindowDragEnter = (event: DragEvent) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      globalDragCounterRef.current += 1;
+      setIsGlobalDragActive(true);
+    };
+
+    const handleWindowDragOver = (event: DragEvent) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'copy';
+      }
+      setIsGlobalDragActive(true);
+    };
+
+    const handleWindowDragLeave = (event: DragEvent) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      globalDragCounterRef.current = Math.max(0, globalDragCounterRef.current - 1);
+      if (globalDragCounterRef.current === 0) {
+        setIsGlobalDragActive(false);
+      }
+    };
+
+    const handleWindowDrop = (event: DragEvent) => {
+      if (!isFileDrag(event)) return;
+
+      resetGlobalDragState();
+
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      if (files.length === 0) {
+        return;
+      }
+
+      const suggestedPrompt = suggestPromptForFiles(files);
+      if (suggestedPrompt) {
+        setInputValue((currentValue) =>
+          currentValue.trim().length === 0 ? suggestedPrompt : currentValue
+        );
+      }
+
+      if (!event.defaultPrevented) {
+        event.preventDefault();
+        handleFilesSelected(files);
+      }
+
+      event.dataTransfer?.clearData();
+    };
+
+    window.addEventListener('dragenter', handleWindowDragEnter);
+    window.addEventListener('dragover', handleWindowDragOver);
+    window.addEventListener('dragleave', handleWindowDragLeave);
+    window.addEventListener('drop', handleWindowDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleWindowDragEnter);
+      window.removeEventListener('dragover', handleWindowDragOver);
+      window.removeEventListener('dragleave', handleWindowDragLeave);
+      window.removeEventListener('drop', handleWindowDrop);
+    };
+  }, [handleFilesSelected]);
 
   const handleRemoveAttachment = (attachmentId: string) => {
     setPendingAttachments((prev) => {
@@ -354,6 +454,73 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     });
     setAttachmentError(null);
   };
+
+  const appendAssistantErrorMessage = useCallback(
+    (rawError: string) => {
+      const classification = classifyError(rawError);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: classification.message,
+          timestamp: new Date(),
+          errorMeta: {
+            rawError,
+            actionType: classification.actionType
+          }
+        }
+      ]);
+      setIsLoading(false);
+    },
+    [setIsLoading, setMessages]
+  );
+
+  const submitMessagePayload = useCallback(
+    async (
+      payload: LastSubmittedPayload,
+      options?: { trackEvent?: boolean; userMessageId?: string }
+    ): Promise<void> => {
+      setIsLoading(true);
+
+      try {
+        const response = await window.electron.chat.sendMessage({
+          text: payload.text,
+          attachments: payload.attachments.length > 0 ? payload.attachments : undefined
+        });
+
+        if (options?.trackEvent) {
+          track('message_sent', { model: modelPreference, hasAttachments: payload.hasAttachments });
+        }
+
+        if (!response.success && response.error) {
+          appendAssistantErrorMessage(response.error);
+          return;
+        }
+
+        if (response.attachments?.length && options?.userMessageId) {
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (msg.id !== options.userMessageId || !msg.attachments?.length) return msg;
+              const updatedAttachments = msg.attachments.map((attachment, index) => {
+                const saved = response.attachments?.[index];
+                if (!saved) return attachment;
+                return {
+                  ...attachment,
+                  savedPath: saved.savedPath,
+                  relativePath: saved.relativePath
+                };
+              });
+              return { ...msg, attachments: updatedAttachments };
+            })
+          );
+        }
+      } catch (error) {
+        appendAssistantErrorMessage(error instanceof Error ? error.message : 'Unknown error');
+      }
+    },
+    [appendAssistantErrorMessage, modelPreference, setIsLoading, setMessages, track]
+  );
 
   // Auto-save conversation when messages change
   useEffect(() => {
@@ -544,62 +711,37 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
       );
     } catch (error) {
       releaseAttachmentPreviews(attachmentsToSend);
-      const errorMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant' as const,
-        content: friendlyError(error instanceof Error ? error.message : 'preparing attachments'),
-        timestamp: new Date()
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      setIsLoading(false);
+      appendAssistantErrorMessage(error instanceof Error ? error.message : 'preparing attachments');
       return;
     }
 
     releaseAttachmentPreviews(attachmentsToSend);
-
-    try {
-      const response = await window.electron.chat.sendMessage({
-        text: trimmedMessage,
-        attachments: serializedAttachments.length > 0 ? serializedAttachments : undefined
-      });
-      track('message_sent', { model: modelPreference, hasAttachments });
-      if (!response.success && response.error) {
-        const errorMessage = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant' as const,
-          content: friendlyError(response.error),
-          timestamp: new Date()
-        };
-        setMessages((prev) => [...prev, errorMessage]);
-        setIsLoading(false);
-      } else if (response.attachments?.length) {
-        setMessages((prev) =>
-          prev.map((msg) => {
-            if (msg.id !== userMessage.id || !msg.attachments?.length) return msg;
-            const updatedAttachments = msg.attachments.map((attachment, index) => {
-              const saved = response.attachments?.[index];
-              if (!saved) return attachment;
-              return {
-                ...attachment,
-                savedPath: saved.savedPath,
-                relativePath: saved.relativePath
-              };
-            });
-            return { ...msg, attachments: updatedAttachments };
-          })
-        );
-      }
-    } catch (error) {
-      const errorMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant' as const,
-        content: friendlyError(error instanceof Error ? error.message : 'Unknown error'),
-        timestamp: new Date()
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      setIsLoading(false);
-    }
+    const payload: LastSubmittedPayload = {
+      text: trimmedMessage,
+      attachments: serializedAttachments,
+      hasAttachments
+    };
+    // Keep a lightweight copy for retry (strip binary data to avoid memory leak)
+    lastSubmittedPayloadRef.current = clearPayloadBinaryData(payload);
+    await submitMessagePayload(payload, { trackEvent: true, userMessageId: userMessage.id });
   };
+
+  const handleRetryLastMessage = useCallback(async () => {
+    const payload = lastSubmittedPayloadRef.current;
+    if (!payload || isLoading || payload.hasAttachments) {
+      return;
+    }
+
+    setMessages((prev) => {
+      const lastMessage = prev[prev.length - 1];
+      if (lastMessage?.role === 'assistant' && lastMessage.errorMeta?.actionType === 'retry') {
+        return prev.slice(0, -1);
+      }
+      return prev;
+    });
+
+    await submitMessagePayload(payload);
+  }, [isLoading, setMessages, submitMessagePayload]);
 
   const handleStopStreaming = async () => {
     if (!isLoading) return;
@@ -653,6 +795,12 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   const DEFAULT_BOTTOM_PADDING = 160;
   const messageListBottomPadding =
     chatInputHeight > 0 ? chatInputHeight + INPUT_BOTTOM_OFFSET : DEFAULT_BOTTOM_PADDING;
+  const retryMessage =
+    retryStatus ?
+      retryStatus.secondsRemaining > 0 ?
+        `AI 正忙，等待重试中（${retryStatus.secondsRemaining}s）…`
+      : 'AI 正忙，正在重试…'
+    : null;
 
   const handleModelPreferenceChange = async (preference: ChatModelPreference) => {
     if (preference === modelPreference) return;
@@ -681,7 +829,9 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   };
 
   return (
-    <Group className="flex h-full overflow-hidden">
+    <>
+      {isGlobalDragActive && <DropZoneOverlay />}
+      <Group className="flex h-full overflow-hidden">
       {/* Chat area */}
       <Panel minSize="300px" className="relative flex flex-col overflow-hidden">
         {/* Top bar with drag region and dropdown buttons */}
@@ -731,6 +881,23 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
             )}
           </div>
         </div>
+
+        {(!isOnline || retryMessage) && (
+          <div className="px-3 pt-3">
+            <div className="mx-auto flex max-w-3xl flex-col gap-2">
+              {!isOnline && (
+                <div className="rounded-2xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  当前网络可能已断开，恢复后可继续发送消息。
+                </div>
+              )}
+              {retryMessage && (
+                <div className="rounded-2xl border border-sky-200/80 bg-sky-50/90 px-3 py-2 text-sm text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100">
+                  {retryMessage}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {messages.length === 0 && !isLoading ?
           /* Welcome layout: centered input + skill cards */
@@ -791,9 +958,12 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
             <MessageList
               messages={messages}
               isLoading={isLoading}
-              containerRef={messagesContainerRef}
               bottomPadding={messageListBottomPadding}
               conversationId={currentConversationId}
+              onRetryMessage={
+                lastSubmittedPayloadRef.current?.hasAttachments ? undefined : handleRetryLastMessage
+              }
+              onOpenSettings={onSettingsClick}
               onDeliverablePreview={(d) =>
                 setSelectedArtifact({
                   id: d.id,
@@ -844,7 +1014,8 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
           </Panel>
         </>
       )}
-    </Group>
+      </Group>
+    </>
   );
 });
 
