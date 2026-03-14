@@ -3,6 +3,7 @@ import { join } from 'path';
 import { app, BrowserWindow, Menu } from 'electron';
 
 import { registerAnalyticsHandlers } from './handlers/analytics-handlers';
+import { registerCanvasHandlers } from './handlers/canvas-handlers';
 import { registerAppHandlers } from './handlers/app-handlers';
 import { registerChatHandlers } from './handlers/chat-handlers';
 import { registerConfigHandlers } from './handlers/config-handlers';
@@ -129,6 +130,7 @@ app.whenReady().then(async () => {
   registerSkillHandlers(() => mainWindow);
   registerScheduleHandlers();
   registerAnalyticsHandlers();
+  registerCanvasHandlers(() => mainWindow);
 
   createWindow();
 

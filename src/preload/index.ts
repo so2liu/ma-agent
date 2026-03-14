@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
+import type { SimpleElement } from '../shared/types/canvas';
 import type { TaskNotificationEvent, TaskProgressEvent } from '../shared/types/background-task';
 import type {
   AgentProvider,
@@ -287,6 +288,41 @@ contextBridge.exposeInMainWorld('electron', {
     getSettings: () => ipcRenderer.invoke('analytics:get-settings') as Promise<AnalyticsSettings>,
     setSettings: (settings: Partial<AnalyticsSettings>) =>
       ipcRenderer.invoke('analytics:set-settings', settings) as Promise<AnalyticsSettings>
+  },
+  canvas: {
+    loadFile: (filePath: string) => ipcRenderer.invoke('canvas:load-file', filePath),
+    saveFile: (filePath: string, content: string) =>
+      ipcRenderer.invoke('canvas:save-file', filePath, content),
+    createFile: (filePath: string) => ipcRenderer.invoke('canvas:create-file', filePath),
+    updateState: (filePath: string, elements: SimpleElement[]) =>
+      ipcRenderer.invoke('canvas:update-state', filePath, elements),
+    getState: (filePath: string) => ipcRenderer.invoke('canvas:get-state', filePath),
+    applySdkResult: (filePath: string, intermediateElementsJson: string) =>
+      ipcRenderer.invoke('canvas:apply-sdk-result', filePath, intermediateElementsJson),
+    screenshot: (filePath: string, outputPath: string) =>
+      ipcRenderer.invoke('canvas:screenshot', filePath, outputPath),
+    onElementsUpdated: (
+      callback: (data: { filePath: string; intermediateElements: unknown[] }) => void
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { filePath: string; intermediateElements: unknown[] }
+      ) => callback(data);
+      ipcRenderer.on('canvas:elements-updated', listener);
+      return () => ipcRenderer.removeListener('canvas:elements-updated', listener);
+    },
+    onScreenshotRequest: (
+      callback: (data: { filePath: string; outputPath: string }) => void
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { filePath: string; outputPath: string }
+      ) => callback(data);
+      ipcRenderer.on('canvas:screenshot-request', listener);
+      return () => ipcRenderer.removeListener('canvas:screenshot-request', listener);
+    },
+    sendScreenshotResult: (result: { success: boolean; path?: string; error?: string }) =>
+      ipcRenderer.send('canvas:screenshot-result', result)
   },
   update: {
     getStatus: () => ipcRenderer.invoke('update:get-status'),

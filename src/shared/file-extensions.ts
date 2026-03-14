@@ -45,6 +45,8 @@ export const CODE_EXTENSIONS = new Set([
 
 export const TEXT_EXTENSIONS = new Set(['txt', 'csv', 'tsv']);
 
+export const EXCALIDRAW_EXTENSIONS = new Set(['excalidraw']);
+
 /** All extensions that can be read as UTF-8 text (superset used by main process). */
 export const ALL_TEXT_EXTENSIONS = new Set([
   ...HTML_EXTENSIONS,
@@ -67,10 +69,11 @@ export const PREVIEWABLE_EXTENSIONS = new Set([
   ...IMAGE_EXTENSIONS,
   ...MARKDOWN_EXTENSIONS,
   ...CODE_EXTENSIONS,
-  ...TEXT_EXTENSIONS
+  ...TEXT_EXTENSIONS,
+  ...EXCALIDRAW_EXTENSIONS
 ]);
 
-export type ArtifactType = 'html' | 'image' | 'markdown' | 'code' | 'text';
+export type ArtifactType = 'html' | 'image' | 'markdown' | 'code' | 'text' | 'excalidraw';
 
 export function getArtifactType(ext: string): ArtifactType | null {
   if (HTML_EXTENSIONS.has(ext)) return 'html';
@@ -78,6 +81,7 @@ export function getArtifactType(ext: string): ArtifactType | null {
   if (MARKDOWN_EXTENSIONS.has(ext)) return 'markdown';
   if (CODE_EXTENSIONS.has(ext)) return 'code';
   if (TEXT_EXTENSIONS.has(ext)) return 'text';
+  if (EXCALIDRAW_EXTENSIONS.has(ext)) return 'excalidraw';
   return null;
 }
 
