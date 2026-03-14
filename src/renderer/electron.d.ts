@@ -1,4 +1,5 @@
 import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
+import type { SimpleElement } from '../shared/types/canvas';
 import type { TaskNotificationEvent, TaskProgressEvent } from '../shared/types/background-task';
 import type {
   AgentProvider,
@@ -583,6 +584,49 @@ export interface ElectronAPI {
     submitFeedback: (feedback: MessageFeedback) => Promise<void>;
     getSettings: () => Promise<AnalyticsSettings>;
     setSettings: (settings: Partial<AnalyticsSettings>) => Promise<AnalyticsSettings>;
+  };
+  canvas: {
+    loadFile: (filePath: string) => Promise<{
+      success: boolean;
+      elements?: SimpleElement[];
+      error?: string;
+    }>;
+    saveFile: (filePath: string, content: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    createFile: (filePath: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    updateState: (filePath: string, elements: SimpleElement[]) => Promise<{
+      success: boolean;
+    }>;
+    getState: (filePath: string) => Promise<{
+      success: boolean;
+      elements?: SimpleElement[];
+      error?: string;
+    }>;
+    applySdkResult: (filePath: string, intermediateElementsJson: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    screenshot: (filePath: string, outputPath: string) => Promise<{
+      success: boolean;
+      path?: string;
+      error?: string;
+    }>;
+    onElementsUpdated: (
+      callback: (data: { filePath: string; intermediateElements: unknown[] }) => void
+    ) => () => void;
+    onScreenshotRequest: (
+      callback: (data: { filePath: string; outputPath: string }) => void
+    ) => () => void;
+    sendScreenshotResult: (result: {
+      success: boolean;
+      path?: string;
+      error?: string;
+    }) => void;
   };
   update: {
     getStatus: () => Promise<UpdateStatus>;

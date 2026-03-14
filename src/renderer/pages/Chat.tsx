@@ -12,8 +12,10 @@ import { Group, Panel } from 'react-resizable-panels';
 
 import AppPanel from '@/components/AppPanel';
 import type { Artifact } from '@/components/ArtifactPanel';
-import ArtifactPanel from '@/components/ArtifactPanel';
+import CanvasChangeAttachment from '@/components/CanvasChangeAttachment';
 import ChatInput from '@/components/ChatInput';
+import type { WorkspaceTab } from '@/components/TabBar';
+import WorkspacePanel from '@/components/WorkspacePanel';
 import DropZoneOverlay from '@/components/DropZoneOverlay';
 import FileTree from '@/components/FileTree';
 import BackgroundTaskIndicator from '@/components/BackgroundTaskIndicator';
@@ -24,6 +26,7 @@ import SkillCardGrid from '@/components/SkillCardGrid';
 import DragRegion from '@/components/TitleBar';
 import type { AppInfo } from '@/electron';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { useCanvasChanges } from '@/hooks/useCanvasChanges';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import type { Message, MessageAttachment } from '@/types/chat';
@@ -228,7 +231,10 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   const [isModelPreferenceUpdating, setIsModelPreferenceUpdating] = useState(false);
   const [customModelActive, setCustomModelActive] = useState(false);
   const [customModelIds, setCustomModelIds] = useState<CustomModelIds>({});
-  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
+  const [openTabs, setOpenTabs] = useState<WorkspaceTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [artifactMap] = useState(() => new Map<string, Artifact>());
+  const canvasChanges = useCanvasChanges();
   const [showFilesDropdown, setShowFilesDropdown] = useState(false);
   const [showAppsDropdown, setShowAppsDropdown] = useState(false);
   const [apps, setApps] = useState<AppInfo[]>([]);
@@ -248,14 +254,65 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   // Extract artifacts from messages
   const artifacts = useMemo(() => extractArtifacts(messages), [messages]);
 
+  // Helper: open artifact or excalidraw file as a tab
+  const openTab = useCallback(
+    (artifact: Artifact) => {
+      const isExcalidraw = artifact.type === 'excalidraw';
+      const tabId = `tab-${artifact.filePath}`;
+
+      setOpenTabs((prev) => {
+        const existing = prev.find((t) => t.id === tabId);
+        if (existing) return prev;
+        return [
+          ...prev,
+          {
+            id: tabId,
+            type: isExcalidraw ? 'excalidraw' : 'artifact',
+            title: artifact.fileName,
+            filePath: artifact.filePath
+          }
+        ];
+      });
+
+      if (!isExcalidraw) {
+        artifactMap.set(tabId, artifact);
+      }
+
+      setActiveTabId(tabId);
+    },
+    [artifactMap]
+  );
+
+  const closeTab = useCallback(
+    (tabId: string) => {
+      artifactMap.delete(tabId);
+      setOpenTabs((prev) => prev.filter((t) => t.id !== tabId));
+      setActiveTabId((prev) => {
+        if (prev !== tabId) return prev;
+        // Switch to the last remaining tab
+        const remaining = openTabs.filter((t) => t.id !== tabId);
+        return remaining.length > 0 ? remaining[remaining.length - 1].id : null;
+      });
+    },
+    [artifactMap, openTabs]
+  );
+
+  const handleTabDirtyChange = useCallback((tabId: string, isDirty: boolean) => {
+    setOpenTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, isDirty } : t)));
+  }, []);
+
+  // Derived: is the right panel visible?
+  const hasOpenTabs = openTabs.length > 0;
+
   // Auto-select the latest artifact when new ones appear
   const prevArtifactCountRef = useRef(0);
   useEffect(() => {
     if (artifacts.length > prevArtifactCountRef.current && artifacts.length > 0) {
-      setSelectedArtifact(artifacts[artifacts.length - 1]);
+      const latest = artifacts[artifacts.length - 1];
+      openTab(latest);
     }
     prevArtifactCountRef.current = artifacts.length;
-  }, [artifacts]);
+  }, [artifacts, openTab]);
 
   useEffect(() => {
     let isMounted = true;
@@ -613,7 +670,10 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
       setInputValue('');
       setCurrentConversationId(null);
       setCurrentSessionId(null);
-      setSelectedArtifact(null);
+      setOpenTabs([]);
+      setActiveTabId(null);
+      artifactMap.clear();
+      canvasChanges.clearChanges();
       prevArtifactCountRef.current = 0;
       isInitialLoadRef.current = true;
       projectIdForNewChatRef.current = selectedProjectId;
@@ -650,7 +710,10 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
         setMessages(parsedMessages);
         setCurrentConversationId(conversationId);
         setCurrentSessionId(response.conversation.sessionId ?? null);
-        setSelectedArtifact(null);
+        setOpenTabs([]);
+        setActiveTabId(null);
+        artifactMap.clear();
+        canvasChanges.clearChanges();
         prevArtifactCountRef.current = 0;
         isInitialLoadRef.current = true;
         if (response.conversation.projectId) {
@@ -671,8 +734,23 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
 
   const handleSendMessage = async () => {
     const trimmedMessage = inputValue.trim();
-    const hasSendableContent = trimmedMessage.length > 0 || pendingAttachments.length > 0;
+    const hasCanvasChanges = canvasChanges.totalChanges > 0;
+    const hasSendableContent =
+      trimmedMessage.length > 0 || pendingAttachments.length > 0 || hasCanvasChanges;
     if (!hasSendableContent || isLoading) return;
+
+    // Append canvas changes as context to the message text (per file)
+    let messageText = trimmedMessage;
+    if (hasCanvasChanges) {
+      const sections: string[] = [];
+      for (const [fp, changes] of canvasChanges.changesByFile) {
+        const changeSummary = changes.map((c) => `- ${c.summary}`).join('\n');
+        sections.push(`[画布变更: ${fp}]\n${changeSummary}`);
+      }
+      const canvasContext = '\n\n' + sections.join('\n\n');
+      messageText = trimmedMessage ? trimmedMessage + canvasContext : canvasContext.trim();
+      canvasChanges.clearChanges();
+    }
 
     const hasAttachments = pendingAttachments.length > 0;
     const attachmentsToSend = pendingAttachments;
@@ -691,7 +769,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     const userMessage = {
       id: Date.now().toString(),
       role: 'user' as const,
-      content: trimmedMessage,
+      content: messageText,
       timestamp: new Date(),
       attachments: messageAttachments.length > 0 ? messageAttachments : undefined
     };
@@ -717,7 +795,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
 
     releaseAttachmentPreviews(attachmentsToSend);
     const payload: LastSubmittedPayload = {
-      text: trimmedMessage,
+      text: messageText,
       attachments: serializedAttachments,
       hasAttachments
     };
@@ -761,7 +839,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     const type = getArtifactType(ext);
 
     if (type) {
-      setSelectedArtifact({
+      openTab({
         id: `file-${filePath}`,
         filePath,
         fileName,
@@ -771,17 +849,14 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   };
 
   const handleFileDeleted = (deletedPath: string, isDirectory: boolean) => {
-    if (!selectedArtifact) return;
-    if (isDirectory) {
-      if (
-        selectedArtifact.filePath === deletedPath ||
-        selectedArtifact.filePath.startsWith(deletedPath + '/')
-      ) {
-        setSelectedArtifact(null);
-      }
-    } else if (selectedArtifact.filePath === deletedPath) {
-      setSelectedArtifact(null);
-    }
+    setOpenTabs((prev) =>
+      prev.filter((tab) => {
+        if (isDirectory) {
+          return tab.filePath !== deletedPath && !tab.filePath.startsWith(deletedPath + '/');
+        }
+        return tab.filePath !== deletedPath;
+      })
+    );
   };
 
   useImperativeHandle(ref, () => ({
@@ -854,7 +929,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                     handleFileSelect(path);
                     setShowFilesDropdown(false);
                   }}
-                  selectedPath={selectedArtifact?.filePath ?? null}
+                  selectedPath={openTabs.find((t) => t.id === activeTabId)?.filePath ?? null}
                   onFileDeleted={handleFileDeleted}
                 />
               </div>
@@ -927,7 +1002,11 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 attachments={pendingAttachments}
                 onFilesSelected={handleFilesSelected}
                 onRemoveAttachment={handleRemoveAttachment}
-                canSend={Boolean(inputValue.trim()) || pendingAttachments.length > 0}
+                canSend={
+                  Boolean(inputValue.trim()) ||
+                  pendingAttachments.length > 0 ||
+                  canvasChanges.totalChanges > 0
+                }
                 attachmentError={attachmentError}
                 modelPreference={modelPreference}
                 onModelPreferenceChange={handleModelPreferenceChange}
@@ -965,7 +1044,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
               }
               onOpenSettings={onSettingsClick}
               onDeliverablePreview={(d) =>
-                setSelectedArtifact({
+                openTab({
                   id: d.id,
                   filePath: d.filePath,
                   fileName: d.fileName,
@@ -986,7 +1065,11 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 attachments={pendingAttachments}
                 onFilesSelected={handleFilesSelected}
                 onRemoveAttachment={handleRemoveAttachment}
-                canSend={Boolean(inputValue.trim()) || pendingAttachments.length > 0}
+                canSend={
+                  Boolean(inputValue.trim()) ||
+                  pendingAttachments.length > 0 ||
+                  canvasChanges.totalChanges > 0
+                }
                 attachmentError={attachmentError}
                 modelPreference={modelPreference}
                 onModelPreferenceChange={handleModelPreferenceChange}
@@ -997,6 +1080,12 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                   <>
                     <BackgroundTaskIndicator backgroundTasks={backgroundTasks} />
                     <FloatingTaskPanel messages={messages} />
+                    {canvasChanges.totalChanges > 0 && (
+                      <CanvasChangeAttachment
+                        changesByFile={canvasChanges.changesByFile}
+                        onDismiss={canvasChanges.clearChanges}
+                      />
+                    )}
                   </>
                 }
               />
@@ -1005,12 +1094,20 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
         }
       </Panel>
 
-      {/* Right: artifact preview panel */}
-      {selectedArtifact && (
+      {/* Right: workspace panel with tabs */}
+      {hasOpenTabs && (
         <>
           <ResizeHandle />
           <Panel defaultSize="400px" minSize="280px" maxSize="700px">
-            <ArtifactPanel artifact={selectedArtifact} onClose={() => setSelectedArtifact(null)} />
+            <WorkspacePanel
+              tabs={openTabs}
+              activeTabId={activeTabId}
+              onSelectTab={setActiveTabId}
+              onCloseTab={closeTab}
+              onTabDirtyChange={handleTabDirtyChange}
+              artifactMap={artifactMap}
+              onCanvasElementsChange={canvasChanges.handleElementsChange}
+            />
           </Panel>
         </>
       )}

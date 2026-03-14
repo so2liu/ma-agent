@@ -1,0 +1,11 @@
+{
+  "id": "excalidraw",
+  "name": "excalidraw",
+  "version": "1.0.0",
+  "description": "Draw diagrams and flowcharts using Excalidraw canvas via TypeScript SDK",
+  "license": "MIT",
+  "shared": false,
+  "tags": ["drawing", "diagram", "flowchart", "excalidraw"],
+  "createdAt": "2026-03-14T00:00:00.000Z",
+  "updatedAt": "2026-03-14T00:00:00.000Z"
+}
