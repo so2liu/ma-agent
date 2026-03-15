@@ -77,7 +77,14 @@ def main():
         key = f"{prefix}/{filename}"
         size_mb = os.path.getsize(filepath) / (1024 * 1024)
         print(f"  Uploading {filename} ({size_mb:.1f} MB) -> {key}")
-        client.put_object_from_file(bucket, key, filepath)
+        # Use multipart upload with parallel threads for large files
+        client.upload_file(
+            bucket,
+            key,
+            filepath,
+            part_size=10 * 1024 * 1024,  # 10MB parts
+            task_num=4,  # 4 parallel upload threads
+        )
         print(f"  Done: {filename}")
 
     print(f"\nAll {len(files_to_upload)} file(s) uploaded successfully.")
