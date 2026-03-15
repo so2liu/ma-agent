@@ -31,8 +31,8 @@ export interface AppConfig {
   updateChannel?: UpdateChannel;
   customModelId?: string; // Legacy single override — migrated to customModelIds
   customModelIds?: CustomModelIds;
-  /** Active agent provider: 'anthropic' (default) or 'openai' */
-  agentProvider?: AgentProvider;
+  /** Active agent runtime, with legacy values accepted during migration */
+  agentProvider?: AgentProvider | 'anthropic' | 'openai';
   /** OpenAI provider configuration */
   openai?: OpenAIConfig;
 }
@@ -535,7 +535,10 @@ export function setCustomModelIds(ids: CustomModelIds): void {
 
 export function getAgentProvider(): AgentProvider {
   const config = loadConfig();
-  return config.agentProvider === 'openai' ? 'openai' : 'anthropic';
+  const stored = config.agentProvider;
+  if (stored === 'anthropic') return 'claude-sdk';
+  if (stored === 'openai') return 'pi';
+  return stored === 'pi' ? 'pi' : 'claude-sdk';
 }
 
 export function setAgentProvider(provider: AgentProvider): void {

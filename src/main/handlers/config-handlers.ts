@@ -11,7 +11,13 @@ import Anthropic, {
 } from '@anthropic-ai/sdk';
 import { app, ipcMain } from 'electron';
 
-import type { AgentProvider, CustomModelIds, OpenAIConfig, ProbeDetail } from '../../shared/types/ipc';
+import type {
+  AgentProvider,
+  CustomModelIds,
+  LlmProvider,
+  OpenAIConfig,
+  ProbeDetail
+} from '../../shared/types/ipc';
 import { getModelIdForPreference } from '../lib/claude-session';
 import {
   buildClaudeSessionEnv,
@@ -518,7 +524,7 @@ export function registerConfigHandlers(): void {
     return url.replace(/\/v1\/(chat\/completions|completions|models|messages)\/?$/i, '');
   }
 
-  // Auto-detect provider type by probing both Anthropic and OpenAI endpoints
+  // Auto-detect LLM protocol by probing both Anthropic and OpenAI endpoints
   ipcMain.handle(
     'config:auto-detect-provider',
     async (
@@ -622,12 +628,12 @@ export function registerConfigHandlers(): void {
       const [first, second] =
         tryAnthropicFirst ?
           [
-            { probe: probeAnthropic, provider: 'anthropic' as const },
-            { probe: probeOpenAI, provider: 'openai' as const }
+            { probe: probeAnthropic, provider: 'anthropic' as LlmProvider },
+            { probe: probeOpenAI, provider: 'openai' as LlmProvider }
           ]
         : [
-            { probe: probeOpenAI, provider: 'openai' as const },
-            { probe: probeAnthropic, provider: 'anthropic' as const }
+            { probe: probeOpenAI, provider: 'openai' as LlmProvider },
+            { probe: probeAnthropic, provider: 'anthropic' as LlmProvider }
           ];
 
       const probes: ProbeDetail[] = [];
