@@ -11,6 +11,7 @@ import type {
   SerializedAttachmentPayload
 } from '../../shared/types/ipc';
 import {
+  applyChatModelPreference,
   getCurrentModelPreference,
   interruptCurrentResponse,
   isSessionActive,
@@ -18,8 +19,7 @@ import {
   setChatModelPreference,
   startStreamingSession
 } from '../lib/claude-session';
-import { getAgentProvider, getApiKey, getOpenAIApiKey, getWorkspaceDir } from '../lib/config';
-import { messageQueue } from '../lib/message-queue';
+import { getApiKey, getOpenAIApiKey, getWorkspaceDir } from '../lib/config';
 import {
   getPiModelForPreference,
   interruptOpenAIResponse,
@@ -28,11 +28,20 @@ import {
   sendOpenAIMessage
 } from '../lib/openai-session';
 import { isScheduledTaskExecuting } from '../lib/schedule-state';
+import { sessionManager } from '../lib/session-manager';
 import { buildPlainTextWithAttachments, buildUserMessage, sanitizeFileName } from './chat-helpers';
 
 export function registerChatHandlers(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle('chat:send-message', async (_event, payload: SendMessagePayload) => {
-    const provider = getAgentProvider();
+    const normalizedPayload = payload ?? { chatId: '', text: '', attachments: [] };
+    const chatId = normalizedPayload.chatId?.trim() ?? '';
+
+    if (!chatId) {
+      return { success: false, error: 'Chat ID is required.' };
+    }
+
+    const session = sessionManager.getOrCreate(chatId);
+    const provider = session.provider;
 
     if (provider === 'pi') {
       const modelId = getPiModelForPreference(getCurrentModelPreference());
@@ -61,7 +70,6 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
       }
     }
 
-    const normalizedPayload = payload ?? { text: '', attachments: [] };
     const text = normalizedPayload.text?.trim() ?? '';
     const attachments = normalizedPayload.attachments ?? [];
 
@@ -84,7 +92,12 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
       if (provider === 'pi') {
         // Pi path: build plain text with attachment instructions, send directly
         const fullText = buildPlainTextWithAttachments(text, savedAttachments);
-        sendOpenAIMessage(getMainWindow(), fullText, getCurrentModelPreference()).catch((error) => {
+        sendOpenAIMessage(
+          getMainWindow(),
+          chatId,
+          fullText,
+          getCurrentModelPreference()
+        ).catch((error) => {
           console.error('Failed to send Pi message:', error);
         });
         return { success: true, attachments: savedAttachments };
@@ -94,15 +107,15 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
       const userMessage = buildUserMessage(text, savedAttachments);
 
       // Start streaming session if not already running
-      if (!isSessionActive()) {
-        startStreamingSession(getMainWindow()).catch((error) => {
+      if (!isSessionActive(chatId)) {
+        startStreamingSession(getMainWindow(), chatId).catch((error) => {
           console.error('Failed to start streaming session:', error);
         });
       }
 
       // Queue the message
       await new Promise<void>((resolve) => {
-        messageQueue.push({ message: userMessage, resolve });
+        session.messageQueue.push({ message: userMessage, resolve });
       });
 
       return { success: true, attachments: savedAttachments };
@@ -113,39 +126,78 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
     }
   });
 
-  ipcMain.handle('chat:reset-session', async (_event, resumeSessionId?: string | null) => {
-    try {
-      // Reset both sessions to handle provider switches cleanly
-      await resetSession(resumeSessionId);
-      await resetOpenAISession();
-      return { success: true };
-    } catch (error) {
-      console.error('Error resetting session:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      return { success: false, error: errorMessage };
+  ipcMain.handle(
+    'chat:reset-session',
+    async (_event, chatId: string, resumeSessionId?: string | null) => {
+      if (!chatId?.trim()) {
+        return { success: false, error: 'Chat ID is required.' };
+      }
+
+      const session = sessionManager.getOrCreate(chatId);
+
+      try {
+        if (session.provider === 'pi') {
+          await resetOpenAISession(chatId);
+        } else {
+          await resetSession(chatId, resumeSessionId);
+        }
+        return { success: true };
+      } catch (error) {
+        console.error('Error resetting session:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        return { success: false, error: errorMessage };
+      }
     }
-  });
+  );
 
-  ipcMain.handle('chat:stop-message', async () => {
+  ipcMain.handle('chat:stop-message', async (_event, chatId: string) => {
+    if (!chatId?.trim()) {
+      return { success: false, error: 'Chat ID is required.' };
+    }
+
     try {
+      const session = sessionManager.get(chatId);
+      if (!session) {
+        return { success: false, error: 'No active session for this chat.' };
+      }
       const mainWindow = getMainWindow();
-      const provider = getAgentProvider();
 
-      if (provider === 'pi') {
-        const wasInterrupted = await interruptOpenAIResponse(mainWindow);
+      if (session.provider === 'pi') {
+        const wasInterrupted = await interruptOpenAIResponse(mainWindow, chatId);
         if (!wasInterrupted) {
           return { success: false, error: 'No active response to stop.' };
         }
         return { success: true };
       }
 
-      const wasInterrupted = await interruptCurrentResponse(mainWindow);
+      const wasInterrupted = await interruptCurrentResponse(mainWindow, chatId);
       if (!wasInterrupted) {
         return { success: false, error: 'No active response to stop.' };
       }
       return { success: true };
     } catch (error) {
       console.error('Error stopping response:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      return { success: false, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('chat:destroy-session', async (_event, chatId: string) => {
+    if (!chatId?.trim()) {
+      return { success: false, error: 'Chat ID is required.' };
+    }
+
+    try {
+      const session = sessionManager.get(chatId);
+      if (session?.provider === 'pi') {
+        await resetOpenAISession(chatId);
+        await sessionManager.destroy(chatId);
+      } else {
+        await sessionManager.destroy(chatId);
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Error destroying session:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       return { success: false, error: errorMessage };
     }
@@ -160,6 +212,12 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
   ipcMain.handle('chat:set-model-preference', async (_event, preference: ChatModelPreference) => {
     try {
       await setChatModelPreference(preference);
+      for (const chatId of sessionManager.listActive()) {
+        const session = sessionManager.get(chatId);
+        if (session?.provider === 'claude-sdk') {
+          await applyChatModelPreference(chatId, preference);
+        }
+      }
       return { success: true, preference: getCurrentModelPreference() };
     } catch (error) {
       console.error('Error updating model preference:', error);

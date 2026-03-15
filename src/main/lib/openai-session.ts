@@ -32,16 +32,91 @@ import {
   getOpenAIModelId,
   getWorkspaceDir
 } from './config';
+import { sendChatEvent } from './ipc-utils';
 
-let piSession: AgentSession | null = null;
-let isProcessing = false;
-let shouldAbortSession = false;
-let sessionTerminationPromise: Promise<void> | null = null;
-let currentUnsubscribe: (() => void) | null = null;
-let currentPiModelKey: string | null = null;
+interface OpenAIChatSession {
+  chatId: string;
+  piSession: AgentSession | null;
+  isProcessing: boolean;
+  shouldAbortSession: boolean;
+  sessionTerminationPromise: Promise<void> | null;
+  resolveTermination: (() => void) | null;
+  unsubscribe: (() => void) | null;
+  nextToolStreamIndex: number;
+  toolResultSnapshots: Map<string, string>;
+  currentPiModelKey: string | null;
+}
 
-// Tool call ID counter for generating unique IDs when pi doesn't provide them
+const openAISessions = new Map<string, OpenAIChatSession>();
 let toolCallCounter = 0;
+
+function createOpenAIChatSession(chatId: string): OpenAIChatSession {
+  return {
+    chatId,
+    piSession: null,
+    isProcessing: false,
+    shouldAbortSession: false,
+    sessionTerminationPromise: null,
+    resolveTermination: null,
+    unsubscribe: null,
+    nextToolStreamIndex: 0,
+    toolResultSnapshots: new Map(),
+    currentPiModelKey: null
+  };
+}
+
+function getOrCreateOpenAIChatSession(chatId: string): OpenAIChatSession {
+  const existing = openAISessions.get(chatId);
+  if (existing) {
+    return existing;
+  }
+
+  const session = createOpenAIChatSession(chatId);
+  openAISessions.set(chatId, session);
+  return session;
+}
+
+function clearToolTracking(session: OpenAIChatSession): void {
+  session.nextToolStreamIndex = 0;
+  session.toolResultSnapshots.clear();
+}
+
+function stringifyToolContent(content: unknown): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  if (content === null || typeof content === 'undefined') {
+    return '';
+  }
+
+  try {
+    return JSON.stringify(content, null, 2);
+  } catch {
+    return String(content);
+  }
+}
+
+function getIncrementalDelta(previous: string, next: string): string {
+  if (!previous) {
+    return next;
+  }
+
+  if (next.startsWith(previous)) {
+    return next.slice(previous.length);
+  }
+
+  let sharedPrefixLength = 0;
+  const maxPrefixLength = Math.min(previous.length, next.length);
+  while (sharedPrefixLength < maxPrefixLength) {
+    if (previous[sharedPrefixLength] !== next[sharedPrefixLength]) {
+      break;
+    }
+    sharedPrefixLength += 1;
+  }
+
+  return next.slice(sharedPrefixLength);
+}
 
 /**
  * Resolve the Pi model to use based on preference.
@@ -146,54 +221,73 @@ export function resolveModel(modelId: string): Model<Api> | undefined {
   return undefined;
 }
 
-async function disposePiSession(): Promise<void> {
-  if (piSession) {
+async function disposePiSession(session: OpenAIChatSession): Promise<void> {
+  if (session.piSession) {
     try {
-      await piSession.abort();
+      await session.piSession.abort();
     } catch {
       // Ignore abort errors during session disposal
     }
-    piSession.dispose();
-    piSession = null;
+    session.piSession.dispose();
+    session.piSession = null;
   }
 
-  if (currentUnsubscribe) {
-    currentUnsubscribe();
-    currentUnsubscribe = null;
+  if (session.unsubscribe) {
+    session.unsubscribe();
+    session.unsubscribe = null;
   }
 
-  currentPiModelKey = null;
+  session.currentPiModelKey = null;
 }
 
-export function isOpenAISessionActive(): boolean {
-  return isProcessing || piSession !== null;
+export function isOpenAISessionActive(chatId?: string): boolean {
+  if (chatId) {
+    const session = openAISessions.get(chatId);
+    return Boolean(session?.isProcessing || session?.piSession);
+  }
+
+  return Array.from(openAISessions.values()).some(
+    (session) => session.isProcessing || session.piSession !== null
+  );
 }
 
-export async function interruptOpenAIResponse(mainWindow: BrowserWindow | null): Promise<boolean> {
-  if (!piSession) return false;
+export async function interruptOpenAIResponse(
+  mainWindow: BrowserWindow | null,
+  chatId: string
+): Promise<boolean> {
+  const session = openAISessions.get(chatId);
+  if (!session?.piSession || !session.isProcessing) {
+    return false;
+  }
 
   try {
-    await piSession.abort();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('chat:message-stopped');
-    }
+    await session.piSession.abort();
+    sendChatEvent(mainWindow, 'chat:message-stopped', chatId);
     return true;
   } catch (error) {
-    console.error('Failed to interrupt OpenAI response:', error);
+    console.error('Failed to interrupt Pi response:', error);
     throw error;
   }
 }
 
-export async function resetOpenAISession(): Promise<void> {
-  shouldAbortSession = true;
-  await disposePiSession();
-
-  if (sessionTerminationPromise) {
-    await sessionTerminationPromise;
+export async function resetOpenAISession(chatId: string): Promise<void> {
+  const session = openAISessions.get(chatId);
+  if (!session) {
+    return;
   }
 
-  isProcessing = false;
-  sessionTerminationPromise = null;
+  session.shouldAbortSession = true;
+  clearToolTracking(session);
+  await disposePiSession(session);
+
+  if (session.sessionTerminationPromise) {
+    await session.sessionTerminationPromise;
+  }
+
+  session.isProcessing = false;
+  session.resolveTermination = null;
+  session.sessionTerminationPromise = null;
+  openAISessions.delete(chatId);
 }
 
 /**
@@ -202,19 +296,20 @@ export async function resetOpenAISession(): Promise<void> {
  */
 export async function sendOpenAIMessage(
   mainWindow: BrowserWindow | null,
+  chatId: string,
   text: string,
   modelPreference: ChatModelPreference
 ): Promise<void> {
-  if (sessionTerminationPromise) {
-    await sessionTerminationPromise;
+  const session = getOrCreateOpenAIChatSession(chatId);
+
+  if (session.sessionTerminationPromise) {
+    await session.sessionTerminationPromise;
   }
 
-  shouldAbortSession = false;
-  isProcessing = true;
-
-  let resolveTermination: () => void;
-  sessionTerminationPromise = new Promise((resolve) => {
-    resolveTermination = resolve;
+  session.shouldAbortSession = false;
+  session.isProcessing = true;
+  session.sessionTerminationPromise = new Promise((resolve) => {
+    session.resolveTermination = resolve;
   });
 
   try {
@@ -227,12 +322,12 @@ export async function sendOpenAIMessage(
 
     const modelKey = `${model.provider}:${model.id}:${model.baseUrl ?? ''}`;
 
-    if (piSession && currentPiModelKey !== modelKey) {
-      await disposePiSession();
+    if (session.piSession && session.currentPiModelKey !== modelKey) {
+      await disposePiSession(session);
     }
 
     // Create session if needed
-    if (!piSession) {
+    if (!session.piSession) {
       const authStorage = AuthStorage.inMemory();
       if (isAnthropicModel(model)) {
         const apiKey = getApiKey();
@@ -248,7 +343,7 @@ export async function sendOpenAIMessage(
         authStorage.setRuntimeApiKey('openai', apiKey);
       }
 
-      const { session } = await createAgentSession({
+      const { session: agentSession } = await createAgentSession({
         cwd: getWorkspaceDir(),
         authStorage,
         model,
@@ -257,117 +352,138 @@ export async function sendOpenAIMessage(
         sessionManager: SessionManager.inMemory()
       });
 
-      // Set the system prompt
-      session.agent.setSystemPrompt(SYSTEM_PROMPT_APPEND);
+      agentSession.agent.setSystemPrompt(SYSTEM_PROMPT_APPEND);
+      session.piSession = agentSession;
+      session.currentPiModelKey = modelKey;
+      session.unsubscribe = agentSession.subscribe((event: AgentSessionEvent) => {
+        if (session.shouldAbortSession) {
+          return;
+        }
 
-      piSession = session;
-      currentPiModelKey = modelKey;
+        if (!mainWindow || mainWindow.isDestroyed()) {
+          return;
+        }
 
-      // Subscribe to events and translate to IPC
-      currentUnsubscribe = piSession.subscribe((event: AgentSessionEvent) => {
-        if (shouldAbortSession) return;
-        if (!mainWindow || mainWindow.isDestroyed()) return;
-
-        handlePiEvent(mainWindow, event);
+        handlePiEvent(mainWindow, session, event);
       });
     }
 
-    // Send the prompt
-    await piSession.prompt(text);
+    await session.piSession.prompt(text);
   } catch (error) {
     console.error('Error in Pi session:', error);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      mainWindow.webContents.send('chat:message-error', errorMessage);
-    }
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    sendChatEvent(mainWindow, 'chat:message-error', chatId, { error: errorMessage });
   } finally {
-    isProcessing = false;
-    resolveTermination!();
+    clearToolTracking(session);
+    session.isProcessing = false;
+    session.resolveTermination?.();
+    session.resolveTermination = null;
+    session.sessionTerminationPromise = null;
   }
 }
 
 /**
  * Translate pi-coding-agent events into IPC events the renderer understands.
  */
-function handlePiEvent(mainWindow: BrowserWindow, event: AgentSessionEvent): void {
+function handlePiEvent(
+  mainWindow: BrowserWindow,
+  session: OpenAIChatSession,
+  event: AgentSessionEvent
+): void {
+  const { chatId } = session;
+
   if (getDebugMode()) {
-    mainWindow.webContents.send(
-      'chat:debug-message',
-      `[pi] ${event.type}: ${JSON.stringify(event).slice(0, 200)}`
-    );
+    sendChatEvent(mainWindow, 'chat:debug-message', chatId, {
+      message: `[pi] ${event.type}: ${JSON.stringify(event).slice(0, 200)}`
+    });
   }
 
   switch (event.type) {
     case 'message_update': {
       const assistantEvent = event.assistantMessageEvent;
       if (assistantEvent.type === 'text_delta') {
-        mainWindow.webContents.send('chat:message-chunk', assistantEvent.delta);
+        sendChatEvent(mainWindow, 'chat:message-chunk', chatId, {
+          chunk: assistantEvent.delta
+        });
       } else if (assistantEvent.type === 'thinking_delta') {
-        mainWindow.webContents.send('chat:thinking-chunk', {
+        sendChatEvent(mainWindow, 'chat:thinking-chunk', chatId, {
           index: 0,
           delta: assistantEvent.delta
         });
       } else if (assistantEvent.type === 'thinking_start') {
-        mainWindow.webContents.send('chat:thinking-start', { index: 0 });
+        sendChatEvent(mainWindow, 'chat:thinking-start', chatId, { index: 0 });
       }
       break;
     }
 
     case 'tool_execution_start': {
       const toolId = event.toolCallId || `tool-${++toolCallCounter}`;
-      mainWindow.webContents.send('chat:tool-use-start', {
+      const streamIndex = session.nextToolStreamIndex;
+      session.nextToolStreamIndex += 1;
+      session.toolResultSnapshots.delete(toolId);
+
+      sendChatEvent(mainWindow, 'chat:tool-use-start', chatId, {
         id: toolId,
         name: event.toolName,
         input: event.args || {},
-        streamIndex: toolCallCounter
+        streamIndex
       });
       break;
     }
 
     case 'tool_execution_update': {
-      const updateToolId = event.toolCallId || '';
-      if (event.partialResult) {
-        const content =
-          typeof event.partialResult === 'string' ?
-            event.partialResult
-          : JSON.stringify(event.partialResult, null, 2);
-        mainWindow.webContents.send('chat:tool-result-start', {
-          toolUseId: updateToolId,
+      const toolUseId = event.toolCallId || '';
+      if (!toolUseId || !event.partialResult) {
+        break;
+      }
+
+      const content = stringifyToolContent(event.partialResult);
+      const previousSnapshot = session.toolResultSnapshots.get(toolUseId) ?? '';
+      if (!previousSnapshot) {
+        sendChatEvent(mainWindow, 'chat:tool-result-start', chatId, {
+          toolUseId,
           content,
           isError: false
         });
+      } else {
+        const delta = getIncrementalDelta(previousSnapshot, content);
+        if (delta) {
+          sendChatEvent(mainWindow, 'chat:tool-result-delta', chatId, {
+            toolUseId,
+            delta
+          });
+        }
       }
+
+      session.toolResultSnapshots.set(toolUseId, content);
       break;
     }
 
     case 'tool_execution_end': {
-      const endToolId = event.toolCallId || '';
-      const resultContent =
-        typeof event.result === 'string' ? event.result : JSON.stringify(event.result, null, 2);
-      mainWindow.webContents.send('chat:tool-result-complete', {
-        toolUseId: endToolId,
+      const toolUseId = event.toolCallId || '';
+      const resultContent = stringifyToolContent(event.result);
+      sendChatEvent(mainWindow, 'chat:tool-result-complete', chatId, {
+        toolUseId,
         content: resultContent,
         isError: event.isError
       });
+      session.toolResultSnapshots.delete(toolUseId);
       break;
     }
 
     case 'agent_end': {
-      mainWindow.webContents.send('chat:message-complete');
+      sendChatEvent(mainWindow, 'chat:message-complete', chatId);
       break;
     }
 
     case 'auto_retry_start': {
-      mainWindow.webContents.send(
-        'chat:debug-message',
-        `Auto-retry attempt ${event.attempt}/${event.maxAttempts}: ${event.errorMessage}`
-      );
+      sendChatEvent(mainWindow, 'chat:debug-message', chatId, {
+        message: `Auto-retry attempt ${event.attempt}/${event.maxAttempts}: ${event.errorMessage}`
+      });
       break;
     }
 
     default:
-      // Other events (turn_start, turn_end, message_start, message_end, etc.)
-      // are internal lifecycle events that don't need IPC translation
       break;
   }
 }

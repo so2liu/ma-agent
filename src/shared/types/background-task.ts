@@ -1,4 +1,5 @@
 export interface TaskProgressEvent {
+  chatId?: string;
   taskId: string;
   toolUseId?: string;
   description: string;
@@ -9,6 +10,7 @@ export interface TaskProgressEvent {
 }
 
 export interface TaskNotificationEvent {
+  chatId?: string;
   taskId: string;
   toolUseId?: string;
   status: 'completed' | 'failed' | 'stopped';

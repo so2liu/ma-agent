@@ -272,6 +272,67 @@ export interface RetryStatus {
   retryInMs: number;
 }
 
+export interface ChatMessageChunkEvent {
+  chatId: string;
+  chunk: string;
+}
+
+export interface ChatLifecycleEvent {
+  chatId: string;
+}
+
+export interface ChatMessageErrorEvent {
+  chatId: string;
+  error: string;
+}
+
+export interface ChatRetryStatusEvent extends RetryStatus {
+  chatId: string;
+}
+
+export interface ChatDebugMessageEvent {
+  chatId: string;
+  message: string;
+}
+
+export interface ChatThinkingStartEvent extends ThinkingStart {
+  chatId: string;
+}
+
+export interface ChatThinkingChunkEvent extends ThinkingChunk {
+  chatId: string;
+}
+
+export interface ChatToolUseStartEvent extends ToolUse {
+  chatId: string;
+}
+
+export interface ChatToolInputDeltaEvent extends ToolInputDelta {
+  chatId: string;
+}
+
+export interface ChatContentBlockStopEvent extends ContentBlockStop {
+  chatId: string;
+}
+
+export interface ChatToolResultStartEvent extends ToolResultStart {
+  chatId: string;
+}
+
+export interface ChatToolResultDeltaEvent extends ToolResultDelta {
+  chatId: string;
+}
+
+export interface ChatToolResultCompleteEvent extends ToolResultComplete {
+  chatId: string;
+}
+
+export interface ChatSessionUpdatedEvent {
+  chatId: string;
+  sessionId: string;
+  resumed: boolean;
+}
+
 export interface SkillInfo {
   name: string;
   manifest: SkillManifest | null;
@@ -360,31 +421,31 @@ export interface ElectronAPI {
   onNavigate: (callback: (view: string) => void) => () => void;
   chat: {
     sendMessage: (payload: SendMessagePayload) => Promise<ChatResponse>;
-    stopMessage: () => Promise<{ success: boolean; error?: string }>;
+    stopMessage: (chatId: string) => Promise<{ success: boolean; error?: string }>;
+    destroySession: (chatId: string) => Promise<{ success: boolean; error?: string }>;
     resetSession: (
+      chatId: string,
       resumeSessionId?: string | null
     ) => Promise<{ success: boolean; error?: string }>;
     getModelPreference: () => Promise<GetChatModelPreferenceResponse>;
     setModelPreference: (
       preference: ChatModelPreference
     ) => Promise<SetChatModelPreferenceResponse>;
-    onMessageChunk: (callback: (chunk: string) => void) => () => void;
-    onThinkingStart: (callback: (data: ThinkingStart) => void) => () => void;
-    onThinkingChunk: (callback: (data: ThinkingChunk) => void) => () => void;
-    onMessageComplete: (callback: () => void) => () => void;
-    onMessageStopped: (callback: () => void) => () => void;
-    onMessageError: (callback: (error: string) => void) => () => void;
-    onRetryStatus: (callback: (status: RetryStatus) => void) => () => void;
-    onDebugMessage: (callback: (message: string) => void) => () => void;
-    onToolUseStart: (callback: (tool: ToolUse) => void) => () => void;
-    onToolInputDelta: (callback: (data: ToolInputDelta) => void) => () => void;
-    onContentBlockStop: (callback: (data: ContentBlockStop) => void) => () => void;
-    onToolResultStart: (callback: (data: ToolResultStart) => void) => () => void;
-    onToolResultDelta: (callback: (data: ToolResultDelta) => void) => () => void;
-    onToolResultComplete: (callback: (data: ToolResultComplete) => void) => () => void;
-    onSessionUpdated: (
-      callback: (data: { sessionId: string; resumed: boolean }) => void
-    ) => () => void;
+    onMessageChunk: (callback: (data: ChatMessageChunkEvent) => void) => () => void;
+    onThinkingStart: (callback: (data: ChatThinkingStartEvent) => void) => () => void;
+    onThinkingChunk: (callback: (data: ChatThinkingChunkEvent) => void) => () => void;
+    onMessageComplete: (callback: (data: ChatLifecycleEvent) => void) => () => void;
+    onMessageStopped: (callback: (data: ChatLifecycleEvent) => void) => () => void;
+    onMessageError: (callback: (data: ChatMessageErrorEvent) => void) => () => void;
+    onRetryStatus: (callback: (status: ChatRetryStatusEvent) => void) => () => void;
+    onDebugMessage: (callback: (data: ChatDebugMessageEvent) => void) => () => void;
+    onToolUseStart: (callback: (tool: ChatToolUseStartEvent) => void) => () => void;
+    onToolInputDelta: (callback: (data: ChatToolInputDeltaEvent) => void) => () => void;
+    onContentBlockStop: (callback: (data: ChatContentBlockStopEvent) => void) => () => void;
+    onToolResultStart: (callback: (data: ChatToolResultStartEvent) => void) => () => void;
+    onToolResultDelta: (callback: (data: ChatToolResultDeltaEvent) => void) => () => void;
+    onToolResultComplete: (callback: (data: ChatToolResultCompleteEvent) => void) => () => void;
+    onSessionUpdated: (callback: (data: ChatSessionUpdatedEvent) => void) => () => void;
     onTaskProgress: (callback: (data: TaskProgressEvent) => void) => () => void;
     onTaskNotification: (callback: (data: TaskNotificationEvent) => void) => () => void;
   };
