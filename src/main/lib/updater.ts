@@ -7,9 +7,9 @@ import { getUpdateChannel } from './config';
 const { autoUpdater } = electronUpdater;
 
 let mainWindow: BrowserWindow | null = null;
-const updateFeedUrl = process.env.UPDATE_FEED_URL;
-const hasCustomFeed = Boolean(updateFeedUrl);
-const updatesConfigured = hasCustomFeed || app.isPackaged;
+const customFeedUrl = process.env.UPDATE_FEED_URL;
+const TOS_BASE_URL = 'https://ma-agent-releases.tos-cn-beijing.volces.com/releases';
+const updatesConfigured = Boolean(customFeedUrl) || app.isPackaged;
 
 export interface UpdateInfo {
   version: string;
@@ -45,25 +45,30 @@ let currentStatus: UpdateStatus = {
 autoUpdater.autoDownload = true; // Auto-download in background
 autoUpdater.autoInstallOnAppQuit = true; // Auto-install on quit after download
 
-// Allow prereleases based on update channel setting
+// Sync update channel: set allowPrerelease and update feed URL
 function syncAllowPrerelease(): void {
   const channel = getUpdateChannel();
   autoUpdater.allowPrerelease = channel === 'nightly';
   currentStatus = { ...currentStatus, updateChannel: channel };
+
+  // Set feed URL based on channel
+  if (customFeedUrl) {
+    autoUpdater.setFeedURL({ provider: 'generic', url: customFeedUrl });
+  } else if (app.isPackaged) {
+    const channelPath = channel === 'nightly' ? 'nightly' : 'release';
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: `${TOS_BASE_URL}/${channelPath}`
+    });
+  }
 }
 
-// Initialize prerelease setting
+// Initialize
 syncAllowPrerelease();
-
-// Configure update feed if provided
-if (updateFeedUrl) {
-  autoUpdater.setFeedURL({
-    provider: 'generic',
-    url: updateFeedUrl
-  });
+if (customFeedUrl) {
   console.log('Auto-update feed configured from UPDATE_FEED_URL');
 } else if (app.isPackaged) {
-  console.log('Using bundled auto-update configuration (GitHub releases)');
+  console.log('Auto-update feed configured from Volcengine TOS');
 } else {
   console.log('Auto-update feed not configured; skipping feed setup');
 }
@@ -233,7 +238,7 @@ export function checkForUpdates(): void {
   syncAllowPrerelease();
 
   // Only check in production (not in dev mode)
-  if (isDev && !hasCustomFeed) {
+  if (isDev && !customFeedUrl) {
     console.log('Skipping update check in development mode');
     currentStatus = {
       ...currentStatus,
