@@ -14,17 +14,10 @@ import {
   getWorkspaceDir,
   setChatModelPreferenceSetting
 } from './config';
-import {
-  abortGenerator,
-  clearMessageQueue,
-  messageGenerator,
-  messageQueue,
-  regenerateSessionId,
-  resetAbortFlag,
-  setSessionId
-} from './message-queue';
+import { sendChatEvent } from './ipc-utils';
 import { isScheduledTaskExecuting } from './schedule-state';
 import { endSessionLog, logSessionEvent, startSessionLog } from './session-logger';
+import { sessionManager, type ManagedSession } from './session-manager';
 
 const requireModule = createRequire(import.meta.url);
 const RETRY_BACKOFF_MS = [2000, 4000, 8000] as const;
@@ -75,37 +68,25 @@ export const SYSTEM_PROMPT_APPEND = `**你的身份：**
 **记忆：**
 在工作目录根目录维护 \`CLAUDE.md\` 作为持久记忆。持续更新（不只是被要求时）：用户偏好、常用文件位置、项目信息、以及任何对未来任务有用的信息。`;
 
-let querySession: Query | null = null;
-let isProcessing = false;
-let shouldAbortSession = false;
-let sessionTerminationPromise: Promise<void> | null = null;
-let isInterruptingResponse = false;
-// Map stream index to tool ID for current message
-const streamIndexToToolId: Map<number, string> = new Map();
-let pendingResumeSessionId: string | null = null;
-let sessionGeneration = 0;
-let lastRateLimitNoticeAt = 0;
-let rateLimitAttempt = 0;
-
-function resetRateLimitTracking(): void {
-  lastRateLimitNoticeAt = 0;
-  rateLimitAttempt = 0;
+function resetRateLimitTracking(session: ManagedSession): void {
+  session.lastRateLimitNoticeAt = 0;
+  session.rateLimitAttempt = 0;
 }
 
 export function getModelIdForPreference(
   preference: ChatModelPreference = currentModelPreference
 ): string {
-  // Per-tier custom model ID (set in Settings > 模型配置)
   const customModelIds = getCustomModelIds();
   const perTierCustom = customModelIds[preference]?.trim();
   if (perTierCustom) {
     return perTierCustom;
   }
-  // Legacy single custom model override (developer info, kept for backward compat)
+
   const customModelId = getCustomModelId();
   if (customModelId) {
     return customModelId;
   }
+
   return MODEL_BY_PREFERENCE[preference] ?? DEFAULT_MODEL_IDS.fast;
 }
 
@@ -114,93 +95,105 @@ export function getCurrentModelPreference(): ChatModelPreference {
 }
 
 export async function setChatModelPreference(preference: ChatModelPreference): Promise<void> {
-  if (preference === currentModelPreference) {
-    return;
-  }
-
-  const previousPreference = currentModelPreference;
   currentModelPreference = preference;
-
-  if (querySession) {
-    try {
-      await querySession.setModel(getModelIdForPreference(preference));
-    } catch (error) {
-      currentModelPreference = previousPreference;
-      console.error('Failed to update Claude model preference:', error);
-      throw error;
-    }
-  }
-
   setChatModelPreferenceSetting(currentModelPreference);
 }
 
-export function isSessionActive(): boolean {
-  return isProcessing || querySession !== null || isScheduledTaskExecuting();
+export async function applyChatModelPreference(
+  chatId: string,
+  preference: ChatModelPreference = currentModelPreference
+): Promise<void> {
+  const session = sessionManager.get(chatId);
+  if (!session?.querySession) {
+    return;
+  }
+
+  try {
+    await session.querySession.setModel(getModelIdForPreference(preference));
+  } catch (error) {
+    console.error(`Failed to update Claude model preference for chat ${chatId}:`, error);
+    throw error;
+  }
 }
 
-export async function interruptCurrentResponse(mainWindow: BrowserWindow | null): Promise<boolean> {
-  if (!querySession) {
+export function isSessionActive(chatId?: string): boolean {
+  if (chatId) {
+    const session = sessionManager.get(chatId);
+    return Boolean(session?.isProcessing || session?.querySession);
+  }
+
+  return sessionManager.isAnyChatActive() || isScheduledTaskExecuting();
+}
+
+export async function interruptCurrentResponse(
+  mainWindow: BrowserWindow | null,
+  chatId: string
+): Promise<boolean> {
+  const session = sessionManager.get(chatId);
+  if (!session?.querySession) {
     return false;
   }
 
-  if (isInterruptingResponse) {
+  if (session.isInterruptingResponse) {
     return true;
   }
 
-  isInterruptingResponse = true;
+  session.isInterruptingResponse = true;
   try {
-    await querySession.interrupt();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('chat:message-stopped');
-    }
+    await session.querySession.interrupt();
+    sendChatEvent(mainWindow, 'chat:message-stopped', chatId);
     return true;
   } catch (error) {
-    console.error('Failed to interrupt current response:', error);
+    console.error(`Failed to interrupt current response for chat ${chatId}:`, error);
     throw error;
   } finally {
-    isInterruptingResponse = false;
+    session.isInterruptingResponse = false;
   }
 }
 
-export async function resetSession(resumeSessionId?: string | null): Promise<void> {
-  // Increment generation to invalidate any zombie session's IPC emissions
-  sessionGeneration++;
+export async function resetSession(chatId: string, resumeSessionId?: string | null): Promise<void> {
+  const session = sessionManager.getOrCreate(chatId);
 
-  // Signal any running session to abort
-  shouldAbortSession = true;
+  session.sessionGeneration += 1;
+  session.shouldAbortSession = true;
+  sessionManager.abortGenerator(session);
+  sessionManager.clearMessageQueue(session);
+  sessionManager.setSessionId(session, resumeSessionId ?? null);
+  session.pendingResumeSessionId = resumeSessionId ?? null;
 
-  // Signal the message generator to abort
-  abortGenerator();
+  if (session.querySession) {
+    try {
+      await session.querySession.interrupt();
+    } catch {
+      // Ignore interrupt failures during reset.
+    }
+  }
 
-  // Clear the message queue to prevent pending messages from being sent
-  clearMessageQueue();
-
-  // Generate or set the appropriate session ID for the next conversation
-  regenerateSessionId(resumeSessionId ?? null);
-  pendingResumeSessionId = resumeSessionId ?? null;
-
-  // Wait for the current session to fully terminate (with 3s timeout to avoid UI hang)
-  if (sessionTerminationPromise) {
+  if (session.sessionTerminationPromise) {
     await Promise.race([
-      sessionTerminationPromise,
+      session.sessionTerminationPromise,
       new Promise<void>((resolve) => setTimeout(resolve, 3000))
     ]);
   }
 
-  // Clear session state
-  querySession = null;
-  isProcessing = false;
-  sessionTerminationPromise = null;
+  session.querySession = null;
+  session.isProcessing = false;
+  session.sessionTerminationPromise = null;
+  session.resolveTermination = null;
 }
 
 // Start streaming session
-export async function startStreamingSession(mainWindow: BrowserWindow | null): Promise<void> {
-  // Wait for any pending session termination to complete first
-  if (sessionTerminationPromise) {
-    await sessionTerminationPromise;
+export async function startStreamingSession(
+  mainWindow: BrowserWindow | null,
+  chatId: string
+): Promise<void> {
+  const session = sessionManager.getOrCreate(chatId);
+
+  if (session.sessionTerminationPromise) {
+    await session.sessionTerminationPromise;
   }
 
-  if (isProcessing || querySession) {
+  if (session.isProcessing || session.querySession) {
     return;
   }
 
@@ -209,39 +202,29 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
     throw new Error('API key is not configured');
   }
 
-  // Reset abort flags for new session
-  shouldAbortSession = false;
-  resetAbortFlag();
-  isProcessing = true;
-  // Clear stream index mapping for new session
-  streamIndexToToolId.clear();
-  resetRateLimitTracking();
-  // Capture generation so zombie sessions (from timeout) can't emit events
-  const myGeneration = sessionGeneration;
+  session.shouldAbortSession = false;
+  sessionManager.resetAbortFlag(session);
+  session.isProcessing = true;
+  session.streamIndexToToolId.clear();
+  resetRateLimitTracking(session);
+  const myGeneration = session.sessionGeneration;
 
-  // Create a promise that resolves when this session terminates
-  let resolveTermination: () => void;
-  sessionTerminationPromise = new Promise((resolve) => {
-    resolveTermination = resolve;
+  session.sessionTerminationPromise = new Promise((resolve) => {
+    session.resolveTermination = resolve;
   });
 
   try {
-    // Use the shared environment builder to ensure consistency across Electron app,
-    // Claude Agent SDK, and debug panel
     const env = buildClaudeSessionEnv();
-
-    // Ensure API key is set (buildClaudeSessionEnv uses getApiKey which may return null)
-    // but we've already checked it exists above, so set it explicitly
     env.ANTHROPIC_API_KEY = apiKey;
 
-    const resumeSessionId = pendingResumeSessionId;
+    const resumeSessionId = session.pendingResumeSessionId;
     const isResumedSession = typeof resumeSessionId === 'string' && resumeSessionId.length > 0;
-    pendingResumeSessionId = null;
+    session.pendingResumeSessionId = null;
 
     const modelId = getModelIdForPreference();
 
-    querySession = query({
-      prompt: messageGenerator(),
+    session.querySession = query({
+      prompt: session.messageGenerator(),
       options: {
         model: modelId,
         maxThinkingTokens: 32_000,
@@ -253,46 +236,53 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
         executableArgs: ['--no-warnings'],
         env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
         stderr: (message: string) => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            // Skip SDK spawn/debug info lines that are not real errors
-            const isSpawnInfo = /^Spawning Claude Code/i.test(message.trim());
-            if (isSpawnInfo) {
-              if (getDebugMode()) {
-                mainWindow.webContents.send('chat:debug-message', message);
-              }
-              return;
-            }
-            const isError =
-              /rate.?limit|429|401|403|5\d{2}|error|ECONNREFUSED|ETIMEDOUT|unauthorized|forbidden/i.test(
-                message
-              );
-            if (isError) {
-              const trimmedMessage = message.trim();
-              const isRateLimit = /rate.?limit|429/i.test(trimmedMessage);
+          if (!mainWindow || mainWindow.isDestroyed()) {
+            return;
+          }
 
-              if (isRateLimit) {
-                const now = Date.now();
-                if (
-                  rateLimitAttempt === 0 ||
-                  now - lastRateLimitNoticeAt >= RATE_LIMIT_NOTICE_DEBOUNCE_MS
-                ) {
-                  rateLimitAttempt = Math.min(rateLimitAttempt + 1, RETRY_BACKOFF_MS.length);
-                  lastRateLimitNoticeAt = now;
-                  mainWindow.webContents.send('chat:retry-status', {
-                    attempt: rateLimitAttempt,
-                    maxAttempts: RETRY_BACKOFF_MS.length,
-                    retryInMs: RETRY_BACKOFF_MS[rateLimitAttempt - 1]
-                  });
-                }
-              } else {
-                resetRateLimitTracking();
-                mainWindow.webContents.send('chat:message-error', trimmedMessage);
-              }
-            }
-            // Send debug messages if debug mode is enabled
+          const isSpawnInfo = /^Spawning Claude Code/i.test(message.trim());
+          if (isSpawnInfo) {
             if (getDebugMode()) {
-              mainWindow.webContents.send('chat:debug-message', message);
+              sendChatEvent(mainWindow, 'chat:debug-message', chatId, { message });
             }
+            return;
+          }
+
+          const isError =
+            /rate.?limit|429|401|403|5\d{2}|error|ECONNREFUSED|ETIMEDOUT|unauthorized|forbidden/i.test(
+              message
+            );
+          if (isError) {
+            const trimmedMessage = message.trim();
+            const isRateLimit = /rate.?limit|429/i.test(trimmedMessage);
+
+            if (isRateLimit) {
+              const now = Date.now();
+              if (
+                session.rateLimitAttempt === 0 ||
+                now - session.lastRateLimitNoticeAt >= RATE_LIMIT_NOTICE_DEBOUNCE_MS
+              ) {
+                session.rateLimitAttempt = Math.min(
+                  session.rateLimitAttempt + 1,
+                  RETRY_BACKOFF_MS.length
+                );
+                session.lastRateLimitNoticeAt = now;
+                sendChatEvent(mainWindow, 'chat:retry-status', chatId, {
+                  attempt: session.rateLimitAttempt,
+                  maxAttempts: RETRY_BACKOFF_MS.length,
+                  retryInMs: RETRY_BACKOFF_MS[session.rateLimitAttempt - 1]
+                });
+              }
+            } else {
+              resetRateLimitTracking(session);
+              sendChatEvent(mainWindow, 'chat:message-error', chatId, {
+                error: trimmedMessage
+              });
+            }
+          }
+
+          if (getDebugMode()) {
+            sendChatEvent(mainWindow, 'chat:debug-message', chatId, { message });
           }
         },
         systemPrompt: {
@@ -304,16 +294,14 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
         includePartialMessages: true,
         ...(isResumedSession && { resume: resumeSessionId! })
       }
-    });
+    }) as Query;
 
     if (getDebugMode()) {
       startSessionLog(isResumedSession ? resumeSessionId! : `new-${Date.now()}`);
     }
 
-    // Process streaming responses
-    for await (const sdkMessage of querySession) {
-      // Check if session should be aborted or has been superseded by a newer session
-      if (shouldAbortSession || myGeneration !== sessionGeneration) {
+    for await (const sdkMessage of session.querySession) {
+      if (session.shouldAbortSession || myGeneration !== session.sessionGeneration) {
         break;
       }
 
@@ -321,43 +309,37 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
         break;
       }
 
-      // Log every SDK event to JSONL for debugging
       logSessionEvent(sdkMessage);
 
       if (sdkMessage.type === 'stream_event') {
-        // Handle streaming events
         const streamEvent = sdkMessage.event;
         if (streamEvent.type === 'content_block_delta') {
           if (streamEvent.delta.type === 'text_delta') {
-            // Regular text delta
-            mainWindow.webContents.send('chat:message-chunk', streamEvent.delta.text);
+            sendChatEvent(mainWindow, 'chat:message-chunk', chatId, {
+              chunk: streamEvent.delta.text
+            });
           } else if (streamEvent.delta.type === 'thinking_delta') {
-            // Thinking text delta - send as thinking chunk
-            mainWindow.webContents.send('chat:thinking-chunk', {
+            sendChatEvent(mainWindow, 'chat:thinking-chunk', chatId, {
               index: streamEvent.index,
               delta: streamEvent.delta.thinking
             });
           } else if (streamEvent.delta.type === 'input_json_delta') {
-            // Handle input JSON deltas for tool use
-            // Look up the tool ID for this stream index
-            const toolId = streamIndexToToolId.get(streamEvent.index);
-            mainWindow.webContents.send('chat:tool-input-delta', {
+            const toolId = session.streamIndexToToolId.get(streamEvent.index);
+            sendChatEvent(mainWindow, 'chat:tool-input-delta', chatId, {
               index: streamEvent.index,
-              toolId: toolId || '', // Send tool ID if available
+              toolId: toolId || '',
               delta: streamEvent.delta.partial_json
             });
           }
         } else if (streamEvent.type === 'content_block_start') {
-          // Handle thinking blocks
           if (streamEvent.content_block.type === 'thinking') {
-            mainWindow.webContents.send('chat:thinking-start', {
+            sendChatEvent(mainWindow, 'chat:thinking-start', chatId, {
               index: streamEvent.index
             });
           } else if (streamEvent.content_block.type === 'tool_use') {
-            // Store mapping of stream index to tool ID
-            streamIndexToToolId.set(streamEvent.index, streamEvent.content_block.id);
+            session.streamIndexToToolId.set(streamEvent.index, streamEvent.content_block.id);
 
-            mainWindow.webContents.send('chat:tool-use-start', {
+            sendChatEvent(mainWindow, 'chat:tool-use-start', chatId, {
               id: streamEvent.content_block.id,
               name: streamEvent.content_block.name,
               input: streamEvent.content_block.input || {},
@@ -372,7 +354,6 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
               streamEvent.content_block.type === 'mcp_tool_result') &&
             'tool_use_id' in streamEvent.content_block
           ) {
-            // Handle tool result blocks starting - these are the actual tool result types
             const toolResultBlock = streamEvent.content_block as {
               tool_use_id: string;
               content?: string | unknown;
@@ -387,7 +368,7 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
             }
 
             if (contentStr) {
-              mainWindow.webContents.send('chat:tool-result-start', {
+              sendChatEvent(mainWindow, 'chat:tool-result-start', chatId, {
                 toolUseId: toolResultBlock.tool_use_id,
                 content: contentStr,
                 isError: toolResultBlock.is_error || false
@@ -395,79 +376,59 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
             }
           }
         } else if (streamEvent.type === 'content_block_stop') {
-          // Signal end of a content block
-          // Look up tool ID for this stream index (if it's a tool block)
-          const toolId = streamIndexToToolId.get(streamEvent.index);
-          mainWindow.webContents.send('chat:content-block-stop', {
+          const toolId = session.streamIndexToToolId.get(streamEvent.index);
+          sendChatEvent(mainWindow, 'chat:content-block-stop', chatId, {
             index: streamEvent.index,
             toolId: toolId || undefined
           });
         }
       } else if (sdkMessage.type === 'assistant') {
-        // Handle complete assistant messages - extract tool results
         const assistantMessage = sdkMessage.message;
         if (assistantMessage.content) {
           for (const block of assistantMessage.content) {
-            // Check for tool result blocks (SDK uses specific types like web_search_tool_result, etc.)
-            // These blocks have tool_use_id and content properties
             if (
               typeof block === 'object' &&
               block !== null &&
               'tool_use_id' in block &&
               'content' in block
             ) {
-              // Type guard for tool_result-like blocks
-              // Content contains ToolOutput types (BashOutput, ReadOutput, GrepOutput, etc.)
-              // which are structured objects describing the tool's result
               const toolResultBlock = block as {
                 tool_use_id: string;
                 content: string | unknown[] | unknown;
                 is_error?: boolean;
               };
 
-              // Convert content to string representation
-              // Content can be:
-              // - A string (for simple text results)
-              // - An array of content blocks (text, images, etc.) from Anthropic API
-              // - A structured ToolOutput object (BashOutput, ReadOutput, GrepOutput, etc.)
               let contentStr: string;
               if (typeof toolResultBlock.content === 'string') {
                 contentStr = toolResultBlock.content;
               } else if (Array.isArray(toolResultBlock.content)) {
-                // Array of content blocks - extract text from each
                 contentStr = toolResultBlock.content
-                  .map((c) => {
-                    if (typeof c === 'string') {
-                      return c;
+                  .map((contentItem) => {
+                    if (typeof contentItem === 'string') {
+                      return contentItem;
                     }
-                    if (typeof c === 'object' && c !== null) {
-                      // Could be text block, image block, etc.
-                      if ('text' in c && typeof c.text === 'string') {
-                        return c.text;
+                    if (typeof contentItem === 'object' && contentItem !== null) {
+                      if ('text' in contentItem && typeof contentItem.text === 'string') {
+                        return contentItem.text;
                       }
-                      if ('type' in c && c.type === 'text' && 'text' in c) {
-                        return String(c.text);
+                      if ('type' in contentItem && contentItem.type === 'text' && 'text' in contentItem) {
+                        return String(contentItem.text);
                       }
-                      // For other types, stringify
-                      return JSON.stringify(c, null, 2);
+                      return JSON.stringify(contentItem, null, 2);
                     }
-                    return String(c);
+                    return String(contentItem);
                   })
                   .join('\n');
               } else if (
                 typeof toolResultBlock.content === 'object' &&
                 toolResultBlock.content !== null
               ) {
-                // Structured ToolOutput object (e.g., BashOutput with output/exitCode,
-                // ReadOutput with content/total_lines, GrepOutput with matches, etc.)
-                // Stringify as JSON - the renderer will format it nicely
                 contentStr = JSON.stringify(toolResultBlock.content, null, 2);
               } else {
                 contentStr = String(toolResultBlock.content);
               }
 
-              // Send tool result - this will be displayed in the UI
-              mainWindow.webContents.send('chat:tool-result-complete', {
+              sendChatEvent(mainWindow, 'chat:tool-result-complete', chatId, {
                 toolUseId: toolResultBlock.tool_use_id,
                 content: contentStr,
                 isError: toolResultBlock.is_error || false
@@ -475,24 +436,19 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
             }
           }
         }
-        // Don't signal completion here - agent may still be running tools
       } else if (sdkMessage.type === 'result') {
-        // Final result message - this is when the agent is truly done
-        mainWindow.webContents.send('chat:message-complete');
+        sendChatEvent(mainWindow, 'chat:message-complete', chatId);
       } else if (sdkMessage.type === 'system') {
         if (sdkMessage.subtype === 'init') {
           const sessionIdFromSdk = sdkMessage.session_id;
           if (sessionIdFromSdk) {
-            setSessionId(sessionIdFromSdk);
-            if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('chat:session-updated', {
-                sessionId: sessionIdFromSdk,
-                resumed: isResumedSession
-              });
-            }
+            sessionManager.setSessionId(session, sessionIdFromSdk);
+            sendChatEvent(mainWindow, 'chat:session-updated', chatId, {
+              sessionId: sessionIdFromSdk,
+              resumed: isResumedSession
+            });
           }
         } else if ((sdkMessage.subtype as string) === 'task_progress') {
-          // SDK types may not yet include task_progress — cast to access fields
           const msg = sdkMessage as unknown as {
             task_id: string;
             tool_use_id?: string;
@@ -500,7 +456,7 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
             usage: { total_tokens: number; tool_uses: number; duration_ms: number };
             last_tool_name?: string;
           };
-          mainWindow.webContents.send('chat:task-progress', {
+          sendChatEvent(mainWindow, 'chat:task-progress', chatId, {
             taskId: msg.task_id,
             toolUseId: msg.tool_use_id,
             description: msg.description,
@@ -510,7 +466,6 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
             lastToolName: msg.last_tool_name
           });
         } else if ((sdkMessage.subtype as string) === 'task_notification') {
-          // SDK types may not yet include task_notification — cast to access fields
           const msg = sdkMessage as unknown as {
             task_id: string;
             tool_use_id?: string;
@@ -519,7 +474,7 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
             summary: string;
             usage?: { total_tokens: number; tool_uses: number; duration_ms: number };
           };
-          mainWindow.webContents.send('chat:task-notification', {
+          sendChatEvent(mainWindow, 'chat:task-notification', chatId, {
             taskId: msg.task_id,
             toolUseId: msg.tool_use_id,
             status: msg.status,
@@ -533,31 +488,23 @@ export async function startStreamingSession(mainWindow: BrowserWindow | null): P
       }
     }
   } catch (error) {
-    console.error('Error in streaming session:', error);
-    // Clear the queue on error to prevent the finally block from retrying
-    // a failing session in an infinite loop.
-    clearMessageQueue();
-    resetRateLimitTracking();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      mainWindow.webContents.send('chat:message-error', errorMessage);
-    }
+    console.error(`Error in streaming session for chat ${chatId}:`, error);
+    sessionManager.clearMessageQueue(session);
+    resetRateLimitTracking(session);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    sendChatEvent(mainWindow, 'chat:message-error', chatId, { error: errorMessage });
   } finally {
-    resetRateLimitTracking();
+    resetRateLimitTracking(session);
     endSessionLog();
-    isProcessing = false;
-    querySession = null;
+    session.isProcessing = false;
+    session.querySession = null;
+    session.resolveTermination?.();
+    session.resolveTermination = null;
+    session.sessionTerminationPromise = null;
 
-    // Resolve the termination promise to signal session has ended
-    resolveTermination!();
-
-    // If messages were queued while the session was winding down (e.g. user sent
-    // a message right after stopping), start a new session to consume them.
-    // The queue is cleared in the catch block on error, so this only triggers
-    // after a normal session exit (e.g. interrupt / result).
-    if (messageQueue.length > 0) {
-      startStreamingSession(mainWindow).catch((error) => {
-        console.error('Failed to restart session for pending messages:', error);
+    if (session.messageQueue.length > 0) {
+      startStreamingSession(mainWindow, chatId).catch((error) => {
+        console.error(`Failed to restart session for pending messages in chat ${chatId}:`, error);
       });
     }
   }

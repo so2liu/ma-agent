@@ -29,6 +29,12 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 import { useCanvasChanges } from '@/hooks/useCanvasChanges';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import {
+  getChatIdForConversation,
+  registerConversationMapping,
+  replaceChatState,
+  serializeMessagesForStorage
+} from '@/stores/chatStore';
 import type { Message, MessageAttachment } from '@/types/chat';
 import { extractArtifacts } from '@/utils/artifacts';
 import { suggestPromptForFiles } from '@/utils/filePromptSuggestion';
@@ -110,18 +116,6 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error('Unable to read file'));
     reader.readAsDataURL(file);
   });
-}
-
-type PersistedMessage = Omit<Message, 'timestamp'> & { timestamp: string };
-
-function serializeMessagesForStorage(messages: Message[]): PersistedMessage[] {
-  return messages.map((msg) => ({
-    ...msg,
-    attachments: msg.attachments?.map(
-      ({ previewUrl: _previewUrl, ...attachmentRest }) => attachmentRest
-    ),
-    timestamp: msg.timestamp.toISOString()
-  }));
 }
 
 export interface ChatHandle {
@@ -221,7 +215,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   ref
 ) {
   const [inputValue, setInputValue] = useState('');
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [activeChatId, setActiveChatId] = useState<string>(() => crypto.randomUUID());
   const [chatInputHeight, setChatInputHeight] = useState(0);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -241,8 +235,8 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   const appsRef = useRef(apps);
   appsRef.current = apps;
   const projectIdForNewChatRef = useRef<string | null>(null);
-  const { messages, setMessages, isLoading, setIsLoading, backgroundTasks, retryStatus } =
-    useClaudeChat();
+  const { messages, setMessages, isLoading, setIsLoading, backgroundTasks, retryStatus, sessionId } =
+    useClaudeChat(activeChatId);
   const { track } = useAnalytics();
   const isOnline = useOnlineStatus();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -542,6 +536,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
 
       try {
         const response = await window.electron.chat.sendMessage({
+          chatId: activeChatId,
           text: payload.text,
           attachments: payload.attachments.length > 0 ? payload.attachments : undefined
         });
@@ -576,67 +571,122 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
         appendAssistantErrorMessage(error instanceof Error ? error.message : 'Unknown error');
       }
     },
-    [appendAssistantErrorMessage, modelPreference, setIsLoading, setMessages, track]
+    [activeChatId, appendAssistantErrorMessage, modelPreference, setIsLoading, setMessages, track]
   );
 
-  // Auto-save conversation when messages change
+  const persistConversationSnapshot = useCallback(
+    async (options?: {
+      chatId?: string;
+      conversationId?: string | null;
+      messages?: Message[];
+      sessionId?: string | null;
+      projectId?: string | null;
+      onCreated?: (conversationId: string) => void;
+    }) => {
+      const targetChatId = options?.chatId ?? activeChatId;
+      const targetConversationId = options?.conversationId ?? currentConversationId;
+      const targetMessages = options?.messages ?? messages;
+      const targetSessionId = options?.sessionId ?? sessionId;
+
+      if (targetMessages.length === 0) {
+        return null;
+      }
+
+      try {
+        const messagesToSave = serializeMessagesForStorage(targetMessages);
+        if (targetConversationId) {
+          await window.electron.conversation.update(
+            targetConversationId,
+            undefined,
+            messagesToSave,
+            targetSessionId ?? undefined
+          );
+          registerConversationMapping(targetConversationId, targetChatId);
+          return targetConversationId;
+        }
+
+        const response = await window.electron.conversation.create(
+          messagesToSave,
+          targetSessionId ?? undefined
+        );
+        if (!response.success || !response.conversation) {
+          return null;
+        }
+
+        const newConversationId = response.conversation.id;
+        registerConversationMapping(newConversationId, targetChatId);
+        options?.onCreated?.(newConversationId);
+        track('conversation_created');
+
+        let projectId = options?.projectId ?? projectIdForNewChatRef.current;
+        if (!projectId) {
+          const projResponse = await window.electron.project.list();
+          if (projResponse.success && projResponse.projects) {
+            projectId = projResponse.projects.find((p) => p.isDefault)?.id ?? null;
+          }
+        }
+        if (projectId) {
+          await window.electron.conversation.setProject(newConversationId, projectId);
+        }
+
+        for (const app of appsRef.current) {
+          if (!app.conversationId) {
+            window.electron.app.setConversationId(app.id, newConversationId).catch(() => {});
+          }
+        }
+
+        return newConversationId;
+      } catch (error) {
+        console.error('Error saving conversation:', error);
+        return null;
+      }
+    },
+    [activeChatId, currentConversationId, messages, sessionId, track]
+  );
+
+  // Auto-create conversation when the active chat first gets content.
   useEffect(() => {
     if (isInitialLoadRef.current) {
       isInitialLoadRef.current = false;
       return;
     }
-    if (messages.length === 0) return;
+
+    if (messages.length === 0 || currentConversationId) {
+      return;
+    }
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        const messagesToSave = serializeMessagesForStorage(messages);
-        if (currentConversationId) {
-          await window.electron.conversation.update(
-            currentConversationId,
-            undefined,
-            messagesToSave,
-            currentSessionId ?? undefined
-          );
-        } else {
-          const response = await window.electron.conversation.create(
-            messagesToSave,
-            currentSessionId ?? undefined
-          );
-          if (response.success && response.conversation) {
-            const newId = response.conversation.id;
-            setCurrentConversationId(newId);
-            track('conversation_created');
-            // Always assign to a project: selected project or default project
-            let projectId = projectIdForNewChatRef.current;
-            if (!projectId) {
-              const projResponse = await window.electron.project.list();
-              if (projResponse.success && projResponse.projects) {
-                projectId = projResponse.projects.find((p) => p.isDefault)?.id ?? null;
-              }
-            }
-            if (projectId) {
-              await window.electron.conversation.setProject(newId, projectId);
-            }
-            // Retroactively stamp apps created during this conversation before
-            // the conversation ID existed (fixes race with crud.ts init)
-            for (const a of appsRef.current) {
-              if (!a.conversationId) {
-                window.electron.app.setConversationId(a.id, newId).catch(() => {});
-              }
-            }
+    const scheduledChatId = activeChatId;
+    const scheduledMessages = messages;
+    const scheduledSessionId = sessionId;
+    saveTimeoutRef.current = setTimeout(() => {
+      void persistConversationSnapshot({
+        chatId: scheduledChatId,
+        conversationId: null,
+        messages: scheduledMessages,
+        sessionId: scheduledSessionId,
+        projectId: projectIdForNewChatRef.current ?? selectedProjectId,
+        onCreated: (newConversationId) => {
+          if (scheduledChatId === activeChatId) {
+            setCurrentConversationId(newConversationId);
           }
         }
-      } catch (error) {
-        console.error('Error saving conversation:', error);
-      }
+      });
     }, 2000);
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [messages, currentConversationId, currentSessionId, setCurrentConversationId, track]);
+  }, [
+    activeChatId,
+    currentConversationId,
+    messages,
+    persistConversationSnapshot,
+    selectedProjectId,
+    sessionId,
+    setCurrentConversationId
+  ]);
 
   // Sync conversationId to workspace file so CLI tools (crud.ts) can read it
   useEffect(() => {
@@ -645,31 +695,24 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     });
   }, [currentConversationId]);
 
-  useEffect(() => {
-    const unsubscribe = window.electron.chat.onSessionUpdated(({ sessionId }) => {
-      setCurrentSessionId((prev) => (prev === sessionId ? prev : sessionId));
-    });
-    return () => unsubscribe();
-  }, []);
-
   const handleNewChat = async () => {
-    if (isLoading) return;
     clearPendingAttachments();
 
     try {
-      // Fire-and-forget: save current conversation without blocking the switch
-      if (currentConversationId && messages.length > 0) {
-        const messagesToSave = serializeMessagesForStorage(messages);
-        window.electron.conversation
-          .update(currentConversationId, undefined, messagesToSave, currentSessionId ?? undefined)
-          .catch((error) => console.error('Error saving conversation before new chat:', error));
+      if (messages.length > 0) {
+        void persistConversationSnapshot({
+          chatId: activeChatId,
+          conversationId: currentConversationId,
+          messages,
+          sessionId,
+          projectId: selectedProjectId
+        });
       }
 
-      await window.electron.chat.resetSession();
-      setMessages([]);
-      setInputValue('');
+      const newChatId = crypto.randomUUID();
+      setActiveChatId(newChatId);
       setCurrentConversationId(null);
-      setCurrentSessionId(null);
+      setInputValue('');
       setOpenTabs([]);
       setActiveTabId(null);
       artifactMap.clear();
@@ -683,18 +726,30 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   };
 
   const handleLoadConversation = async (conversationId: string) => {
-    if (isLoading) return;
     clearPendingAttachments();
 
     try {
-      // Fire-and-forget: save current conversation without blocking the switch
-      if (currentConversationId && messages.length > 0) {
-        const messagesToSave = serializeMessagesForStorage(messages);
-        window.electron.conversation
-          .update(currentConversationId, undefined, messagesToSave, currentSessionId ?? undefined)
-          .catch((error) =>
-            console.error('Error saving conversation before switching:', error)
-          );
+      if (messages.length > 0) {
+        void persistConversationSnapshot({
+          chatId: activeChatId,
+          conversationId: currentConversationId,
+          messages,
+          sessionId,
+          projectId: selectedProjectId
+        });
+      }
+
+      const existingChatId = getChatIdForConversation(conversationId);
+      if (existingChatId) {
+        setActiveChatId(existingChatId);
+        setCurrentConversationId(conversationId);
+        setOpenTabs([]);
+        setActiveTabId(null);
+        artifactMap.clear();
+        canvasChanges.clearChanges();
+        prevArtifactCountRef.current = 0;
+        isInitialLoadRef.current = true;
+        return;
       }
 
       const response = await window.electron.conversation.get(conversationId);
@@ -706,10 +761,22 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
           })
         );
 
-        await window.electron.chat.resetSession(response.conversation.sessionId ?? null);
-        setMessages(parsedMessages);
+        const loadedChatId = crypto.randomUUID();
+        replaceChatState(loadedChatId, {
+          messages: parsedMessages,
+          isLoading: false,
+          isStreaming: false,
+          sessionId: response.conversation.sessionId ?? null,
+          retryStatus: null,
+          lastError: null
+        });
+        registerConversationMapping(conversationId, loadedChatId);
+        await window.electron.chat.resetSession(
+          loadedChatId,
+          response.conversation.sessionId ?? null
+        );
+        setActiveChatId(loadedChatId);
         setCurrentConversationId(conversationId);
-        setCurrentSessionId(response.conversation.sessionId ?? null);
         setOpenTabs([]);
         setActiveTabId(null);
         artifactMap.clear();
@@ -824,7 +891,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   const handleStopStreaming = async () => {
     if (!isLoading) return;
     try {
-      const response = await window.electron.chat.stopMessage();
+      const response = await window.electron.chat.stopMessage(activeChatId);
       if (!response.success && response.error) {
         console.error('Error stopping response:', response.error);
       }

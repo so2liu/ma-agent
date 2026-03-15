@@ -396,7 +396,7 @@ function Settings() {
     setApiKeySaveState('idle');
     try {
       const response = await window.electron.config.setApiKey(apiKeyInput);
-      await window.electron.chat.resetSession();
+
       setApiKeyStatus(response.status);
       setApiKeyInput('');
       setApiKeySaveState('success');
@@ -414,7 +414,7 @@ function Settings() {
     setApiKeySaveState('idle');
     try {
       const response = await window.electron.config.setApiKey(null);
-      await window.electron.chat.resetSession();
+
       setApiKeyStatus(response.status);
       setApiKeyInput('');
       setApiKeySaveState('success');
@@ -432,7 +432,7 @@ function Settings() {
     setBaseUrlSaveState('idle');
     try {
       const response = await window.electron.config.setApiBaseUrl(apiBaseUrl.trim() || null);
-      await window.electron.chat.resetSession();
+
       setApiBaseUrl(response.apiBaseUrl || '');
       setBaseUrlSaveState('success');
       setTimeout(() => setBaseUrlSaveState('idle'), 2000);
@@ -449,7 +449,7 @@ function Settings() {
     setModelIdsSaveState('idle');
     try {
       const response = await window.electron.config.setCustomModelIds(customModelIds);
-      await window.electron.chat.resetSession();
+
       setCustomModelIds(response.customModelIds || {});
       setModelIdsSaveState('success');
       setTimeout(() => setModelIdsSaveState('idle'), 2000);
@@ -466,7 +466,7 @@ function Settings() {
     setModelIdSaveState('idle');
     try {
       const response = await window.electron.config.setCustomModelId(customModelId.trim() || null);
-      await window.electron.chat.resetSession();
+
       setCustomModelId(response.customModelId || '');
       setModelIdSaveState('success');
       setTimeout(() => setModelIdSaveState('idle'), 2000);
@@ -483,8 +483,6 @@ function Settings() {
     try {
       const response = await window.electron.config.setAgentProvider(provider);
       setAgentProvider(response.provider);
-      // Reset session when switching providers
-      await window.electron.chat.resetSession();
     } catch {
       // Revert on error
     } finally {
@@ -501,7 +499,7 @@ function Settings() {
       if (openaiBaseUrl.trim()) config.baseUrl = openaiBaseUrl.trim();
       if (openaiModelId.trim()) config.modelId = openaiModelId.trim();
       await window.electron.config.setOpenAIConfig(config);
-      await window.electron.chat.resetSession();
+
 
       // Refresh status
       const status = await window.electron.config.getOpenAIConfig();
@@ -712,7 +710,6 @@ function Settings() {
       }
 
       await window.electron.config.setAgentProvider(recommendedRuntime);
-      await window.electron.chat.resetSession();
 
       // Refresh UI state
       setAgentProvider(recommendedRuntime);

@@ -73,56 +73,79 @@ export interface AgentRuntime {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Map a RuntimeEvent to the IPC channel name and arguments the renderer expects. */
-export function runtimeEventToIpc(event: RuntimeEvent): { channel: string; args: unknown[] } {
+export function runtimeEventToIpc(
+  event: RuntimeEvent,
+  chatId: string
+): { channel: string; args: unknown[] } {
   switch (event.type) {
     case 'message-chunk':
-      return { channel: 'chat:message-chunk', args: [event.text] };
+      return { channel: 'chat:message-chunk', args: [{ chatId, chunk: event.text }] };
     case 'thinking-start':
-      return { channel: 'chat:thinking-start', args: [{ index: event.index }] };
+      return { channel: 'chat:thinking-start', args: [{ chatId, index: event.index }] };
     case 'thinking-chunk':
       return {
         channel: 'chat:thinking-chunk',
-        args: [{ index: event.index, delta: event.delta }]
+        args: [{ chatId, index: event.index, delta: event.delta }]
       };
     case 'tool-use-start':
       return {
         channel: 'chat:tool-use-start',
         args: [
-          { id: event.id, name: event.name, input: event.input, streamIndex: event.streamIndex }
+          {
+            chatId,
+            id: event.id,
+            name: event.name,
+            input: event.input,
+            streamIndex: event.streamIndex
+          }
         ]
       };
     case 'tool-input-delta':
       return {
         channel: 'chat:tool-input-delta',
-        args: [{ index: event.index, toolId: event.toolId, delta: event.delta }]
+        args: [{ chatId, index: event.index, toolId: event.toolId, delta: event.delta }]
       };
     case 'tool-result-start':
       return {
         channel: 'chat:tool-result-start',
-        args: [{ toolUseId: event.toolUseId, content: event.content, isError: event.isError }]
+        args: [
+          {
+            chatId,
+            toolUseId: event.toolUseId,
+            content: event.content,
+            isError: event.isError
+          }
+        ]
       };
     case 'tool-result-complete':
       return {
         channel: 'chat:tool-result-complete',
-        args: [{ toolUseId: event.toolUseId, content: event.content, isError: event.isError }]
+        args: [
+          {
+            chatId,
+            toolUseId: event.toolUseId,
+            content: event.content,
+            isError: event.isError
+          }
+        ]
       };
     case 'content-block-stop':
       return {
         channel: 'chat:content-block-stop',
-        args: [{ index: event.index, toolId: event.toolId }]
+        args: [{ chatId, index: event.index, toolId: event.toolId }]
       };
     case 'session-updated':
       return {
         channel: 'chat:session-updated',
-        args: [{ sessionId: event.sessionId, resumed: event.resumed }]
+        args: [{ chatId, sessionId: event.sessionId, resumed: event.resumed }]
       };
     case 'message-complete':
-      return { channel: 'chat:message-complete', args: [] };
+      return { channel: 'chat:message-complete', args: [{ chatId }] };
     case 'message-stopped':
-      return { channel: 'chat:message-stopped', args: [] };
+      return { channel: 'chat:message-stopped', args: [{ chatId }] };
     case 'message-error':
-      return { channel: 'chat:message-error', args: [event.error] };
+      return { channel: 'chat:message-error', args: [{ chatId, error: event.error }] };
     case 'debug-message':
-      return { channel: 'chat:debug-message', args: [event.message] };
+      return { channel: 'chat:debug-message', args: [{ chatId, message: event.message }] };
   }
 }

@@ -65,6 +65,7 @@ export interface SerializedAttachmentPayload {
 }
 
 export interface SendMessagePayload {
+  chatId: string;
   text: string;
   attachments?: SerializedAttachmentPayload[];
 }

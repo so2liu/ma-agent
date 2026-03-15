@@ -15,7 +15,7 @@ import {
   Timer,
   Trash2
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
 import type {
   ConversationSearchResult,
@@ -24,6 +24,12 @@ import type {
   Project,
   ScheduledTask
 } from '@/electron';
+import {
+  destroyChatState,
+  getChatIdForConversation,
+  getConversationStatus,
+  subscribeToChatStore
+} from '@/stores/chatStore';
 
 import {
   AlertDialog,
@@ -104,6 +110,7 @@ export default function Sidebar({
   const [hasMoreSearchResults, setHasMoreSearchResults] = useState(false);
   const [isSearchingConversations, setIsSearchingConversations] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null);
+  const [, forceStoreUpdate] = useReducer((count: number) => count + 1, 0);
   const newProjectInputRef = useRef<HTMLInputElement>(null);
   const editProjectInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -154,6 +161,8 @@ export default function Sidebar({
     loadData();
   }, [loadData]);
 
+  useEffect(() => subscribeToChatStore(forceStoreUpdate), []);
+
   const prevConversationIdRef = useRef(currentConversationId);
   useEffect(() => {
     // Refresh conversation list when the active conversation changes (including to null)
@@ -190,8 +199,13 @@ export default function Sidebar({
 
   const handleDelete = async (conversationId: string) => {
     try {
+      const chatId = getChatIdForConversation(conversationId);
       const response = await window.electron.conversation.delete(conversationId);
       if (response.success) {
+        if (chatId) {
+          await window.electron.chat.destroySession(chatId);
+          await destroyChatState(chatId);
+        }
         window.electron.analytics.trackEvent({
           type: 'conversation_deleted',
           timestamp: Date.now()
@@ -448,6 +462,7 @@ export default function Sidebar({
 
   const renderConversationItem = (conversation: ConversationSummary) => {
     const isActive = conversation.id === currentConversationId;
+    const status = getConversationStatus(conversation.id);
     return (
       <div
         key={conversation.id}
@@ -470,8 +485,19 @@ export default function Sidebar({
       >
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] leading-tight text-neutral-800 dark:text-neutral-200">
-              {conversation.title}
+            <div className="flex items-center gap-1.5">
+              <div className="truncate text-[13px] leading-tight text-neutral-800 dark:text-neutral-200">
+                {conversation.title}
+              </div>
+              {status === 'running' && (
+                <span
+                  className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-500"
+                  title="运行中"
+                />
+              )}
+              {status === 'error' && (
+                <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" title="出错" />
+              )}
             </div>
             <div className="mt-1 flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-500">
               <Clock className="h-2.5 w-2.5" />

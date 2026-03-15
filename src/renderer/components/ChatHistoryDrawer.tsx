@@ -2,6 +2,7 @@ import { Clock, MessageSquare, Plus, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { ConversationSummary } from '@/electron';
+import { destroyChatState, getChatIdForConversation } from '@/stores/chatStore';
 
 interface ChatHistoryDrawerProps {
   isOpen: boolean;
@@ -52,8 +53,13 @@ export default function ChatHistoryDrawer({
     e.stopPropagation();
     if (confirm('确定要删除此对话吗？此操作无法撤销。')) {
       try {
+        const chatId = getChatIdForConversation(conversationId);
         const response = await window.electron.conversation.delete(conversationId);
         if (response.success) {
+          if (chatId) {
+            await window.electron.chat.destroySession(chatId);
+            await destroyChatState(chatId);
+          }
           await loadConversations();
           // If the deleted conversation is the currently active one, reset to blank page and close drawer
           if (conversationId === currentConversationId) {

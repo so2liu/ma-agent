@@ -84,20 +84,17 @@ export default function App() {
   };
 
   const handleLoadConversation = useCallback(async (id: string) => {
-    if (chatRef.current?.isLoading()) return;
     setCurrentView('home');
     await chatRef.current?.loadConversation(id);
   }, []);
 
   const handleNewChat = useCallback(async () => {
-    if (chatRef.current?.isLoading()) return;
     setCurrentView('home');
     await chatRef.current?.newChat();
   }, []);
 
   const handleDebugApp = useCallback(
     async (conversationId: string, errorMsg: string) => {
-      if (chatRef.current?.isLoading()) return;
       setCurrentView('home');
       await chatRef.current?.loadConversation(conversationId);
       chatRef.current?.setInput(`应用出错了，请帮我修复：\n\n${errorMsg}`);
