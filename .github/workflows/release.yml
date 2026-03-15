@@ -104,9 +104,10 @@ jobs:
 
       - name: Upload to Volcengine TOS
         continue-on-error: true
+        timeout-minutes: 15
         env:
           VOLC_ACCESS_KEY: ${{ secrets.VOLC_ACCESS_KEY }}
           VOLC_SECRET_KEY: ${{ secrets.VOLC_SECRET_KEY }}
         run: |
-          pip install tos --quiet
+          pip install tos --quiet --only-binary :all: || pip install tos --quiet
           python scripts/upload-tos.py --channel release --dist-dir dist/
