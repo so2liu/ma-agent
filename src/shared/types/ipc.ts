@@ -9,8 +9,11 @@ export interface SuccessResponse {
   error?: string;
 }
 
-/** Which agent runtime / LLM provider to use */
-export type AgentProvider = 'anthropic' | 'openai';
+/** Which protocol / API shape an LLM endpoint speaks */
+export type LlmProvider = 'anthropic' | 'openai';
+
+/** Which agent runtime to use */
+export type AgentProvider = 'claude-sdk' | 'pi';
 
 export type ChatModelPreference = 'fast' | 'smart-sonnet' | 'smart-opus';
 
@@ -120,7 +123,7 @@ export interface ParsedApiConfig {
 
 /** Detail of a single provider probe attempt */
 export interface ProbeDetail {
-  provider: AgentProvider;
+  provider: LlmProvider;
   success: boolean;
   model?: string;
   error?: string;
@@ -131,7 +134,7 @@ export interface ProbeDetail {
 /** Result of auto-detecting provider type */
 export interface AutoDetectResult {
   success: boolean;
-  provider?: AgentProvider;
+  provider?: LlmProvider;
   model?: string;
   error?: string;
   /** Details of each probe attempt, in order tried */

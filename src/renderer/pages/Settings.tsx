@@ -20,6 +20,7 @@ import type {
   AgentProvider,
   ChatModelPreference,
   CustomModelIds,
+  LlmProvider,
   OpenAIConfig,
   ParsedApiConfig
 } from '../../shared/types/ipc';
@@ -36,6 +37,20 @@ const TIER_LABELS: Record<ChatModelPreference, string> = {
   'smart-sonnet': '均衡',
   'smart-opus': '强力'
 };
+
+const RUNTIME_LABELS: Record<AgentProvider, string> = {
+  'claude-sdk': 'Claude SDK',
+  pi: 'Pi Agent'
+};
+
+const LLM_PROVIDER_LABELS: Record<LlmProvider, string> = {
+  anthropic: 'Anthropic 兼容',
+  openai: 'OpenAI 兼容'
+};
+
+function getRecommendedRuntime(provider: LlmProvider): AgentProvider {
+  return provider === 'anthropic' ? 'claude-sdk' : 'pi';
+}
 
 const NAV_ITEMS = [
   { id: 'ai-config', label: 'AI 服务配置', icon: Cpu },
@@ -134,7 +149,7 @@ function Settings() {
   const [isSavingModelIds, setIsSavingModelIds] = useState(false);
   const [modelIdsSaveState, setModelIdsSaveState] = useState<'idle' | 'success' | 'error'>('idle');
 
-  const [agentProvider, setAgentProvider] = useState<AgentProvider>('anthropic');
+  const [agentProvider, setAgentProvider] = useState<AgentProvider>('claude-sdk');
   const [isLoadingProvider, setIsLoadingProvider] = useState(true);
   const [isSavingProvider, setIsSavingProvider] = useState(false);
 
@@ -156,7 +171,7 @@ function Settings() {
   const [autoConfigText, setAutoConfigText] = useState('');
   const [autoConfigStatus, setAutoConfigStatus] = useState<AutoConfigStatus>('idle');
   const [parsedConfig, setParsedConfig] = useState<ParsedApiConfig | null>(null);
-  const [detectedProvider, setDetectedProvider] = useState<AgentProvider | null>(null);
+  const [detectedProvider, setDetectedProvider] = useState<LlmProvider | null>(null);
   const [detectedModel, setDetectedModel] = useState<string | null>(null);
   const [autoConfigError, setAutoConfigError] = useState<string | null>(null);
   const [autoConfigSteps, setAutoConfigSteps] = useState<AutoConfigStep[]>([]);
@@ -381,6 +396,7 @@ function Settings() {
     setApiKeySaveState('idle');
     try {
       const response = await window.electron.config.setApiKey(apiKeyInput);
+      await window.electron.chat.resetSession();
       setApiKeyStatus(response.status);
       setApiKeyInput('');
       setApiKeySaveState('success');
@@ -398,6 +414,7 @@ function Settings() {
     setApiKeySaveState('idle');
     try {
       const response = await window.electron.config.setApiKey(null);
+      await window.electron.chat.resetSession();
       setApiKeyStatus(response.status);
       setApiKeyInput('');
       setApiKeySaveState('success');
@@ -415,6 +432,7 @@ function Settings() {
     setBaseUrlSaveState('idle');
     try {
       const response = await window.electron.config.setApiBaseUrl(apiBaseUrl.trim() || null);
+      await window.electron.chat.resetSession();
       setApiBaseUrl(response.apiBaseUrl || '');
       setBaseUrlSaveState('success');
       setTimeout(() => setBaseUrlSaveState('idle'), 2000);
@@ -431,6 +449,7 @@ function Settings() {
     setModelIdsSaveState('idle');
     try {
       const response = await window.electron.config.setCustomModelIds(customModelIds);
+      await window.electron.chat.resetSession();
       setCustomModelIds(response.customModelIds || {});
       setModelIdsSaveState('success');
       setTimeout(() => setModelIdsSaveState('idle'), 2000);
@@ -447,6 +466,7 @@ function Settings() {
     setModelIdSaveState('idle');
     try {
       const response = await window.electron.config.setCustomModelId(customModelId.trim() || null);
+      await window.electron.chat.resetSession();
       setCustomModelId(response.customModelId || '');
       setModelIdSaveState('success');
       setTimeout(() => setModelIdSaveState('idle'), 2000);
@@ -481,6 +501,7 @@ function Settings() {
       if (openaiBaseUrl.trim()) config.baseUrl = openaiBaseUrl.trim();
       if (openaiModelId.trim()) config.modelId = openaiModelId.trim();
       await window.electron.config.setOpenAIConfig(config);
+      await window.electron.chat.resetSession();
 
       // Refresh status
       const status = await window.electron.config.getOpenAIConfig();
@@ -664,6 +685,8 @@ function Settings() {
 
     setAutoConfigStatus('saving');
     try {
+      const recommendedRuntime = getRecommendedRuntime(detectedProvider);
+
       // Resolve per-tier model IDs: user-selected tierModels > parsed modelId > empty
       const resolvedModelIds: Partial<Record<ChatModelPreference, string>> = {};
       for (const tier of TIER_KEYS) {
@@ -688,11 +711,11 @@ function Settings() {
         });
       }
 
-      await window.electron.config.setAgentProvider(detectedProvider);
+      await window.electron.config.setAgentProvider(recommendedRuntime);
       await window.electron.chat.resetSession();
 
       // Refresh UI state
-      setAgentProvider(detectedProvider);
+      setAgentProvider(recommendedRuntime);
       const keyStatus = await window.electron.config.getApiKeyStatus();
       setApiKeyStatus(keyStatus.status);
 
@@ -793,6 +816,7 @@ function Settings() {
     isLoadingProvider ||
     isLoadingOpenAI;
   const apiKeyPlaceholder = apiKeyStatus.lastFour ? `...${apiKeyStatus.lastFour}` : 'sk-ant-...';
+  const recommendedRuntime = detectedProvider ? getRecommendedRuntime(detectedProvider) : null;
 
   // Shared styles
   const inputClass =
@@ -902,8 +926,10 @@ function Settings() {
                       配置成功
                     </p>
                     <p className="mt-1 text-xs text-green-600 dark:text-green-400">
-                      已检测到{detectedProvider === 'anthropic' ? ' Anthropic' : ' OpenAI'} 兼容接口
-                      {detectedModel ? `，模型: ${detectedModel}` : ''}，配置已保存
+                      已检测到 {detectedProvider ? LLM_PROVIDER_LABELS[detectedProvider] : ''}，
+                      已按推荐运行时保存为{' '}
+                      {recommendedRuntime ? RUNTIME_LABELS[recommendedRuntime] : ''}
+                      {detectedModel ? `，模型: ${detectedModel}` : ''}
                     </p>
                     <button
                       onClick={resetAutoConfig}
@@ -1029,7 +1055,23 @@ function Settings() {
                               </span>
                             </div>
                           )}
+                          {recommendedRuntime && (
+                            <div className="flex gap-2">
+                              <span className="shrink-0 font-medium">推荐运行时:</span>
+                              <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-medium dark:bg-neutral-700">
+                                {RUNTIME_LABELS[recommendedRuntime]}
+                              </span>
+                            </div>
+                          )}
                         </div>
+
+                        {detectedProvider === 'openai' && (
+                          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                            已识别为 OpenAI 兼容接口，默认推荐使用 Pi Agent。若想继续使用 Claude SDK
+                            的续接、skills 等能力，请在手动配置中切换到 Claude SDK，并将代理地址填写到
+                            Anthropic API 地址。
+                          </div>
+                        )}
 
                         {/* Model tier selection */}
                         <div className="space-y-2 border-t border-neutral-200 pt-2 dark:border-neutral-700">
@@ -1099,34 +1141,40 @@ function Settings() {
                 <section className="space-y-3">
                   <div>
                     <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                      接口类型
+                      运行时
                     </h2>
                     <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                      选择 API 兼容的接口类型，切换后需要开始新对话
+                      选择消息处理运行时，切换后会自动开始新会话
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
                     <button
-                      onClick={() => handleSwitchProvider('anthropic')}
+                      onClick={() => handleSwitchProvider('claude-sdk')}
                       disabled={isSavingProvider}
-                      className={`rounded-lg px-4 py-2 text-xs font-medium transition ${
-                        agentProvider === 'anthropic' ?
-                          'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
-                        : 'border border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                      className={`rounded-lg border px-4 py-3 text-left text-xs transition ${
+                        agentProvider === 'claude-sdk' ?
+                          'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
+                        : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
                       }`}
                     >
-                      Anthropic 兼容
+                      <div className="font-medium">Claude SDK</div>
+                      <p className="mt-1 text-[11px] opacity-80">
+                        功能最完整，支持续接、skills、消息队列；原生使用 Anthropic，也可通过代理接入 OpenAI 兼容接口
+                      </p>
                     </button>
                     <button
-                      onClick={() => handleSwitchProvider('openai')}
+                      onClick={() => handleSwitchProvider('pi')}
                       disabled={isSavingProvider}
-                      className={`rounded-lg px-4 py-2 text-xs font-medium transition ${
-                        agentProvider === 'openai' ?
-                          'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
-                        : 'border border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                      className={`rounded-lg border px-4 py-3 text-left text-xs transition ${
+                        agentProvider === 'pi' ?
+                          'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
+                        : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
                       }`}
                     >
-                      OpenAI 兼容
+                      <div className="font-medium">Pi Agent</div>
+                      <p className="mt-1 text-[11px] opacity-80">
+                        轻量 in-process 运行；可直接使用 Anthropic 或 OpenAI 兼容接口，并按模型 ID 自动切换对应密钥
+                      </p>
                     </button>
                   </div>
                 </section>
@@ -1135,155 +1183,45 @@ function Settings() {
               </>
             }
 
-            {configMode === 'manual' && (agentProvider === 'openai' ?
+            {configMode === 'manual' && (
               <>
-                {/* OpenAI Configuration */}
                 <section className="space-y-3">
-                  <div>
-                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                      OpenAI API Key
-                    </h2>
-                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                      在此处设置 OpenAI API Key，或通过{' '}
-                      <code className="text-[11px]">OPENAI_API_KEY</code> 环境变量配置
-                    </p>
+                  <div
+                    className={`rounded-lg border px-4 py-3 text-xs ${
+                      agentProvider === 'claude-sdk' ?
+                        'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-300'
+                      : 'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
+                    }`}
+                  >
+                    {agentProvider === 'claude-sdk' ?
+                      <>
+                        <p className="font-medium">Claude SDK 代理模式</p>
+                        <p className="mt-1">
+                          Claude SDK 原生走 Anthropic 协议。若你只有 OpenAI 兼容 API，可先用 LiteLLM
+                          等代理暴露一个 Anthropic 兼容端点，再把代理地址填到下方的 Anthropic API 地址中。
+                        </p>
+                      </>
+                    : <>
+                        <p className="font-medium">Pi Agent provider 选择规则</p>
+                        <p className="mt-1">
+                          当前运行时会按模型 ID 自动挑选密钥。Claude 系列模型使用下方 Anthropic 配置，GPT /
+                          DeepSeek 等 OpenAI 兼容模型使用下方 OpenAI 配置。
+                        </p>
+                      </>
+                    }
                   </div>
-
-                  <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-                    <span
-                      className={
-                        openaiApiKeyConfigured ?
-                          'font-medium text-neutral-800 dark:text-neutral-200'
-                        : 'text-neutral-500'
-                      }
-                    >
-                      {openaiApiKeyConfigured ?
-                        openaiApiKeySource === 'env' ?
-                          '使用环境变量'
-                        : '本地存储'
-                      : '未配置'}
-                    </span>
-                    {openaiApiKeyLastFour && openaiApiKeyConfigured && (
-                      <span className="font-mono text-[11px] text-neutral-400">
-                        ...{openaiApiKeyLastFour}
-                      </span>
-                    )}
-                    {openaiApiKeySource === 'env' && (
-                      <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-                        ENV
-                      </span>
-                    )}
-                  </div>
-
-                  <input
-                    type="password"
-                    value={openaiApiKeyInput}
-                    onChange={(e) => setOpenaiApiKeyInput(e.target.value)}
-                    placeholder={openaiApiKeyLastFour ? `...${openaiApiKeyLastFour}` : 'sk-...'}
-                    className={inputClass}
-                  />
                 </section>
 
                 <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
-                {/* OpenAI Base URL */}
+                {/* Anthropic API Key */}
                 <section className="space-y-3">
                   <div>
                     <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                      OpenAI API 地址
+                      Anthropic API Key
                     </h2>
                     <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                      兼容 OpenAI 的 API 端点地址，留空使用默认地址
-                    </p>
-                  </div>
-                  <input
-                    type="text"
-                    value={openaiBaseUrl}
-                    onChange={(e) => setOpenaiBaseUrl(e.target.value)}
-                    placeholder="https://api.openai.com"
-                    className={inputClass}
-                  />
-                </section>
-
-                <div className="border-t border-neutral-100 dark:border-neutral-800" />
-
-                {/* OpenAI Model */}
-                <section className="space-y-3">
-                  <div>
-                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                      OpenAI 模型
-                    </h2>
-                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                      {'指定使用的模型 ID，留空使用默认模型（快速: '}
-                      {DEFAULT_OPENAI_MODEL_NAMES.fast}
-                      {'、均衡: '}
-                      {DEFAULT_OPENAI_MODEL_NAMES['smart-sonnet']}
-                      {'、强力: '}
-                      {DEFAULT_OPENAI_MODEL_NAMES['smart-opus']}
-                      {'）'}
-                    </p>
-                  </div>
-                  <input
-                    type="text"
-                    value={openaiModelId}
-                    onChange={(e) => setOpenaiModelId(e.target.value)}
-                    placeholder={`默认按档位自动选择`}
-                    className={inputClass}
-                  />
-                </section>
-
-                <div className="border-t border-neutral-100 dark:border-neutral-800" />
-
-                {/* Save & Test OpenAI */}
-                <section className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleSaveOpenAI}
-                      disabled={isSavingOpenAI}
-                      className={primaryBtnClass}
-                    >
-                      {isSavingOpenAI ? '保存中...' : '保存'}
-                    </button>
-                    <button
-                      onClick={handleTestOpenAI}
-                      disabled={openaiTestResult.status === 'testing'}
-                      className={secondaryBtnClass}
-                    >
-                      {openaiTestResult.status === 'testing' ?
-                        <span className="flex items-center gap-1.5">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          测试中...
-                        </span>
-                      : '测试连接'}
-                    </button>
-                    {openaiSaveState === 'success' && (
-                      <span className="text-[11px] text-green-600 dark:text-green-400">已保存</span>
-                    )}
-                    {openaiSaveState === 'error' && (
-                      <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
-                    )}
-                    {openaiTestResult.status === 'success' && openaiTestResult.message && (
-                      <span className="text-[11px] text-green-600 dark:text-green-400">
-                        {openaiTestResult.message}
-                      </span>
-                    )}
-                  </div>
-                  {openaiTestResult.status === 'error' && openaiTestResult.message && (
-                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-                      {openaiTestResult.message}
-                    </div>
-                  )}
-                </section>
-              </>
-            : <>
-                {/* API Key */}
-                <section className="space-y-3">
-                  <div>
-                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                      API Key
-                    </h2>
-                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                      在此处设置 API Key，或通过{' '}
+                      在此处设置 Anthropic API Key，或通过{' '}
                       <code className="text-[11px]">ANTHROPIC_API_KEY</code> 环境变量配置
                     </p>
                   </div>
@@ -1350,11 +1288,11 @@ function Settings() {
 
                 <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
-                {/* API Base URL */}
+                {/* Anthropic Base URL */}
                 <section className="space-y-3">
                   <div>
                     <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                      API 地址
+                      Anthropic API 地址
                     </h2>
                     <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                       兼容 Anthropic 的 API 端点地址，留空使用默认地址
@@ -1386,14 +1324,14 @@ function Settings() {
 
                 <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
-                {/* Test Connection */}
+                {/* Anthropic Connection Test */}
                 <section className="space-y-3">
                   <div>
                     <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                      连接测试
+                      Anthropic 连接测试
                     </h2>
                     <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                      测试当前配置的 API Key、地址和模型是否可用
+                      测试当前 Anthropic API Key、地址和模型是否可用
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1424,14 +1362,14 @@ function Settings() {
 
                 <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
-                {/* Per-tier Model Configuration */}
+                {/* Anthropic Model Configuration */}
                 <section className="space-y-3">
                   <div>
                     <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                      模型配置
+                      Claude / Anthropic 模型配置
                     </h2>
                     <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                      {'分别设置「快速」「均衡」「强力」三个档位使用的 AI 模型，留空则使用默认模型'}
+                      分别设置「快速」「均衡」「强力」三个档位的 Claude 模型，Pi Agent 也会使用这里的 Claude 模型配置
                     </p>
                   </div>
                   {isLoadingModelIds ?
@@ -1485,6 +1423,149 @@ function Settings() {
                     </div>
                   }
                 </section>
+
+                {agentProvider === 'pi' && (
+                  <>
+                    <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+                    {/* OpenAI Configuration */}
+                    <section className="space-y-3">
+                      <div>
+                        <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                          OpenAI API Key
+                        </h2>
+                        <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                          在此处设置 OpenAI API Key，或通过{' '}
+                          <code className="text-[11px]">OPENAI_API_KEY</code> 环境变量配置
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                        <span
+                          className={
+                            openaiApiKeyConfigured ?
+                              'font-medium text-neutral-800 dark:text-neutral-200'
+                            : 'text-neutral-500'
+                          }
+                        >
+                          {openaiApiKeyConfigured ?
+                            openaiApiKeySource === 'env' ?
+                              '使用环境变量'
+                            : '本地存储'
+                          : '未配置'}
+                        </span>
+                        {openaiApiKeyLastFour && openaiApiKeyConfigured && (
+                          <span className="font-mono text-[11px] text-neutral-400">
+                            ...{openaiApiKeyLastFour}
+                          </span>
+                        )}
+                        {openaiApiKeySource === 'env' && (
+                          <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                            ENV
+                          </span>
+                        )}
+                      </div>
+
+                      <input
+                        type="password"
+                        value={openaiApiKeyInput}
+                        onChange={(e) => setOpenaiApiKeyInput(e.target.value)}
+                        placeholder={openaiApiKeyLastFour ? `...${openaiApiKeyLastFour}` : 'sk-...'}
+                        className={inputClass}
+                      />
+                    </section>
+
+                    <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+                    <section className="space-y-3">
+                      <div>
+                        <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                          OpenAI API 地址
+                        </h2>
+                        <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                          兼容 OpenAI 的 API 端点地址，留空使用默认地址
+                        </p>
+                      </div>
+                      <input
+                        type="text"
+                        value={openaiBaseUrl}
+                        onChange={(e) => setOpenaiBaseUrl(e.target.value)}
+                        placeholder="https://api.openai.com"
+                        className={inputClass}
+                      />
+                    </section>
+
+                    <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+                    <section className="space-y-3">
+                      <div>
+                        <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                          OpenAI 模型
+                        </h2>
+                        <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                          {'填写后 Pi Agent 三个档位都会优先使用这个 OpenAI 模型，留空则使用默认模型（快速: '}
+                          {DEFAULT_OPENAI_MODEL_NAMES.fast}
+                          {'、均衡: '}
+                          {DEFAULT_OPENAI_MODEL_NAMES['smart-sonnet']}
+                          {'、强力: '}
+                          {DEFAULT_OPENAI_MODEL_NAMES['smart-opus']}
+                          {'）'}
+                        </p>
+                      </div>
+                      <input
+                        type="text"
+                        value={openaiModelId}
+                        onChange={(e) => setOpenaiModelId(e.target.value)}
+                        placeholder="默认按档位自动选择"
+                        className={inputClass}
+                      />
+                    </section>
+
+                    <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+                    <section className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleSaveOpenAI}
+                          disabled={isSavingOpenAI}
+                          className={primaryBtnClass}
+                        >
+                          {isSavingOpenAI ? '保存中...' : '保存'}
+                        </button>
+                        <button
+                          onClick={handleTestOpenAI}
+                          disabled={openaiTestResult.status === 'testing'}
+                          className={secondaryBtnClass}
+                        >
+                          {openaiTestResult.status === 'testing' ?
+                            <span className="flex items-center gap-1.5">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              测试中...
+                            </span>
+                          : '测试连接'}
+                        </button>
+                        {openaiSaveState === 'success' && (
+                          <span className="text-[11px] text-green-600 dark:text-green-400">
+                            已保存
+                          </span>
+                        )}
+                        {openaiSaveState === 'error' && (
+                          <span className="text-[11px] text-red-600 dark:text-red-400">保存失败</span>
+                        )}
+                        {openaiTestResult.status === 'success' && openaiTestResult.message && (
+                          <span className="text-[11px] text-green-600 dark:text-green-400">
+                            {openaiTestResult.message}
+                          </span>
+                        )}
+                      </div>
+                      {openaiTestResult.status === 'error' && openaiTestResult.message && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                          {openaiTestResult.message}
+                        </div>
+                      )}
+                    </section>
+                  </>
+                )}
               </>
             )}
 

@@ -17,9 +17,15 @@ import {
 } from '@mariozechner/pi-coding-agent';
 import type { BrowserWindow } from 'electron';
 
-import { DEFAULT_OPENAI_MODEL_IDS, type ChatModelPreference } from '../../shared/types/ipc';
+import {
+  DEFAULT_OPENAI_MODEL_IDS,
+  type ChatModelPreference
+} from '../../shared/types/ipc';
 import { SYSTEM_PROMPT_APPEND } from './claude-session';
 import {
+  getApiBaseUrl,
+  getApiKey,
+  getCustomModelIds,
   getDebugMode,
   getOpenAIApiKey,
   getOpenAIBaseUrl,
@@ -32,39 +38,84 @@ let isProcessing = false;
 let shouldAbortSession = false;
 let sessionTerminationPromise: Promise<void> | null = null;
 let currentUnsubscribe: (() => void) | null = null;
+let currentPiModelKey: string | null = null;
 
 // Tool call ID counter for generating unique IDs when pi doesn't provide them
 let toolCallCounter = 0;
 
 /**
- * Resolve the OpenAI model to use based on preference.
+ * Resolve the Pi model to use based on preference.
+ * Priority: per-tier custom > openai.modelId (single override) > tier default.
  */
-export function getOpenAIModelForPreference(preference: ChatModelPreference = 'fast'): string {
-  const customModelId = getOpenAIModelId();
-  if (customModelId) return customModelId;
+export function getPiModelForPreference(preference: ChatModelPreference = 'fast'): string {
+  // Per-tier custom model IDs take highest priority (set in Settings model config)
+  const customModelIds = getCustomModelIds();
+  const perTierCustom = customModelIds[preference]?.trim();
+  if (perTierCustom) return perTierCustom;
+
+  // Legacy single OpenAI model override (applies to all tiers)
+  const openAIModelId = getOpenAIModelId();
+  if (openAIModelId) return openAIModelId;
+
   return DEFAULT_OPENAI_MODEL_IDS[preference] ?? DEFAULT_OPENAI_MODEL_IDS.fast;
 }
 
-/**
- * Find a pi-ai Model object by model ID string.
- * First tries the OpenAI provider, then searches all providers.
- */
-function resolveModel(modelId: string): Model<Api> | undefined {
-  // Try OpenAI provider first
-  const openaiModels = getModels('openai');
-  const found = openaiModels.find((m) => m.id === modelId);
-  if (found) return found;
+function isAnthropicModel(model: Model<Api>): boolean {
+  return model.provider === 'anthropic' || model.api === 'anthropic-messages';
+}
 
-  // If a custom base URL is set, create a model object manually
-  const baseUrl = getOpenAIBaseUrl();
-  if (baseUrl) {
-    // Use a generic openai-completions compatible model
+function getBuiltinModel(modelId: string): Model<Api> | undefined {
+  for (const provider of ['openai', 'anthropic'] as const) {
+    const model = getModels(provider).find((entry) => entry.id === modelId);
+    if (model) {
+      return model as Model<Api>;
+    }
+  }
+  return undefined;
+}
+
+export function resolveModel(modelId: string): Model<Api> | undefined {
+  const builtinModel = getBuiltinModel(modelId);
+  if (builtinModel) {
+    if (isAnthropicModel(builtinModel)) {
+      const customBaseUrl = getApiBaseUrl();
+      return customBaseUrl ? { ...builtinModel, baseUrl: customBaseUrl } : builtinModel;
+    }
+
+    const customBaseUrl = getOpenAIBaseUrl();
+    return customBaseUrl ? { ...builtinModel, baseUrl: customBaseUrl } : builtinModel;
+  }
+
+  // For unknown model IDs, use name heuristic to pick the right provider fallback.
+  // Models starting with "claude" are likely Anthropic; everything else tries OpenAI first.
+  const looksAnthropic = /^claude/i.test(modelId);
+
+  if (looksAnthropic) {
+    const anthropicBaseUrl = getApiBaseUrl();
+    if (anthropicBaseUrl) {
+      return {
+        id: modelId,
+        name: modelId,
+        api: 'anthropic-messages' as Api,
+        provider: 'anthropic',
+        baseUrl: anthropicBaseUrl,
+        reasoning: true,
+        input: ['text', 'image'],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200_000,
+        maxTokens: 64_000
+      };
+    }
+  }
+
+  const openAIBaseUrl = getOpenAIBaseUrl();
+  if (openAIBaseUrl) {
     return {
       id: modelId,
       name: modelId,
       api: 'openai-completions' as Api,
       provider: 'openai',
-      baseUrl,
+      baseUrl: openAIBaseUrl,
       reasoning: false,
       input: ['text', 'image'],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -73,7 +124,45 @@ function resolveModel(modelId: string): Model<Api> | undefined {
     };
   }
 
+  // Last resort: try Anthropic base URL for non-Claude models too
+  if (!looksAnthropic) {
+    const anthropicBaseUrl = getApiBaseUrl();
+    if (anthropicBaseUrl) {
+      return {
+        id: modelId,
+        name: modelId,
+        api: 'anthropic-messages' as Api,
+        provider: 'anthropic',
+        baseUrl: anthropicBaseUrl,
+        reasoning: true,
+        input: ['text', 'image'],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200_000,
+        maxTokens: 64_000
+      };
+    }
+  }
+
   return undefined;
+}
+
+async function disposePiSession(): Promise<void> {
+  if (piSession) {
+    try {
+      await piSession.abort();
+    } catch {
+      // Ignore abort errors during session disposal
+    }
+    piSession.dispose();
+    piSession = null;
+  }
+
+  if (currentUnsubscribe) {
+    currentUnsubscribe();
+    currentUnsubscribe = null;
+  }
+
+  currentPiModelKey = null;
 }
 
 export function isOpenAISessionActive(): boolean {
@@ -97,21 +186,7 @@ export async function interruptOpenAIResponse(mainWindow: BrowserWindow | null):
 
 export async function resetOpenAISession(): Promise<void> {
   shouldAbortSession = true;
-
-  if (piSession) {
-    try {
-      await piSession.abort();
-    } catch {
-      // Ignore abort errors during reset
-    }
-    piSession.dispose();
-    piSession = null;
-  }
-
-  if (currentUnsubscribe) {
-    currentUnsubscribe();
-    currentUnsubscribe = null;
-  }
+  await disposePiSession();
 
   if (sessionTerminationPromise) {
     await sessionTerminationPromise;
@@ -143,22 +218,35 @@ export async function sendOpenAIMessage(
   });
 
   try {
-    const apiKey = getOpenAIApiKey();
-    if (!apiKey) {
-      throw new Error('OpenAI API key is not configured');
+    const modelId = getPiModelForPreference(modelPreference);
+    const model = resolveModel(modelId);
+
+    if (!model) {
+      throw new Error(`Could not resolve Pi model: ${modelId}`);
+    }
+
+    const modelKey = `${model.provider}:${model.id}:${model.baseUrl ?? ''}`;
+
+    if (piSession && currentPiModelKey !== modelKey) {
+      await disposePiSession();
     }
 
     // Create session if needed
     if (!piSession) {
-      const modelId = getOpenAIModelForPreference(modelPreference);
-      const model = resolveModel(modelId);
-
-      if (!model) {
-        throw new Error(`Could not resolve OpenAI model: ${modelId}`);
-      }
-
       const authStorage = AuthStorage.inMemory();
-      authStorage.setRuntimeApiKey('openai', apiKey);
+      if (isAnthropicModel(model)) {
+        const apiKey = getApiKey();
+        if (!apiKey) {
+          throw new Error('Anthropic API key is not configured');
+        }
+        authStorage.setRuntimeApiKey('anthropic', apiKey);
+      } else {
+        const apiKey = getOpenAIApiKey();
+        if (!apiKey) {
+          throw new Error('OpenAI API key is not configured');
+        }
+        authStorage.setRuntimeApiKey('openai', apiKey);
+      }
 
       const { session } = await createAgentSession({
         cwd: getWorkspaceDir(),
@@ -173,6 +261,7 @@ export async function sendOpenAIMessage(
       session.agent.setSystemPrompt(SYSTEM_PROMPT_APPEND);
 
       piSession = session;
+      currentPiModelKey = modelKey;
 
       // Subscribe to events and translate to IPC
       currentUnsubscribe = piSession.subscribe((event: AgentSessionEvent) => {
@@ -186,7 +275,7 @@ export async function sendOpenAIMessage(
     // Send the prompt
     await piSession.prompt(text);
   } catch (error) {
-    console.error('Error in OpenAI session:', error);
+    console.error('Error in Pi session:', error);
     if (mainWindow && !mainWindow.isDestroyed()) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       mainWindow.webContents.send('chat:message-error', errorMessage);

@@ -21,7 +21,9 @@ import {
 import { getAgentProvider, getApiKey, getOpenAIApiKey, getWorkspaceDir } from '../lib/config';
 import { messageQueue } from '../lib/message-queue';
 import {
+  getPiModelForPreference,
   interruptOpenAIResponse,
+  resolveModel,
   resetOpenAISession,
   sendOpenAIMessage
 } from '../lib/openai-session';
@@ -32,13 +34,20 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
   ipcMain.handle('chat:send-message', async (_event, payload: SendMessagePayload) => {
     const provider = getAgentProvider();
 
-    if (provider === 'openai') {
-      const apiKey = getOpenAIApiKey();
+    if (provider === 'pi') {
+      const modelId = getPiModelForPreference(getCurrentModelPreference());
+      const model = resolveModel(modelId);
+      const apiKey =
+        model?.provider === 'anthropic' || model?.api === 'anthropic-messages' ?
+          getApiKey()
+        : getOpenAIApiKey();
       if (!apiKey) {
         return {
           success: false,
           error:
-            'OpenAI API key is not configured. Add your OpenAI API key in Settings or set OPENAI_API_KEY.'
+            model?.provider === 'anthropic' || model?.api === 'anthropic-messages' ?
+              'Anthropic API key is not configured. Add your Anthropic API key in Settings or set ANTHROPIC_API_KEY.'
+            : 'OpenAI API key is not configured. Add your OpenAI API key in Settings or set OPENAI_API_KEY.'
         };
       }
     } else {
@@ -72,11 +81,11 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
 
       const savedAttachments = await persistAttachments(attachments);
 
-      if (provider === 'openai') {
-        // OpenAI path: build plain text with attachment instructions, send directly
+      if (provider === 'pi') {
+        // Pi path: build plain text with attachment instructions, send directly
         const fullText = buildPlainTextWithAttachments(text, savedAttachments);
         sendOpenAIMessage(getMainWindow(), fullText, getCurrentModelPreference()).catch((error) => {
-          console.error('Failed to send OpenAI message:', error);
+          console.error('Failed to send Pi message:', error);
         });
         return { success: true, attachments: savedAttachments };
       }
@@ -122,7 +131,7 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
       const mainWindow = getMainWindow();
       const provider = getAgentProvider();
 
-      if (provider === 'openai') {
+      if (provider === 'pi') {
         const wasInterrupted = await interruptOpenAIResponse(mainWindow);
         if (!wasInterrupted) {
           return { success: false, error: 'No active response to stop.' };
@@ -204,4 +213,3 @@ async function persistAttachments(
 
   return saves;
 }
-
