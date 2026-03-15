@@ -101,3 +101,12 @@ jobs:
             --title "Release ${{ steps.version.outputs.version }}" \
             --generate-notes \
             dist/*
+
+      - name: Upload to Volcengine TOS
+        continue-on-error: true
+        env:
+          VOLC_ACCESS_KEY: ${{ secrets.VOLC_ACCESS_KEY }}
+          VOLC_SECRET_KEY: ${{ secrets.VOLC_SECRET_KEY }}
+        run: |
+          pip install tos --quiet
+          python scripts/upload-tos.py --channel release --dist-dir dist/
