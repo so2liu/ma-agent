@@ -41,7 +41,7 @@ function getOrCreateAnonymousId(): string {
 export function getAnalyticsSettings(): AnalyticsSettings {
   const config = loadConfig() as Record<string, unknown>;
   return {
-    enabled: (config.analyticsEnabled as boolean) ?? false,
+    enabled: (config.analyticsEnabled as boolean) ?? true,
     shareConversationOnFeedback: (config.analyticsShareConversation as boolean) ?? false
   };
 }
