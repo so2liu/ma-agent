@@ -30,13 +30,13 @@ src/shared/        → Types shared across processes
 
 ### Agent Integration
 
-The **only file coupled to Claude Agent SDK** is `src/main/lib/claude-session.ts`. It:
+The agent runtime is built on `@mariozechner/pi-coding-agent` (from pi-mono). Key files:
 
-1. Calls `query()` from `@anthropic-ai/claude-agent-sdk` to start an agent session
-2. Consumes the async iterable of SDK events (`stream_event`, `assistant`, `result`, `system`)
-3. Translates them into IPC events sent to renderer
+- `src/main/lib/agent-runtime.ts` — `AgentRuntime` interface definition (event types, IPC mapping)
+- `src/main/lib/pi-runtime.ts` — `PiRuntime` class implementing `AgentRuntime` via pi-coding-agent
+- `src/main/lib/session-manager.ts` — Manages `ManagedSession` instances (each holds an `AgentRuntime`)
 
-The renderer has **zero knowledge of the SDK** -- it only reacts to IPC events. To swap agent runtimes, only `claude-session.ts` needs a new implementation.
+The renderer has **zero knowledge of the agent runtime** -- it only reacts to IPC events. The `AgentRuntime` interface decouples handlers from the specific runtime implementation.
 
 ### IPC Protocol
 
@@ -57,9 +57,9 @@ Adding a new IPC channel requires changes in 3 places:
 ### Message Streaming Flow
 
 1. Renderer sends user text via `chat:send-message`
-2. `chat-handlers.ts` validates API key, persists attachments to workspace, queues message
-3. `claude-session.ts` feeds messages to SDK via async generator (`message-queue.ts`)
-4. SDK streams events back; main process emits IPC events (`chat:message-chunk`, `chat:tool-use-start`, etc.)
+2. `chat-handlers.ts` validates API key, persists attachments to workspace
+3. `PiRuntime.sendMessage()` feeds text to pi-coding-agent's `AgentSession.prompt()`
+4. Pi-agent streams events back; `PiRuntime` translates to `RuntimeEvent`, mapped to IPC via `runtimeEventToIpc()`
 5. `useClaudeChat` hook in renderer accumulates events into `Message[]` state
 6. Chat page auto-saves conversation (debounced 2s) to `conversation-db.ts`
 
@@ -67,7 +67,8 @@ Adding a new IPC channel requires changes in 3 places:
 
 - **Config**: `~/.config/Claude Agent Desktop/config.json` (API key, workspace dir, debug mode, model preference)
 - **Conversations**: `~/.config/Claude Agent Desktop/conversations/{id}.json` (messages as JSON string)
-- **Workspace**: `~/Desktop/claude-agent` (default, configurable) -- SDK cwd, attachments, .claude/ skills
+- **Sessions**: `~/.config/Claude Agent Desktop/sessions/` (JSONL files for agent session state)
+- **Workspace**: `~/Desktop/ma-agent` (default, configurable) -- agent cwd, attachments, .claude/ skills
 
 ### Skills System
 
@@ -96,7 +97,7 @@ Skills live in `.claude/skills/<name>/` with `SKILL.md` + TypeScript tools in `s
 - **TypeScript strict mode** with no explicit `any`
 - **Preload outputs CommonJS** (`out/preload/index.cjs`) -- required by Electron
 - **Attachments**: max 32MB, persisted as `attachments/{timestamp}-{uuid}-{name}` in workspace
-- **Models**: `claude-haiku-4-5-20251001` (fast), `claude-sonnet-4-5-20250929` (smart-sonnet), `claude-opus-4-5-20251101` (smart-opus) -- defined in `claude-session.ts`
+- **Models**: `claude-haiku-4-5-20251001` (fast), `claude-sonnet-4-5-20250929` (smart-sonnet), `claude-opus-4-5-20251101` (smart-opus) -- defined in `shared/types/ipc.ts`, resolved via `pi-runtime.ts`
 - **Platform handling**: Windows bundles Git + MSYS2; PATH is constructed via `buildEnhancedPath()` in `config.ts`
 
 ## Workflow

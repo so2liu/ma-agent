@@ -1,112 +1,26 @@
-import type { Query, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-
-import type { AgentProvider } from '../../shared/types/ipc';
-import { getAgentProvider } from './config';
-import { logSessionEvent } from './session-logger';
-
-export interface MessageQueueItem {
-  message: SDKUserMessage['message'];
-  resolve: () => void;
-}
+import type { AgentRuntime } from './agent-runtime';
+import { PiRuntime } from './pi-runtime';
 
 export interface ManagedSession {
   chatId: string;
-  provider: AgentProvider;
-  querySession: Query | null;
-  isProcessing: boolean;
-  shouldAbortSession: boolean;
-  sessionTerminationPromise: Promise<void> | null;
-  resolveTermination: (() => void) | null;
-  isInterruptingResponse: boolean;
-  sessionGeneration: number;
-  pendingResumeSessionId: string | null;
-  messageQueue: MessageQueueItem[];
-  sessionId: string;
-  shouldAbortGenerator: boolean;
-  streamIndexToToolId: Map<number, string>;
-  lastRateLimitNoticeAt: number;
-  rateLimitAttempt: number;
-  messageGenerator: () => AsyncGenerator<SDKUserMessage>;
-}
-
-function generateSessionId(): string {
-  return `session-${Date.now()}`;
-}
-
-function createMessageGenerator(session: ManagedSession): () => AsyncGenerator<SDKUserMessage> {
-  return async function* messageGenerator(): AsyncGenerator<SDKUserMessage> {
-    while (true) {
-      if (session.shouldAbortGenerator) {
-        return;
-      }
-
-      await new Promise<void>((resolve) => {
-        const checkQueue = () => {
-          if (session.shouldAbortGenerator) {
-            resolve();
-            return;
-          }
-
-          if (session.messageQueue.length > 0) {
-            resolve();
-            return;
-          }
-
-          setTimeout(checkQueue, 100);
-        };
-
-        checkQueue();
-      });
-
-      if (session.shouldAbortGenerator) {
-        return;
-      }
-
-      const item = session.messageQueue.shift();
-      if (!item) {
-        continue;
-      }
-
-      const userMessage: SDKUserMessage = {
-        type: 'user',
-        message: item.message,
-        parent_tool_use_id: null,
-        session_id: session.sessionId
-      };
-
-      logSessionEvent(userMessage);
-      yield userMessage;
-      item.resolve();
-    }
-  };
+  runtime: AgentRuntime;
+  piSessionId: string | null;
 }
 
 function createManagedSession(chatId: string): ManagedSession {
-  const session = {
+  const runtime = new PiRuntime();
+  const session: ManagedSession = {
     chatId,
-    provider: getAgentProvider(),
-    querySession: null,
-    isProcessing: false,
-    shouldAbortSession: false,
-    sessionTerminationPromise: null,
-    resolveTermination: null,
-    isInterruptingResponse: false,
-    sessionGeneration: 0,
-    pendingResumeSessionId: null,
-    messageQueue: [],
-    sessionId: generateSessionId(),
-    shouldAbortGenerator: false,
-    streamIndexToToolId: new Map<number, string>(),
-    lastRateLimitNoticeAt: 0,
-    rateLimitAttempt: 0,
-    messageGenerator: (() => {
-      throw new Error('messageGenerator not initialized');
-    }) as ManagedSession['messageGenerator']
-  } satisfies Omit<ManagedSession, 'messageGenerator'> & {
-    messageGenerator: ManagedSession['messageGenerator'];
+    runtime,
+    piSessionId: null
   };
 
-  session.messageGenerator = createMessageGenerator(session);
+  runtime.onEvent((event) => {
+    if (event.type === 'session-updated') {
+      session.piSessionId = event.sessionId;
+    }
+  });
+
   return session;
 }
 
@@ -138,68 +52,18 @@ export class SessionManager {
       return;
     }
 
-    session.sessionGeneration += 1;
-    session.shouldAbortSession = true;
-    this.abortGenerator(session);
-    this.clearMessageQueue(session);
-
-    if (session.querySession) {
-      try {
-        await session.querySession.interrupt();
-      } catch {
-        // Ignore interrupt failures during destruction.
-      }
-    }
-
-    if (session.sessionTerminationPromise) {
-      await Promise.race([
-        session.sessionTerminationPromise,
-        new Promise<void>((resolve) => setTimeout(resolve, 3000))
-      ]);
-    }
-
-    session.querySession = null;
-    session.isProcessing = false;
-    session.sessionTerminationPromise = null;
-    session.resolveTermination = null;
+    await session.runtime.reset();
     this.sessions.delete(chatId);
   }
 
   isAnyChatActive(): boolean {
-    return Array.from(this.sessions.values()).some((session) => this.isChatActive(session));
+    return Array.from(this.sessions.values()).some((session) => session.runtime.isActive());
   }
 
   listActive(): string[] {
     return Array.from(this.sessions.values())
-      .filter((session) => this.isChatActive(session))
+      .filter((session) => session.runtime.isActive())
       .map((session) => session.chatId);
-  }
-
-  clearMessageQueue(session: ManagedSession): void {
-    while (session.messageQueue.length > 0) {
-      session.messageQueue.shift()?.resolve();
-    }
-  }
-
-  abortGenerator(session: ManagedSession): void {
-    session.shouldAbortGenerator = true;
-  }
-
-  resetAbortFlag(session: ManagedSession): void {
-    session.shouldAbortGenerator = false;
-  }
-
-  setSessionId(session: ManagedSession, nextSessionId?: string | null): void {
-    if (nextSessionId && nextSessionId.trim().length > 0) {
-      session.sessionId = nextSessionId;
-      return;
-    }
-
-    session.sessionId = generateSessionId();
-  }
-
-  private isChatActive(session: ManagedSession): boolean {
-    return session.isProcessing || session.querySession !== null;
   }
 }
 

@@ -4,7 +4,6 @@ import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shar
 import type { SimpleElement } from '../shared/types/canvas';
 import type { TaskNotificationEvent, TaskProgressEvent } from '../shared/types/background-task';
 import type {
-  AgentProvider,
   ChatModelPreference,
   CustomModelIds,
   OpenAIConfig,
@@ -221,9 +220,6 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('config:set-custom-model-ids', ids),
     testApi: (params?: { apiKey?: string; baseUrl?: string; modelId?: string }) =>
       ipcRenderer.invoke('config:test-api', params),
-    getAgentProvider: () => ipcRenderer.invoke('config:get-agent-provider'),
-    setAgentProvider: (provider: AgentProvider) =>
-      ipcRenderer.invoke('config:set-agent-provider', provider),
     getOpenAIConfig: () => ipcRenderer.invoke('config:get-openai-config'),
     setOpenAIConfig: (config: OpenAIConfig) =>
       ipcRenderer.invoke('config:set-openai-config', config),

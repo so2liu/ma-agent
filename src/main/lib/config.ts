@@ -12,7 +12,6 @@ import { join, resolve } from 'path';
 import { app } from 'electron';
 
 import type {
-  AgentProvider,
   ChatModelPreference,
   CustomModelIds,
   OpenAIConfig
@@ -31,8 +30,8 @@ export interface AppConfig {
   updateChannel?: UpdateChannel;
   customModelId?: string; // Legacy single override — migrated to customModelIds
   customModelIds?: CustomModelIds;
-  /** Active agent runtime, with legacy values accepted during migration */
-  agentProvider?: AgentProvider | 'anthropic' | 'openai';
+  /** Legacy field kept for backward compatibility, no longer used */
+  agentProvider?: string;
   /** OpenAI provider configuration */
   openai?: OpenAIConfig;
 }
@@ -349,60 +348,37 @@ export function buildEnhancedPath(): string {
 }
 
 /**
- * Builds the complete environment object used by Claude Agent SDK query sessions.
- * This ensures consistency across the Electron app, Claude Agent SDK, and debug panel.
- *
- * The environment includes:
- * - All process.env variables
- * - ANTHROPIC_API_KEY (from env or local config)
- * - PATH (enhanced with bundled binaries)
- * - CLAUDE_CODE_GIT_BASH_PATH (Windows only, if bash.exe found)
- * - MSYSTEM, MSYS2_PATH_TYPE, and HOME (Windows only, if MSYS2 bash detected - required for PATH inheritance and cwd)
- * - DEBUG (if debug mode enabled)
+ * Builds the environment object used by agent runtime child processes and diagnostics.
+ * Keeps the enhanced PATH and configured provider credentials without Claude Code-specific variables.
  */
 export function buildClaudeSessionEnv(): Record<string, string> {
   const enhancedPath = buildEnhancedPath();
-  const apiKey = getApiKey();
-  const workspaceDir = getWorkspaceDir();
 
   const env: Record<string, string> = {
     ...process.env,
     PATH: enhancedPath
   };
 
-  // Add API key if available
-  if (apiKey) {
-    env.ANTHROPIC_API_KEY = apiKey;
+  const anthropicApiKey = getApiKey();
+  if (anthropicApiKey) {
+    env.ANTHROPIC_API_KEY = anthropicApiKey;
   }
 
-  // Add custom base URL if configured
-  const baseUrl = getApiBaseUrl();
-  if (baseUrl) {
-    env.ANTHROPIC_BASE_URL = baseUrl;
+  const anthropicBaseUrl = getApiBaseUrl();
+  if (anthropicBaseUrl) {
+    env.ANTHROPIC_BASE_URL = anthropicBaseUrl;
   }
 
-  // Set CLAUDE_CODE_GIT_BASH_PATH for Windows (required by Claude Code)
-  if (process.platform === 'win32') {
-    const bashExePath = getBashExePath();
-    if (bashExePath) {
-      env.CLAUDE_CODE_GIT_BASH_PATH = bashExePath;
-
-      // MSYS2 bash requires special environment variables to properly inherit
-      // Windows environment variables and PATH. Without these, env vars and binaries
-      // passed to the SDK won't be available inside the bash session.
-      if (isMsys2Bash(bashExePath)) {
-        // MSYSTEM tells MSYS2 which environment to use (MSYS, MINGW64, etc.)
-        env.MSYSTEM = 'MSYS';
-        // MSYS2_PATH_TYPE=inherit ensures Windows PATH is inherited and converted properly
-        env.MSYS2_PATH_TYPE = 'inherit';
-        // HOME set to workspace directory ensures bash starts in the correct cwd
-        // MSYS2 will automatically convert Windows paths to Unix-style paths
-        env.HOME = resolve(workspaceDir);
-      }
-    }
+  const openAIApiKey = getOpenAIApiKey();
+  if (openAIApiKey) {
+    env.OPENAI_API_KEY = openAIApiKey;
   }
 
-  // Enable debug mode if configured
+  const openAIBaseUrl = getOpenAIBaseUrl();
+  if (openAIBaseUrl) {
+    env.OPENAI_BASE_URL = openAIBaseUrl;
+  }
+
   if (getDebugMode()) {
     env.DEBUG = '1';
   }
@@ -530,20 +506,6 @@ export function setCustomModelIds(ids: CustomModelIds): void {
   } else {
     delete config.customModelIds;
   }
-  saveConfig(config);
-}
-
-export function getAgentProvider(): AgentProvider {
-  const config = loadConfig();
-  const stored = config.agentProvider;
-  if (stored === 'anthropic') return 'claude-sdk';
-  if (stored === 'openai') return 'pi';
-  return stored === 'pi' ? 'pi' : 'claude-sdk';
-}
-
-export function setAgentProvider(provider: AgentProvider): void {
-  const config = loadConfig();
-  config.agentProvider = provider;
   saveConfig(config);
 }
 

@@ -2,7 +2,6 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   buildPlainTextWithAttachments,
-  buildUserMessage,
   resolveAttachmentPath,
   sanitizeFileName
 } from './chat-helpers';
@@ -74,39 +73,6 @@ describe('chat-helpers', () => {
       });
       expect(result.readTarget).toBe('/workspace/attachments/file.csv');
       expect(result.displayPath).toBe('/workspace/attachments/file.csv');
-    });
-  });
-
-  describe('buildUserMessage', () => {
-    test('creates message with text only', () => {
-      const msg = buildUserMessage('hello world', []);
-      expect(msg).toEqual({
-        role: 'user',
-        content: [{ type: 'text', text: 'hello world' }]
-      });
-    });
-
-    test('creates message with attachments', () => {
-      const msg = buildUserMessage('check this', [
-        {
-          name: 'data.csv',
-          mimeType: 'text/csv',
-          size: 100,
-          savedPath: '/workspace/attachments/data.csv',
-          relativePath: 'attachments/data.csv'
-        }
-      ]);
-      const content = msg.content as { type: string; text: string }[];
-      expect(content).toHaveLength(2);
-      expect(content[1].text).toContain('data.csv');
-      expect(content[1].text).toContain('Read("./attachments/data.csv")');
-    });
-
-    test('creates fallback message when no text and no attachments', () => {
-      const msg = buildUserMessage('', []);
-      const content = msg.content as { type: string; text: string }[];
-      expect(content).toHaveLength(1);
-      expect(content[0].text).toContain('uploaded');
     });
   });
 

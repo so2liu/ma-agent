@@ -12,9 +12,6 @@ export interface SuccessResponse {
 /** Which protocol / API shape an LLM endpoint speaks */
 export type LlmProvider = 'anthropic' | 'openai';
 
-/** Which agent runtime to use */
-export type AgentProvider = 'claude-sdk' | 'pi';
-
 export type ChatModelPreference = 'fast' | 'smart-sonnet' | 'smart-opus';
 
 export const MODEL_LABELS: Record<ChatModelPreference, string> = {

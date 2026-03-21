@@ -1,9 +1,9 @@
 import { Notification } from 'electron';
 
-import { isSessionActive } from './claude-session';
 import { listScheduledTasks, updateScheduledTask } from './schedule-db';
 import { executeScheduledTask } from './schedule-executor';
 import { isScheduledTaskExecuting, setScheduledTaskExecuting } from './schedule-state';
+import { sessionManager } from './session-manager';
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -53,7 +53,7 @@ async function checkAndExecute(): Promise<void> {
     // Prevent running the same task multiple times in the same minute
     if (task.lastRunAt && now.getTime() - task.lastRunAt < 60_000) continue;
 
-    if (isSessionActive()) {
+    if (sessionManager.isAnyChatActive()) {
       updateScheduledTask(task.id, {
         lastRunAt: now.getTime(),
         lastRunStatus: 'skipped'
