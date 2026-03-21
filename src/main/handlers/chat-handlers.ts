@@ -10,26 +10,67 @@ import type {
   SendMessagePayload,
   SerializedAttachmentPayload
 } from '../../shared/types/ipc';
-import {
-  applyChatModelPreference,
-  getCurrentModelPreference,
-  interruptCurrentResponse,
-  isSessionActive,
-  resetSession,
-  setChatModelPreference,
-  startStreamingSession
-} from '../lib/claude-session';
+import { runtimeEventToIpc } from '../lib/agent-runtime';
 import { getApiKey, getOpenAIApiKey, getWorkspaceDir } from '../lib/config';
-import {
-  getPiModelForPreference,
-  interruptOpenAIResponse,
-  resolveModel,
-  resetOpenAISession,
-  sendOpenAIMessage
-} from '../lib/openai-session';
 import { isScheduledTaskExecuting } from '../lib/schedule-state';
+import {
+  getCurrentModelPreference,
+  getPiModelForPreference,
+  resolveModel,
+  setChatModelPreference
+} from '../lib/pi-runtime';
 import { sessionManager } from '../lib/session-manager';
-import { buildPlainTextWithAttachments, buildUserMessage, sanitizeFileName } from './chat-helpers';
+import { sanitizeFileName } from './chat-helpers';
+
+const runtimeUnsubscribers = new Map<string, () => void>();
+
+function bindRuntimeEvents(
+  chatId: string,
+  getMainWindow: () => BrowserWindow | null
+): void {
+  if (runtimeUnsubscribers.has(chatId)) {
+    return;
+  }
+
+  const session = sessionManager.get(chatId);
+  if (!session) {
+    return;
+  }
+
+  const unsubscribe = session.runtime.onEvent((event) => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
+    const ipcEvent = runtimeEventToIpc(event, chatId);
+    mainWindow.webContents.send(ipcEvent.channel, ...ipcEvent.args);
+  });
+
+  runtimeUnsubscribers.set(chatId, unsubscribe);
+}
+
+function unbindRuntimeEvents(chatId: string): void {
+  runtimeUnsubscribers.get(chatId)?.();
+  runtimeUnsubscribers.delete(chatId);
+}
+
+function getMissingApiKeyMessage(): string | null {
+  const model = resolveModel(getPiModelForPreference(getCurrentModelPreference()));
+  if (!model) {
+    return '无法解析当前模型配置，请检查设置中的模型 ID。';
+  }
+
+  if (model.provider === 'anthropic' || model.api === 'anthropic-messages') {
+    return getApiKey() ?
+        null
+      : 'Anthropic API key is not configured. Add your Anthropic API key in Settings or set ANTHROPIC_API_KEY.';
+  }
+
+  return getOpenAIApiKey() ?
+      null
+    : 'OpenAI API key is not configured. Add your OpenAI API key in Settings or set OPENAI_API_KEY.';
+}
 
 export function registerChatHandlers(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle('chat:send-message', async (_event, payload: SendMessagePayload) => {
@@ -40,34 +81,9 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
       return { success: false, error: 'Chat ID is required.' };
     }
 
-    const session = sessionManager.getOrCreate(chatId);
-    const provider = session.provider;
-
-    if (provider === 'pi') {
-      const modelId = getPiModelForPreference(getCurrentModelPreference());
-      const model = resolveModel(modelId);
-      const apiKey =
-        model?.provider === 'anthropic' || model?.api === 'anthropic-messages' ?
-          getApiKey()
-        : getOpenAIApiKey();
-      if (!apiKey) {
-        return {
-          success: false,
-          error:
-            model?.provider === 'anthropic' || model?.api === 'anthropic-messages' ?
-              'Anthropic API key is not configured. Add your Anthropic API key in Settings or set ANTHROPIC_API_KEY.'
-            : 'OpenAI API key is not configured. Add your OpenAI API key in Settings or set OPENAI_API_KEY.'
-        };
-      }
-    } else {
-      const apiKey = getApiKey();
-      if (!apiKey) {
-        return {
-          success: false,
-          error:
-            'API key is not configured. Add your Anthropic API key in Settings or set ANTHROPIC_API_KEY.'
-        };
-      }
+    const missingApiKeyMessage = getMissingApiKeyMessage();
+    if (missingApiKeyMessage) {
+      return { success: false, error: missingApiKeyMessage };
     }
 
     const text = normalizedPayload.text?.trim() ?? '';
@@ -78,8 +94,6 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
     }
 
     try {
-      // Reject messages while a scheduled task is running -- no interactive
-      // session exists to drain the queue, so the message would sit forever.
       if (isScheduledTaskExecuting()) {
         return {
           success: false,
@@ -88,35 +102,14 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
       }
 
       const savedAttachments = await persistAttachments(attachments);
+      const session = sessionManager.getOrCreate(chatId);
+      bindRuntimeEvents(chatId, getMainWindow);
 
-      if (provider === 'pi') {
-        // Pi path: build plain text with attachment instructions, send directly
-        const fullText = buildPlainTextWithAttachments(text, savedAttachments);
-        sendOpenAIMessage(
-          getMainWindow(),
-          chatId,
-          fullText,
-          getCurrentModelPreference()
-        ).catch((error) => {
-          console.error('Failed to send Pi message:', error);
+      void session.runtime
+        .sendMessage({ text, attachments: savedAttachments })
+        .catch((error) => {
+          console.error(`Failed to send message for chat ${chatId}:`, error);
         });
-        return { success: true, attachments: savedAttachments };
-      }
-
-      // Anthropic path: use Claude Agent SDK message queue
-      const userMessage = buildUserMessage(text, savedAttachments);
-
-      // Start streaming session if not already running
-      if (!isSessionActive(chatId)) {
-        startStreamingSession(getMainWindow(), chatId).catch((error) => {
-          console.error('Failed to start streaming session:', error);
-        });
-      }
-
-      // Queue the message
-      await new Promise<void>((resolve) => {
-        session.messageQueue.push({ message: userMessage, resolve });
-      });
 
       return { success: true, attachments: savedAttachments };
     } catch (error) {
@@ -133,14 +126,13 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
         return { success: false, error: 'Chat ID is required.' };
       }
 
-      const session = sessionManager.getOrCreate(chatId);
-
       try {
-        if (session.provider === 'pi') {
-          await resetOpenAISession(chatId);
-        } else {
-          await resetSession(chatId, resumeSessionId);
-        }
+        const session = sessionManager.getOrCreate(chatId);
+        bindRuntimeEvents(chatId, getMainWindow);
+        await session.runtime.reset(resumeSessionId);
+        // piSessionId is updated automatically via session-updated event
+        // Don't manually set it here — legacy Claude SDK sessionIds would
+        // persist as stale values until overwritten by a real session.
         return { success: true };
       } catch (error) {
         console.error('Error resetting session:', error);
@@ -160,17 +152,8 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
       if (!session) {
         return { success: false, error: 'No active session for this chat.' };
       }
-      const mainWindow = getMainWindow();
 
-      if (session.provider === 'pi') {
-        const wasInterrupted = await interruptOpenAIResponse(mainWindow, chatId);
-        if (!wasInterrupted) {
-          return { success: false, error: 'No active response to stop.' };
-        }
-        return { success: true };
-      }
-
-      const wasInterrupted = await interruptCurrentResponse(mainWindow, chatId);
+      const wasInterrupted = await session.runtime.interrupt();
       if (!wasInterrupted) {
         return { success: false, error: 'No active response to stop.' };
       }
@@ -188,13 +171,8 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
     }
 
     try {
-      const session = sessionManager.get(chatId);
-      if (session?.provider === 'pi') {
-        await resetOpenAISession(chatId);
-        await sessionManager.destroy(chatId);
-      } else {
-        await sessionManager.destroy(chatId);
-      }
+      unbindRuntimeEvents(chatId);
+      await sessionManager.destroy(chatId);
       return { success: true };
     } catch (error) {
       console.error('Error destroying session:', error);
@@ -214,8 +192,8 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
       await setChatModelPreference(preference);
       for (const chatId of sessionManager.listActive()) {
         const session = sessionManager.get(chatId);
-        if (session?.provider === 'claude-sdk') {
-          await applyChatModelPreference(chatId, preference);
+        if (session) {
+          await session.runtime.setModelPreference(preference);
         }
       }
       return { success: true, preference: getCurrentModelPreference() };

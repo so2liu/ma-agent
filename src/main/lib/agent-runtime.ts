@@ -4,10 +4,6 @@
  * Current implementations (for testing):
  *   - FakeRuntime    (unit tests — predefined event sequences)
  *   - ReplayRuntime  (regression tests — replays JSONL session logs)
- *
- * Production runtimes (ClaudeRuntime, OpenAIRuntime) will be added when
- * claude-session.ts / openai-session.ts are refactored to support event callbacks.
- * See .context/qa-roadmap.md for the migration plan.
  */
 
 import type { ChatModelPreference, SavedAttachmentInfo } from '../../shared/types/ipc';

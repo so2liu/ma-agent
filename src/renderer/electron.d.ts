@@ -2,7 +2,6 @@ import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shar
 import type { SimpleElement } from '../shared/types/canvas';
 import type { TaskNotificationEvent, TaskProgressEvent } from '../shared/types/background-task';
 import type {
-  AgentProvider,
   AutoDetectResult,
   ChatModelPreference,
   CustomModelIds,
@@ -51,7 +50,6 @@ export interface DiagnosticMetadataResponse {
   chromiumVersion: string;
   v8Version: string;
   nodeVersion: string;
-  claudeAgentSdkVersion: string;
   platform: string;
   arch: string;
   osRelease: string;
@@ -484,11 +482,6 @@ export interface ElectronAPI {
       model?: string;
       message?: string;
       error?: string;
-    }>;
-    getAgentProvider: () => Promise<{ provider: AgentProvider }>;
-    setAgentProvider: (provider: AgentProvider) => Promise<{
-      success: boolean;
-      provider: AgentProvider;
     }>;
     getOpenAIConfig: () => Promise<{
       config: OpenAIConfig;

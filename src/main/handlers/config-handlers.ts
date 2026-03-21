@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from 'fs';
-import { createRequire } from 'module';
 import { release, type, version } from 'os';
 import Anthropic, {
   APIConnectionError,
@@ -12,18 +10,15 @@ import Anthropic, {
 import { app, ipcMain } from 'electron';
 
 import type {
-  AgentProvider,
   CustomModelIds,
   LlmProvider,
   OpenAIConfig,
   ProbeDetail
 } from '../../shared/types/ipc';
-import { getModelIdForPreference } from '../lib/claude-session';
 import {
   buildClaudeSessionEnv,
   buildEnhancedPath,
   ensureWorkspaceDir,
-  getAgentProvider,
   getApiBaseUrl,
   getApiKey,
   getApiKeyStatus,
@@ -35,40 +30,14 @@ import {
   getWorkspaceDir,
   loadConfig,
   saveConfig,
-  setAgentProvider,
   setApiBaseUrl,
   setApiKey,
   setCustomModelId,
   setCustomModelIds,
   setOpenAIConfig
 } from '../lib/config';
+import { getPiModelForPreference } from '../lib/pi-runtime';
 import { restartFileWatcher } from './workspace-handlers';
-
-const requireModule = createRequire(import.meta.url);
-
-function getClaudeAgentSdkVersion(): string {
-  try {
-    // Try to resolve the SDK package.json
-    const sdkPackagePath = requireModule.resolve('@anthropic-ai/claude-agent-sdk/package.json');
-
-    // Handle app.asar unpacked case (production builds)
-    let packagePath = sdkPackagePath;
-    if (sdkPackagePath.includes('app.asar')) {
-      const unpackedPath = sdkPackagePath.replace('app.asar', 'app.asar.unpacked');
-      if (existsSync(unpackedPath)) {
-        packagePath = unpackedPath;
-      }
-    }
-
-    if (existsSync(packagePath)) {
-      const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
-      return packageJson.version || 'unknown';
-    }
-  } catch {
-    // Fallback if we can't read the version
-  }
-  return 'unknown';
-}
 
 export function registerConfigHandlers(): void {
   // Get workspace directory
@@ -230,7 +199,7 @@ export function registerConfigHandlers(): void {
 
       const baseURL = params?.baseUrl?.trim() || getApiBaseUrl();
       const explicitModel = params?.modelId?.trim();
-      const modelId = explicitModel || getModelIdForPreference();
+      const modelId = explicitModel || getPiModelForPreference();
       const isCustomModel = Boolean(explicitModel);
 
       try {
@@ -293,17 +262,6 @@ export function registerConfigHandlers(): void {
       }
     }
   );
-
-  // Get active agent provider
-  ipcMain.handle('config:get-agent-provider', () => {
-    return { provider: getAgentProvider() };
-  });
-
-  // Set active agent provider
-  ipcMain.handle('config:set-agent-provider', (_event, provider: AgentProvider) => {
-    setAgentProvider(provider);
-    return { success: true, provider: getAgentProvider() };
-  });
 
   // Get OpenAI configuration
   ipcMain.handle('config:get-openai-config', () => {
@@ -719,7 +677,6 @@ export function registerConfigHandlers(): void {
       chromiumVersion: process.versions.chrome,
       v8Version: process.versions.v8,
       nodeVersion: process.versions.node,
-      claudeAgentSdkVersion: getClaudeAgentSdkVersion(),
       platform: process.platform,
       arch: process.arch,
       osRelease: release(),

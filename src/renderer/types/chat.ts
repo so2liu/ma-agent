@@ -1,37 +1,73 @@
-// Import tool input types from Claude Agent SDK for end-to-end type safety
-import type {
-  AgentInput,
-  BashInput,
-  FileEditInput,
-  FileReadInput,
-  FileWriteInput,
-  GlobInput,
-  GrepInput,
-  NotebookEditInput,
-  TodoWriteInput,
-  WebFetchInput,
-  WebSearchInput
-} from '@anthropic-ai/claude-agent-sdk/sdk-tools';
-
 import type { ToolUse } from '@/electron';
 import type { ErrorActionType } from '@/utils/friendlyError';
 
-// Re-export SDK types with friendly names
-export type ReadInput = FileReadInput;
-export type WriteInput = FileWriteInput;
-export type EditInput = FileEditInput;
+export interface AgentInput {
+  prompt?: string;
+  subagent_type?: string;
+  model?: string;
+}
 
-// Re-export other SDK types directly
-export type {
-  AgentInput,
-  BashInput,
-  GlobInput,
-  GrepInput,
-  TodoWriteInput,
-  WebFetchInput,
-  WebSearchInput,
-  NotebookEditInput
-};
+export interface BashInput {
+  command: string;
+  timeout?: number;
+  description?: string;
+  run_in_background?: boolean;
+}
+
+export interface ReadInput {
+  file_path: string;
+  offset?: number;
+  limit?: number;
+}
+
+export interface WriteInput {
+  file_path: string;
+  content: string;
+}
+
+export interface EditInput {
+  file_path: string;
+  old_string: string;
+  new_string: string;
+  replace_all?: boolean;
+}
+
+export interface GlobInput {
+  pattern: string;
+  path?: string;
+}
+
+export interface GrepInput {
+  pattern: string;
+  path?: string;
+  include?: string;
+}
+
+export interface TodoWriteInput {
+  todos?: Array<{
+    content: string;
+    status?: 'pending' | 'in_progress' | 'completed';
+  }>;
+}
+
+export interface WebFetchInput {
+  url: string;
+  prompt?: string;
+}
+
+export interface WebSearchInput {
+  query: string;
+  allowed_domains?: string[];
+  blocked_domains?: string[];
+}
+
+export interface NotebookEditInput {
+  notebook_path: string;
+  cell_id?: string;
+  cell_type?: 'code' | 'markdown';
+  edit_mode?: 'replace' | 'insert' | 'delete';
+  new_source?: string;
+}
 
 export type ToolInput =
   | AgentInput
@@ -47,15 +83,10 @@ export type ToolInput =
   | NotebookEditInput;
 
 export interface ToolUseSimple extends ToolUse {
-  // Raw input as it streams in - no parsing, just accumulate the raw string
   inputJson?: string;
-  // Parsed input object (populated when inputJson is complete)
   parsedInput?: ToolInput;
-  // Tool result content
   result?: string;
-  // Whether tool is currently executing
   isLoading?: boolean;
-  // Whether tool result is an error
   isError?: boolean;
 }
 
@@ -66,9 +97,7 @@ export interface ContentBlock {
   thinking?: string;
   thinkingStartedAt?: number;
   thinkingDurationMs?: number;
-  // Stream index for thinking blocks (to track separate thinking streams)
   thinkingStreamIndex?: number;
-  // Whether this thinking block is complete (received content_block_stop)
   isComplete?: boolean;
 }
 

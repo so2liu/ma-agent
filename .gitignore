@@ -34,3 +34,8 @@ resources/msys2.tar.zst
 
 # Local dev scripts
 scripts/check-notarization.sh
+
+# Codex planning artifacts
+findings.md
+progress.md
+task_plan.md

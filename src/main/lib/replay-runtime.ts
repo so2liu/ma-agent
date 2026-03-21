@@ -6,8 +6,7 @@
  *
  * This runtime translates recorded SDK events back into RuntimeEvents,
  * allowing regression tests to replay real sessions without calling the API.
- * It maintains a streamIndex→toolId mapping (like claude-session.ts) for
- * faithful tool correlation during replay.
+ * It maintains a streamIndex→toolId mapping for faithful tool correlation during replay.
  *
  * Events are emitted asynchronously (one per microtask) to support interruption.
  */
@@ -52,7 +51,7 @@ export class ReplayRuntime implements AgentRuntime {
     const lines = content.split('\n').filter((line) => line.trim().length > 0);
 
     const runtimeEvents: RuntimeEvent[] = [];
-    // Track streamIndex → toolId mapping, matching claude-session.ts behavior
+    // Track streamIndex → toolId mapping to preserve tool correlation during replay.
     const streamIndexToToolId = new Map<number, string>();
 
     for (const line of lines) {

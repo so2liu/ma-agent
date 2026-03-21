@@ -1,5 +1,3 @@
-import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-
 import type { SavedAttachmentInfo } from '../../shared/types/ipc';
 
 export function sanitizeFileName(name: string): string {
@@ -43,30 +41,4 @@ export function buildPlainTextWithAttachments(
     parts.push(formatAttachmentInstruction(attachment));
   }
   return parts.join('\n\n') || 'User uploaded files without additional context.';
-}
-
-export function buildUserMessage(
-  text: string,
-  attachments: SavedAttachmentInfo[]
-): SDKUserMessage['message'] {
-  const contentBlocks: { type: 'text'; text: string }[] = [];
-  if (text) {
-    contentBlocks.push({ type: 'text', text });
-  }
-
-  for (const attachment of attachments) {
-    contentBlocks.push({ type: 'text', text: formatAttachmentInstruction(attachment) });
-  }
-
-  if (contentBlocks.length === 0) {
-    contentBlocks.push({
-      type: 'text',
-      text: 'User uploaded files without additional context.'
-    });
-  }
-
-  return {
-    role: 'user',
-    content: contentBlocks
-  };
 }

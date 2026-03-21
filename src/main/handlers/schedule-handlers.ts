@@ -1,7 +1,6 @@
 import { ipcMain } from 'electron';
 
 import type { ChatModelPreference } from '../../shared/types/ipc';
-import { isSessionActive } from '../lib/claude-session';
 import {
   createScheduledTask,
   deleteScheduledTask,
@@ -11,6 +10,7 @@ import {
 } from '../lib/schedule-db';
 import { executeScheduledTask } from '../lib/schedule-executor';
 import { isScheduledTaskExecuting, setScheduledTaskExecuting } from '../lib/schedule-state';
+import { sessionManager } from '../lib/session-manager';
 
 export function registerScheduleHandlers(): void {
   ipcMain.handle('schedule:list', async () => {
@@ -90,7 +90,7 @@ export function registerScheduleHandlers(): void {
       const task = getScheduledTask(id);
       if (!task) return { success: false, error: 'Task not found' };
 
-      if (isSessionActive() || isScheduledTaskExecuting()) {
+      if (sessionManager.isAnyChatActive() || isScheduledTaskExecuting()) {
         return { success: false, error: '当前有活跃会话，无法执行定时任务' };
       }
 

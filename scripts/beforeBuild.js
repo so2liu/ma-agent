@@ -4,10 +4,6 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CURRENT_RIPGREP_TARGET =
-  process.platform === 'darwin' ? `${process.arch === 'arm64' ? 'arm64' : 'x64'}-darwin`
-  : process.platform === 'linux' ? `${process.arch === 'arm64' ? 'arm64' : 'x64'}-linux`
-  : 'x64-win32';
 
 function rmIfExists(path) {
   if (existsSync(path)) {
@@ -37,28 +33,9 @@ function pruneNonRuntimeFiles(dir) {
   }
 }
 
-function pruneSdkVendorArtifacts(depName, targetDir) {
-  if (depName !== '@anthropic-ai/claude-agent-sdk') {
-    return;
-  }
-
-  const vendorDir = join(targetDir, 'vendor');
-  const jetbrainsPath = join(vendorDir, 'claude-code-jetbrains-plugin');
-  const ripgrepDir = join(vendorDir, 'ripgrep');
-
-  // The desktop app doesn't use the JetBrains plugin, and keeping it inflates
-  // the app bundle and signing surface substantially.
-  rmIfExists(jetbrainsPath);
-
-  if (!existsSync(ripgrepDir)) {
-    return;
-  }
-
-  for (const target of ['arm64-darwin', 'x64-darwin', 'arm64-linux', 'x64-linux', 'x64-win32']) {
-    if (target !== CURRENT_RIPGREP_TARGET) {
-      rmIfExists(join(ripgrepDir, target));
-    }
-  }
+function pruneSdkVendorArtifacts(_depName, _targetDir) {
+  // No-op: Claude Agent SDK has been removed. This function is retained
+  // as a hook for future vendor artifact pruning if needed.
 }
 
 export default async function beforeBuild(_context) {

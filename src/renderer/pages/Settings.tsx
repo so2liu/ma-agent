@@ -17,7 +17,6 @@ import { Switch } from '@/components/ui/switch';
 import type { UpdateChannel } from '@/electron';
 
 import type {
-  AgentProvider,
   ChatModelPreference,
   CustomModelIds,
   LlmProvider,
@@ -38,19 +37,10 @@ const TIER_LABELS: Record<ChatModelPreference, string> = {
   'smart-opus': '强力'
 };
 
-const RUNTIME_LABELS: Record<AgentProvider, string> = {
-  'claude-sdk': 'Claude SDK',
-  pi: 'Pi Agent'
-};
-
 const LLM_PROVIDER_LABELS: Record<LlmProvider, string> = {
   anthropic: 'Anthropic 兼容',
   openai: 'OpenAI 兼容'
 };
-
-function getRecommendedRuntime(provider: LlmProvider): AgentProvider {
-  return provider === 'anthropic' ? 'claude-sdk' : 'pi';
-}
 
 const NAV_ITEMS = [
   { id: 'ai-config', label: 'AI 服务配置', icon: Cpu },
@@ -117,7 +107,6 @@ function Settings() {
     chromiumVersion: string;
     v8Version: string;
     nodeVersion: string;
-    claudeAgentSdkVersion: string;
     platform: string;
     arch: string;
     osRelease: string;
@@ -148,10 +137,6 @@ function Settings() {
   const [isLoadingModelIds, setIsLoadingModelIds] = useState(true);
   const [isSavingModelIds, setIsSavingModelIds] = useState(false);
   const [modelIdsSaveState, setModelIdsSaveState] = useState<'idle' | 'success' | 'error'>('idle');
-
-  const [agentProvider, setAgentProvider] = useState<AgentProvider>('claude-sdk');
-  const [isLoadingProvider, setIsLoadingProvider] = useState(true);
-  const [isSavingProvider, setIsSavingProvider] = useState(false);
 
   const [openaiApiKeyInput, setOpenaiApiKeyInput] = useState('');
   const [openaiApiKeyConfigured, setOpenaiApiKeyConfigured] = useState(false);
@@ -271,14 +256,6 @@ function Settings() {
         setIsLoadingModelIds(false);
       })
       .catch(() => setIsLoadingModelIds(false));
-
-    window.electron.config
-      .getAgentProvider()
-      .then((response) => {
-        setAgentProvider(response.provider);
-        setIsLoadingProvider(false);
-      })
-      .catch(() => setIsLoadingProvider(false));
 
     window.electron.config
       .getOpenAIConfig()
@@ -478,18 +455,6 @@ function Settings() {
     }
   };
 
-  const handleSwitchProvider = async (provider: AgentProvider) => {
-    setIsSavingProvider(true);
-    try {
-      const response = await window.electron.config.setAgentProvider(provider);
-      setAgentProvider(response.provider);
-    } catch {
-      // Revert on error
-    } finally {
-      setIsSavingProvider(false);
-    }
-  };
-
   const handleSaveOpenAI = async () => {
     setIsSavingOpenAI(true);
     setOpenaiSaveState('idle');
@@ -683,8 +648,6 @@ function Settings() {
 
     setAutoConfigStatus('saving');
     try {
-      const recommendedRuntime = getRecommendedRuntime(detectedProvider);
-
       // Resolve per-tier model IDs: user-selected tierModels > parsed modelId > empty
       const resolvedModelIds: Partial<Record<ChatModelPreference, string>> = {};
       for (const tier of TIER_KEYS) {
@@ -699,20 +662,17 @@ function Settings() {
       if (detectedProvider === 'anthropic') {
         await window.electron.config.setApiKey(parsedConfig.apiKey);
         await window.electron.config.setApiBaseUrl(parsedConfig.baseUrl || null);
-        await window.electron.config.setCustomModelIds(resolvedModelIds);
       } else {
         await window.electron.config.setOpenAIConfig({
           apiKey: parsedConfig.apiKey,
           baseUrl: parsedConfig.baseUrl,
-          // Use fast tier model as the single modelId for OpenAI
           modelId: resolvedModelIds.fast || parsedConfig.modelId
         });
       }
 
-      await window.electron.config.setAgentProvider(recommendedRuntime);
+      await window.electron.config.setCustomModelIds(resolvedModelIds);
 
       // Refresh UI state
-      setAgentProvider(recommendedRuntime);
       const keyStatus = await window.electron.config.getApiKeyStatus();
       setApiKeyStatus(keyStatus.status);
 
@@ -810,10 +770,8 @@ function Settings() {
     isLoadingBaseUrl ||
     isLoadingChannel ||
     isLoadingAnalytics ||
-    isLoadingProvider ||
     isLoadingOpenAI;
   const apiKeyPlaceholder = apiKeyStatus.lastFour ? `...${apiKeyStatus.lastFour}` : 'sk-ant-...';
-  const recommendedRuntime = detectedProvider ? getRecommendedRuntime(detectedProvider) : null;
 
   // Shared styles
   const inputClass =
@@ -924,8 +882,7 @@ function Settings() {
                     </p>
                     <p className="mt-1 text-xs text-green-600 dark:text-green-400">
                       已检测到 {detectedProvider ? LLM_PROVIDER_LABELS[detectedProvider] : ''}，
-                      已按推荐运行时保存为{' '}
-                      {recommendedRuntime ? RUNTIME_LABELS[recommendedRuntime] : ''}
+                      配置已保存
                       {detectedModel ? `，模型: ${detectedModel}` : ''}
                     </p>
                     <button
@@ -1052,23 +1009,7 @@ function Settings() {
                               </span>
                             </div>
                           )}
-                          {recommendedRuntime && (
-                            <div className="flex gap-2">
-                              <span className="shrink-0 font-medium">推荐运行时:</span>
-                              <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-medium dark:bg-neutral-700">
-                                {RUNTIME_LABELS[recommendedRuntime]}
-                              </span>
-                            </div>
-                          )}
                         </div>
-
-                        {detectedProvider === 'openai' && (
-                          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                            已识别为 OpenAI 兼容接口，默认推荐使用 Pi Agent。若想继续使用 Claude SDK
-                            的续接、skills 等能力，请在手动配置中切换到 Claude SDK，并将代理地址填写到
-                            Anthropic API 地址。
-                          </div>
-                        )}
 
                         {/* Model tier selection */}
                         <div className="space-y-2 border-t border-neutral-200 pt-2 dark:border-neutral-700">
@@ -1132,80 +1073,19 @@ function Settings() {
                   </>
                 }
               </section>
-            : /* Manual Config Mode */
-              <>
-                {/* Agent Provider Selector */}
-                <section className="space-y-3">
-                  <div>
-                    <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                      运行时
-                    </h2>
-                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                      选择消息处理运行时，切换后会自动开始新会话
-                    </p>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <button
-                      onClick={() => handleSwitchProvider('claude-sdk')}
-                      disabled={isSavingProvider}
-                      className={`rounded-lg border px-4 py-3 text-left text-xs transition ${
-                        agentProvider === 'claude-sdk' ?
-                          'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
-                        : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
-                      }`}
-                    >
-                      <div className="font-medium">Claude SDK</div>
-                      <p className="mt-1 text-[11px] opacity-80">
-                        功能最完整，支持续接、skills、消息队列；原生使用 Anthropic，也可通过代理接入 OpenAI 兼容接口
-                      </p>
-                    </button>
-                    <button
-                      onClick={() => handleSwitchProvider('pi')}
-                      disabled={isSavingProvider}
-                      className={`rounded-lg border px-4 py-3 text-left text-xs transition ${
-                        agentProvider === 'pi' ?
-                          'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
-                        : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'
-                      }`}
-                    >
-                      <div className="font-medium">Pi Agent</div>
-                      <p className="mt-1 text-[11px] opacity-80">
-                        轻量 in-process 运行；可直接使用 Anthropic 或 OpenAI 兼容接口，并按模型 ID 自动切换对应密钥
-                      </p>
-                    </button>
-                  </div>
-                </section>
-
-                <div className="border-t border-neutral-100 dark:border-neutral-800" />
-              </>
-            }
+            : null}
 
             {configMode === 'manual' && (
               <>
                 <section className="space-y-3">
                   <div
-                    className={`rounded-lg border px-4 py-3 text-xs ${
-                      agentProvider === 'claude-sdk' ?
-                        'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-300'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-                    }`}
+                    className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-xs text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
                   >
-                    {agentProvider === 'claude-sdk' ?
-                      <>
-                        <p className="font-medium">Claude SDK 代理模式</p>
-                        <p className="mt-1">
-                          Claude SDK 原生走 Anthropic 协议。若你只有 OpenAI 兼容 API，可先用 LiteLLM
-                          等代理暴露一个 Anthropic 兼容端点，再把代理地址填到下方的 Anthropic API 地址中。
-                        </p>
-                      </>
-                    : <>
-                        <p className="font-medium">Pi Agent provider 选择规则</p>
-                        <p className="mt-1">
-                          当前运行时会按模型 ID 自动挑选密钥。Claude 系列模型使用下方 Anthropic 配置，GPT /
-                          DeepSeek 等 OpenAI 兼容模型使用下方 OpenAI 配置。
-                        </p>
-                      </>
-                    }
+                    <p className="font-medium">模型自动路由规则</p>
+                    <p className="mt-1">
+                      当前应用会按模型 ID 自动选择对应密钥。Claude 系列模型使用下方 Anthropic 配置，GPT /
+                      DeepSeek 等 OpenAI 兼容模型使用下方 OpenAI 配置。
+                    </p>
                   </div>
                 </section>
 
@@ -1421,56 +1301,55 @@ function Settings() {
                   }
                 </section>
 
-                {agentProvider === 'pi' && (
-                  <>
-                    <div className="border-t border-neutral-100 dark:border-neutral-800" />
+                <>
+                  <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
-                    {/* OpenAI Configuration */}
-                    <section className="space-y-3">
-                      <div>
-                        <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                          OpenAI API Key
-                        </h2>
-                        <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                          在此处设置 OpenAI API Key，或通过{' '}
-                          <code className="text-[11px]">OPENAI_API_KEY</code> 环境变量配置
-                        </p>
-                      </div>
+                  {/* OpenAI Configuration */}
+                  <section className="space-y-3">
+                    <div>
+                      <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                        OpenAI API Key
+                      </h2>
+                      <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                        在此处设置 OpenAI API Key，或通过{' '}
+                        <code className="text-[11px]">OPENAI_API_KEY</code> 环境变量配置
+                      </p>
+                    </div>
 
-                      <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-                        <span
-                          className={
-                            openaiApiKeyConfigured ?
-                              'font-medium text-neutral-800 dark:text-neutral-200'
-                            : 'text-neutral-500'
-                          }
-                        >
-                          {openaiApiKeyConfigured ?
-                            openaiApiKeySource === 'env' ?
-                              '使用环境变量'
-                            : '本地存储'
-                          : '未配置'}
+                    <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                      <span
+                        className={
+                          openaiApiKeyConfigured ?
+                            'font-medium text-neutral-800 dark:text-neutral-200'
+                          : 'text-neutral-500'
+                        }
+                      >
+                        {openaiApiKeyConfigured ?
+                          openaiApiKeySource === 'env' ?
+                            '使用环境变量'
+                          : '本地存储'
+                        : '未配置'}
+                      </span>
+                      {openaiApiKeyLastFour && openaiApiKeyConfigured && (
+                        <span className="font-mono text-[11px] text-neutral-400">
+                          ...{openaiApiKeyLastFour}
                         </span>
-                        {openaiApiKeyLastFour && openaiApiKeyConfigured && (
-                          <span className="font-mono text-[11px] text-neutral-400">
-                            ...{openaiApiKeyLastFour}
-                          </span>
-                        )}
-                        {openaiApiKeySource === 'env' && (
-                          <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-                            ENV
-                          </span>
-                        )}
-                      </div>
+                      )}
+                      {openaiApiKeySource === 'env' && (
+                        <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                          ENV
+                        </span>
+                      )}
+                    </div>
 
-                      <input
-                        type="password"
-                        value={openaiApiKeyInput}
-                        onChange={(e) => setOpenaiApiKeyInput(e.target.value)}
-                        placeholder={openaiApiKeyLastFour ? `...${openaiApiKeyLastFour}` : 'sk-...'}
-                        className={inputClass}
-                      />
-                    </section>
+                    <input
+                      type="password"
+                      value={openaiApiKeyInput}
+                      onChange={(e) => setOpenaiApiKeyInput(e.target.value)}
+                      placeholder={openaiApiKeyLastFour ? `...${openaiApiKeyLastFour}` : 'sk-...'}
+                      className={inputClass}
+                    />
+                  </section>
 
                     <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
@@ -1560,9 +1439,8 @@ function Settings() {
                           {openaiTestResult.message}
                         </div>
                       )}
-                    </section>
-                  </>
-                )}
+                  </section>
+                </>
               </>
             )}
 
@@ -1769,7 +1647,6 @@ function Settings() {
                           ['Chromium', diagnosticMetadata.chromiumVersion],
                           ['Node.js', diagnosticMetadata.nodeVersion],
                           ['V8', diagnosticMetadata.v8Version],
-                          ['SDK', diagnosticMetadata.claudeAgentSdkVersion],
                           ['平台', `${diagnosticMetadata.platform} (${diagnosticMetadata.arch})`],
                           ['系统', diagnosticMetadata.osType],
                           ['系统版本', diagnosticMetadata.osRelease]
