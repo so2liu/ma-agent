@@ -631,6 +631,10 @@ function Settings() {
         setDetectedModel(detectResult.model || null);
         setAvailableModels(detectResult.availableModels || []);
         setTierModels({});
+        // Use the validated baseUrl from auto-detect (the URL that actually worked)
+        if (detectResult.baseUrl) {
+          setParsedConfig((prev) => prev ? { ...prev, baseUrl: detectResult.baseUrl } : prev);
+        }
         setAutoConfigStatus('parsed');
       } else {
         setAutoConfigStatus('error');

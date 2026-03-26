@@ -530,6 +530,7 @@ export function registerConfigHandlers(): void {
         error?: string;
         availableModels?: string[];
         modelCount?: number;
+        validatedBaseUrl?: string;
       }> => {
         try {
           const base = baseUrl || 'https://api.openai.com';
@@ -547,7 +548,8 @@ export function registerConfigHandlers(): void {
               return {
                 success: true,
                 modelCount: modelIds.length,
-                availableModels: modelIds
+                availableModels: modelIds,
+                validatedBaseUrl: `${base}/v1`
               };
             }
           }
@@ -569,7 +571,7 @@ export function registerConfigHandlers(): void {
           });
           if (resp.ok) {
             const data = await resp.json();
-            return { success: true, model: data.model };
+            return { success: true, model: data.model, validatedBaseUrl: `${base}/v1` };
           }
           return { success: false, error: `HTTP ${resp.status}` };
         } catch (err: unknown) {
@@ -586,6 +588,7 @@ export function registerConfigHandlers(): void {
         error?: string;
         availableModels?: string[];
         modelCount?: number;
+        validatedBaseUrl?: string;
       }> => {
         try {
           const client = new Anthropic({
@@ -597,7 +600,8 @@ export function registerConfigHandlers(): void {
             max_tokens: 16,
             messages: [{ role: 'user', content: 'Hi' }]
           });
-          return { success: true, model: resp.model };
+          // Anthropic SDK uses baseUrl directly (no /v1 appended)
+          return { success: true, model: resp.model, validatedBaseUrl: baseUrl };
         } catch (err: unknown) {
           return {
             success: false,
@@ -633,6 +637,7 @@ export function registerConfigHandlers(): void {
           success: true,
           provider: first.provider,
           model: firstResult.model,
+          baseUrl: firstResult.validatedBaseUrl,
           probes,
           availableModels: firstResult.availableModels
         };
@@ -651,6 +656,7 @@ export function registerConfigHandlers(): void {
           success: true,
           provider: second.provider,
           model: secondResult.model,
+          baseUrl: secondResult.validatedBaseUrl,
           probes,
           availableModels: secondResult.availableModels
         };

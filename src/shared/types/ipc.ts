@@ -134,6 +134,8 @@ export interface AutoDetectResult {
   success: boolean;
   provider?: LlmProvider;
   model?: string;
+  /** The validated base URL that the successful probe actually used */
+  baseUrl?: string;
   error?: string;
   /** Details of each probe attempt, in order tried */
   probes?: ProbeDetail[];
