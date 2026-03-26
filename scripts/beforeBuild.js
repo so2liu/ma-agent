@@ -68,6 +68,61 @@ export default async function beforeBuild(_context) {
   // Track which dependencies we've already copied to avoid duplicates
   const copiedDeps = new Set();
 
+  // Walk nested node_modules inside a package and ensure their transitive
+  // dependencies are also copied to the flat out/node_modules. This handles
+  // cases where a nested package (e.g. ajv@8 inside pi-ai) depends on a
+  // module (e.g. fast-uri) that was hoisted to the root but isn't a dependency
+  // of the root-level version of that package.
+  function processNestedNodeModules(pkgDir) {
+    const nestedNM = join(pkgDir, 'node_modules');
+    if (!existsSync(nestedNM)) return;
+
+    for (const entry of readdirSync(nestedNM, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+
+      if (entry.name.startsWith('@')) {
+        // Scoped package: iterate one level deeper
+        const scopeDir = join(nestedNM, entry.name);
+        for (const scopedEntry of readdirSync(scopeDir, { withFileTypes: true })) {
+          if (!scopedEntry.isDirectory()) continue;
+          processNestedPkg(join(scopeDir, scopedEntry.name));
+        }
+      } else {
+        processNestedPkg(join(nestedNM, entry.name));
+      }
+    }
+  }
+
+  function processNestedPkg(nestedPkgDir) {
+    const pkgJsonPath = join(nestedPkgDir, 'package.json');
+    if (!existsSync(pkgJsonPath)) return;
+
+    try {
+      const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
+      const deps = pkgJson.dependencies ?? {};
+      const optDeps = pkgJson.optionalDependencies ?? {};
+
+      for (const depName of Object.keys(deps)) {
+        // Only copy if available at root; if not, it's nested within the parent
+        // and was already copied as part of the parent's directory tree.
+        if (existsSync(join(nodeModulesDir, depName))) {
+          copyDependency(depName, false);
+        }
+      }
+
+      for (const depName of Object.keys(optDeps)) {
+        if (existsSync(join(nodeModulesDir, depName))) {
+          copyDependency(depName, true);
+        }
+      }
+
+      // Recurse into this nested package's own node_modules
+      processNestedNodeModules(nestedPkgDir);
+    } catch {
+      // Ignore malformed package.json
+    }
+  }
+
   // Recursively copy a dependency and its transitive dependencies
   function copyDependency(depName, isOptional = false) {
     if (copiedDeps.has(depName)) {
@@ -122,6 +177,12 @@ export default async function beforeBuild(_context) {
         console.warn(`- Warning: Failed to read package.json for ${depName}:`, error.message);
       }
     }
+
+    // Also process dependencies of nested node_modules packages.
+    // When a package has its own node_modules (e.g. different version from root),
+    // those nested packages may depend on modules hoisted to the root that haven't
+    // been copied yet.
+    processNestedNodeModules(sourceDir);
   }
 
   // Copy all direct runtime dependencies (this will recursively copy transitive deps)
