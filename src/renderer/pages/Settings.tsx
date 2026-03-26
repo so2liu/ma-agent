@@ -666,12 +666,17 @@ function Settings() {
       if (detectedProvider === 'anthropic') {
         await window.electron.config.setApiKey(parsedConfig.apiKey);
         await window.electron.config.setApiBaseUrl(parsedConfig.baseUrl || null);
+        // Clear stale OpenAI credentials to prevent resolveModel from misrouting
+        await window.electron.config.setOpenAIConfig({});
       } else {
         await window.electron.config.setOpenAIConfig({
           apiKey: parsedConfig.apiKey,
           baseUrl: parsedConfig.baseUrl,
           modelId: resolvedModelIds.fast || parsedConfig.modelId
         });
+        // Clear stale Anthropic credentials to prevent resolveModel from misrouting
+        await window.electron.config.setApiKey(null);
+        await window.electron.config.setApiBaseUrl(null);
       }
 
       await window.electron.config.setCustomModelIds(resolvedModelIds);
