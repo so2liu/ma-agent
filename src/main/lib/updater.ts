@@ -237,7 +237,10 @@ function notifyStatusChange(): void {
 let isManualCheck = false;
 
 export function checkForUpdates(manual = false): void {
-  isManualCheck = manual;
+  // Don't overwrite manual flag if a check is already in progress
+  if (!currentStatus.checking && !currentStatus.downloading) {
+    isManualCheck = manual;
+  }
   const isDev = process.env.ELECTRON_RENDERER_URL !== undefined;
 
   // Sync prerelease setting before checking
@@ -249,8 +252,8 @@ export function checkForUpdates(manual = false): void {
     currentStatus = {
       ...currentStatus,
       checking: false,
-      lastCheckComplete: true,
-      error: 'Update checks are disabled in development mode'
+      lastCheckComplete: isManualCheck,
+      error: isManualCheck ? 'Update checks are disabled in development mode' : null
     };
     notifyStatusChange();
     scheduleStatusReset(() => {
@@ -269,8 +272,8 @@ export function checkForUpdates(manual = false): void {
       ...currentStatus,
       checking: false,
       downloading: false,
-      lastCheckComplete: true,
-      error: 'Auto-update feed is not configured'
+      lastCheckComplete: isManualCheck,
+      error: isManualCheck ? 'Auto-update feed is not configured' : null
     };
     notifyStatusChange();
     scheduleStatusReset(() => {
@@ -303,8 +306,8 @@ export function checkForUpdates(manual = false): void {
     currentStatus = {
       ...currentStatus,
       checking: false,
-      lastCheckComplete: true,
-      error: error.message || 'Failed to check for updates'
+      lastCheckComplete: isManualCheck,
+      error: isManualCheck ? (error.message || 'Failed to check for updates') : null
     };
     notifyStatusChange();
     // Clear error after 5 seconds
@@ -324,8 +327,8 @@ export function installUpdate(): void {
     return;
   }
 
-  // isSilent=true: don't show installer UI on macOS
-  // isForceRunAfter=true: relaunch app after install
+  // isSilent=true: suppress installer UI (Windows only; macOS ignores this)
+  // isForceRunAfter=true: relaunch app after install (Windows only; macOS auto-relaunches)
   autoUpdater.quitAndInstall(true, true);
 }
 

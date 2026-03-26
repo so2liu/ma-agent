@@ -2,7 +2,7 @@
   "name": "ma-agent",
   "description": "Open-source desktop client for AI coding agents",
   "type": "module",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "license": "MIT",
   "main": "out/main/index.js",
   "packageManager": "bun@1.3.2",
