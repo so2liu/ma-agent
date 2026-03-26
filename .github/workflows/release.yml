@@ -102,12 +102,55 @@ jobs:
             --generate-notes \
             dist/*
 
-      - name: Upload to Volcengine TOS
+      - name: Upload to Volcengine TOS via relay server
         continue-on-error: true
         timeout-minutes: 30
-        env:
-          VOLC_ACCESS_KEY: ${{ secrets.VOLC_ACCESS_KEY }}
-          VOLC_SECRET_KEY: ${{ secrets.VOLC_SECRET_KEY }}
-        run: |
-          pip install tos --quiet --only-binary :all: || pip install tos --quiet
-          python scripts/upload-tos.py --channel release --dist-dir dist/
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 25m
+          script: |
+            set -e
+            WORK_DIR=$(mktemp -d)
+            cd "$WORK_DIR"
+
+            # Download release assets from GitHub
+            echo "Downloading release assets for ${{ github.ref_name }}..."
+            for url in $(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" \
+              | python3 -c "import sys,json; [print(a['browser_download_url']) for a in json.load(sys.stdin).get('assets',[])]"); do
+              echo "  Downloading $(basename "$url")..."
+              curl -sL -O "$url"
+            done
+
+            # Install TOS SDK and upload
+            pip install tos --quiet 2>/dev/null || pip3 install tos --quiet
+            python3 -c "
+            import tos, glob, os
+            client = tos.TosClientV2(
+              ak='${{ secrets.VOLC_ACCESS_KEY }}',
+              sk='${{ secrets.VOLC_SECRET_KEY }}',
+              endpoint='tos-cn-beijing.volces.com',
+              region='cn-beijing',
+            )
+            bucket = 'ma-agent-releases'
+            prefix = 'releases/release'
+            patterns = ['*.dmg', '*.zip', '*.blockmap', '*-mac*.yml']
+            files = []
+            for p in patterns:
+              files.extend(glob.glob(p))
+            print(f'Uploading {len(files)} file(s) to TOS...')
+            for f in files:
+              key = f'{prefix}/{os.path.basename(f)}'
+              size_mb = os.path.getsize(f) / (1024*1024)
+              print(f'  {os.path.basename(f)} ({size_mb:.1f} MB)')
+              client.upload_file(bucket, key, f, part_size=10*1024*1024, task_num=4)
+              print(f'  Done: {os.path.basename(f)}')
+            print('All files uploaded.')
+            "
+
+            # Cleanup
+            cd /
+            rm -rf "$WORK_DIR"
