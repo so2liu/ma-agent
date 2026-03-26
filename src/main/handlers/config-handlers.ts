@@ -302,7 +302,8 @@ export function registerConfigHandlers(): void {
 
       try {
         // Simple chat completion test using fetch (avoid adding openai npm dependency)
-        const url = `${baseUrl || 'https://api.openai.com'}/v1/chat/completions`;
+        const base = normalizeBaseUrl(baseUrl || 'https://api.openai.com');
+        const url = `${base}/v1/chat/completions`;
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -458,16 +459,36 @@ export function registerConfigHandlers(): void {
       };
     }
 
-    // Merge locally-extracted apiKey with server-extracted baseUrl/modelId
+    // Local fallback: extract baseUrl and modelId from text when server fails
+    let localBaseUrl: string | undefined;
+    let localModelId: string | undefined;
+    if (!serverDetail.baseUrl || !serverDetail.modelId) {
+      // Match URLs (http/https)
+      const urlMatch = params.text.match(/\bhttps?:\/\/[^\s,;'"]+/i);
+      if (urlMatch) {
+        localBaseUrl = urlMatch[0].replace(/\/+$/, '');
+      }
+      // Match MODEL_ID=..., model=..., model_id=..., or model:... patterns
+      const modelMatch = params.text.match(
+        /\b(?:MODEL_ID|model_id|model|MODEL)\s*[=:]\s*([^\s,;'"]+)/i
+      );
+      if (modelMatch) {
+        localModelId = modelMatch[1];
+      }
+    }
+
+    // Merge locally-extracted apiKey with server-extracted (or fallback) baseUrl/modelId
+    const finalBaseUrl = serverDetail.baseUrl || localBaseUrl;
+    const finalModelId = serverDetail.modelId || localModelId;
     const result = {
       ...(apiKey ? { apiKey } : {}),
-      ...(serverDetail.baseUrl ? { baseUrl: serverDetail.baseUrl } : {}),
-      ...(serverDetail.modelId ? { modelId: serverDetail.modelId } : {}),
+      ...(finalBaseUrl ? { baseUrl: finalBaseUrl } : {}),
+      ...(finalModelId ? { modelId: finalModelId } : {}),
       serverDetail
     };
 
     // If nothing useful was extracted at all, return an error
-    if (!apiKey && !serverDetail.baseUrl && !serverDetail.modelId) {
+    if (!apiKey && !finalBaseUrl && !finalModelId) {
       return {
         ...result,
         error: serverDetail.error || 'no_valid_info'
@@ -478,8 +499,11 @@ export function registerConfigHandlers(): void {
   });
 
   // Normalize baseUrl: strip known API path suffixes so probes don't build malformed URLs
+  // Also strips trailing /v1 so callers can consistently append /v1/... paths
   function normalizeBaseUrl(url: string): string {
-    return url.replace(/\/v1\/(chat\/completions|completions|models|messages)\/?$/i, '');
+    return url
+      .replace(/\/v1\/(chat\/completions|completions|models|messages)\/?$/i, '')
+      .replace(/\/v1\/?$/i, '');
   }
 
   // Auto-detect LLM protocol by probing both Anthropic and OpenAI endpoints
