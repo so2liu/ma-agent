@@ -104,7 +104,7 @@ jobs:
 
       - name: Upload to Volcengine TOS
         continue-on-error: true
-        timeout-minutes: 15
+        timeout-minutes: 30
         env:
           VOLC_ACCESS_KEY: ${{ secrets.VOLC_ACCESS_KEY }}
           VOLC_SECRET_KEY: ${{ secrets.VOLC_SECRET_KEY }}
