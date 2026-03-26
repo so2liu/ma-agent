@@ -5,7 +5,7 @@ const SYSTEM_PROMPT = `You are a structured data extractor. Your ONLY job is to 
 Note: API keys have been redacted to [REDACTED] for security. Do NOT try to extract or guess API keys.
 
 Extract these fields if present:
-- baseUrl: The API BASE URL only (e.g. "https://api.example.com"), NOT the full endpoint path. Strip any trailing path like /v1/chat/completions, /v1/messages, /v1/models etc. Just return the scheme + host + port.
+- baseUrl: The API base URL with its path prefix, but WITHOUT the /v1 endpoint suffix. For example: "https://api.example.com" stays as-is, "https://openrouter.ai/api/v1" becomes "https://openrouter.ai/api", "https://api.deepseek.com/v1/chat/completions" becomes "https://api.deepseek.com". Strip /v1, /v1/chat/completions, /v1/messages, /v1/models etc. but keep any path prefix before /v1.
 - modelId: A model identifier (e.g. "gpt-4", "claude-3-sonnet", "deepseek-chat", etc.)
 
 Rules:
