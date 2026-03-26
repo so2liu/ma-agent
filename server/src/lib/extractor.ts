@@ -24,7 +24,7 @@ interface ParseResult {
   error?: string;
 }
 
-const EXTRACTOR_MODEL = process.env.EXTRACTOR_MODEL || 'anthropic/claude-haiku-4.5';
+const EXTRACTOR_MODEL = process.env.EXTRACTOR_MODEL || 'minimax/minimax-m2.5';
 
 const client = new Anthropic();
 
@@ -37,13 +37,14 @@ export async function extractApiConfig(text: string): Promise<ParseResult> {
       messages: [{ role: 'user', content: text }],
     });
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
+    // Find the first text block (some models return thinking blocks before text)
+    const textBlock = response.content.find((c) => c.type === 'text');
+    if (!textBlock || textBlock.type !== 'text') {
       return { error: 'no_valid_info' };
     }
 
     // Strip markdown code fences if present (e.g. ```json ... ```)
-    const jsonText = content.text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+    const jsonText = textBlock.text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
     const parsed = JSON.parse(jsonText) as ParseResult;
 
     // Validate: must have at least one useful field
