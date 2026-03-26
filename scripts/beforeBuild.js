@@ -11,26 +11,61 @@ function rmIfExists(path) {
   }
 }
 
-// Remove .d.ts, .d.mts, .map, and other non-runtime files from a copied dependency tree.
-function pruneNonRuntimeFiles(dir) {
+// Remove .d.ts, .d.mts, .map, and other non-runtime files from copied dependencies.
+// PRUNE_DIRS are only removed at the package root level (not recursively inside dist/lib/src)
+// because some packages use names like 'doc' for runtime code (e.g. yaml/dist/doc/).
+function pruneNonRuntimeFiles(outNodeModulesDir) {
   const PRUNE_EXTENSIONS = new Set(['.d.ts', '.d.mts', '.map']);
   const PRUNE_DIRS = new Set(['docs', 'doc', 'example', 'examples', 'test', 'tests', '__tests__']);
 
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const fullPath = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (PRUNE_DIRS.has(entry.name)) {
-        rmSync(fullPath, { recursive: true, force: true });
-      } else {
-        pruneNonRuntimeFiles(fullPath);
-      }
-    } else if (entry.isFile()) {
-      const matchesExt = [...PRUNE_EXTENSIONS].some((ext) => entry.name.endsWith(ext));
-      if (matchesExt) {
-        rmSync(fullPath, { force: true });
+  // Remove non-runtime extensions recursively
+  function pruneExtensions(dir) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        pruneExtensions(fullPath);
+      } else if (entry.isFile()) {
+        const matchesExt = [...PRUNE_EXTENSIONS].some((ext) => entry.name.endsWith(ext));
+        if (matchesExt) {
+          rmSync(fullPath, { force: true });
+        }
       }
     }
   }
+
+  // Remove documentation/test dirs only at the root of each package (not inside dist/lib/src).
+  // Also recurses into nested node_modules to prune their packages too.
+  function pruneTopLevelDirs(pkgRoot) {
+    for (const entry of readdirSync(pkgRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      if (PRUNE_DIRS.has(entry.name)) {
+        rmSync(join(pkgRoot, entry.name), { recursive: true, force: true });
+      } else if (entry.name === 'node_modules') {
+        prunePackagesInDir(join(pkgRoot, entry.name));
+      }
+    }
+  }
+
+  // Apply pruning to all packages inside a node_modules directory
+  function prunePackagesInDir(nmDir) {
+    for (const entry of readdirSync(nmDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const fullPath = join(nmDir, entry.name);
+      if (entry.name.startsWith('@')) {
+        for (const scopedEntry of readdirSync(fullPath, { withFileTypes: true })) {
+          if (!scopedEntry.isDirectory()) continue;
+          const scopedPkgPath = join(fullPath, scopedEntry.name);
+          pruneTopLevelDirs(scopedPkgPath);
+          pruneExtensions(scopedPkgPath);
+        }
+      } else {
+        pruneTopLevelDirs(fullPath);
+        pruneExtensions(fullPath);
+      }
+    }
+  }
+
+  prunePackagesInDir(outNodeModulesDir);
 }
 
 function pruneSdkVendorArtifacts(_depName, _targetDir) {
