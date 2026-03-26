@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" ry="108" fill="url(#bg)"/>
+  <!-- Stylized running horse - Unicode horse emoji inspired clean silhouette -->
+  <g transform="translate(60, 60) scale(0.76)">
+    <!-- Body -->
+    <ellipse cx="280" cy="290" rx="130" ry="85" fill="white" opacity="0.95"/>
+    <!-- Neck -->
+    <path d="M 210 250 C 200 220, 190 180, 195 150 C 200 130, 215 115, 235 110 L 250 108 C 260 107, 268 112, 270 120 C 275 140, 268 165, 260 190 C 255 210, 250 230, 255 250 Z" fill="white" opacity="0.95"/>
+    <!-- Head -->
+    <ellipse cx="222" cy="118" rx="42" ry="28" transform="rotate(-20, 222, 118)" fill="white" opacity="0.95"/>
+    <!-- Snout -->
+    <ellipse cx="183" cy="128" rx="22" ry="16" transform="rotate(-10, 183, 128)" fill="white" opacity="0.95"/>
+    <!-- Ear -->
+    <path d="M 240 95 L 232 68 C 230 62, 236 58, 242 62 L 252 85 Z" fill="white" opacity="0.95"/>
+    <!-- Second ear -->
+    <path d="M 248 92 L 245 66 C 244 59, 250 56, 254 60 L 258 82 Z" fill="white" opacity="0.85"/>
+    <!-- Eye -->
+    <circle cx="215" cy="112" r="7" fill="url(#bg)"/>
+    <circle cx="217" cy="110" r="2.5" fill="white"/>
+    <!-- Nostril -->
+    <circle cx="170" cy="128" r="4" fill="url(#bg)" opacity="0.35"/>
+    <!-- Mane -->
+    <path d="M 238 98 C 245 105, 248 120, 240 140 C 235 155, 225 168, 218 182 C 212 195, 210 210, 215 225" fill="none" stroke="white" stroke-width="10" stroke-linecap="round" opacity="0.5"/>
+    <!-- Front left leg (running, forward) -->
+    <path d="M 200 340 L 155 400 L 145 430 L 138 445" stroke="white" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.95"/>
+    <!-- Front right leg (running, back) -->
+    <path d="M 220 350 L 230 400 L 235 435" stroke="white" stroke-width="16" stroke-linecap="round" fill="none" opacity="0.8"/>
+    <!-- Back left leg (running, forward) -->
+    <path d="M 350 340 L 370 395 L 385 435" stroke="white" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.95"/>
+    <!-- Back right leg (running, back) -->
+    <path d="M 365 335 L 405 385 L 420 410 L 430 440" stroke="white" stroke-width="16" stroke-linecap="round" fill="none" opacity="0.8"/>
+    <!-- Tail -->
+    <path d="M 400 255 C 430 240, 455 235, 470 250 C 480 260, 475 278, 460 285 C 445 292, 420 288, 405 278" fill="white" opacity="0.7"/>
+    <path d="M 405 260 C 435 248, 460 248, 468 262" fill="none" stroke="white" stroke-width="5" opacity="0.4"/>
+  </g>
+</svg>
