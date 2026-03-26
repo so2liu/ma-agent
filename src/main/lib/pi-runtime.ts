@@ -218,9 +218,17 @@ export function resolveModel(modelId: string): Model<Api> | undefined {
     return openAIBaseUrl ? { ...builtinModel, baseUrl: openAIBaseUrl } : builtinModel;
   }
 
+  // Determine provider for unknown model IDs:
+  // 1. If the name looks like a Claude model, use Anthropic
+  // 2. If the user has Anthropic credentials configured (key + baseUrl), prefer Anthropic
+  //    (covers OpenRouter and other Anthropic-compatible proxies)
+  // 3. Otherwise fall back to OpenAI
   const looksAnthropic = /^claude/i.test(modelId);
+  const hasAnthropicConfig = !!(getApiKey() && getApiBaseUrl());
+  const hasOpenAIConfig = !!getOpenAIApiKey();
+  const useAnthropic = looksAnthropic || (hasAnthropicConfig && !hasOpenAIConfig);
 
-  if (looksAnthropic) {
+  if (useAnthropic) {
     const anthropicBaseUrl = getApiBaseUrl();
     return {
       id: modelId,
