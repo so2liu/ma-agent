@@ -34,7 +34,7 @@ export function createApplicationMenu(mainWindow: BrowserWindow | null): Menu {
             { type: 'separator' as const },
             {
               label: 'Check for Updates...',
-              click: () => checkForUpdates()
+              click: () => checkForUpdates(true)
             },
             { type: 'separator' as const },
             { role: 'quit' as const }
@@ -54,7 +54,7 @@ export function createApplicationMenu(mainWindow: BrowserWindow | null): Menu {
             { type: 'separator' as const },
             {
               label: 'Check for Updates...',
-              click: () => checkForUpdates()
+              click: () => checkForUpdates(true)
             },
             { type: 'separator' as const },
             { role: 'quit' as const }

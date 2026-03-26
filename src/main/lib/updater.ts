@@ -167,29 +167,31 @@ export function initializeUpdater(window: BrowserWindow | null): void {
       checking: false,
       updateAvailable: false,
       updateInfo: null,
-      lastCheckComplete: true
+      lastCheckComplete: isManualCheck
     };
     notifyStatusChange();
-    // Clear the check complete flag after 3 seconds
-    scheduleStatusReset(() => {
-      currentStatus = {
-        ...currentStatus,
-        lastCheckComplete: false
-      };
-      notifyStatusChange();
-    }, 3000);
+    if (isManualCheck) {
+      // Clear the check complete flag after 3 seconds
+      scheduleStatusReset(() => {
+        currentStatus = {
+          ...currentStatus,
+          lastCheckComplete: false
+        };
+        notifyStatusChange();
+      }, 3000);
+    }
   });
 
   autoUpdater.on('error', (error) => {
     if (activeGeneration !== updateGeneration) return;
-    // Only mark lastCheckComplete if the error happened during check phase, not download
+    // Only mark lastCheckComplete if it was a manual check during the check phase
     const wasChecking = currentStatus.checking;
     currentStatus = {
       ...currentStatus,
       checking: false,
       downloading: false,
-      lastCheckComplete: wasChecking,
-      error: error.message || 'Unknown error occurred'
+      lastCheckComplete: isManualCheck && wasChecking,
+      error: isManualCheck ? (error.message || 'Unknown error occurred') : null
     };
     notifyStatusChange();
     // Clear error after 5 seconds
@@ -231,7 +233,11 @@ function notifyStatusChange(): void {
   }
 }
 
-export function checkForUpdates(): void {
+// Whether the current check was triggered manually by the user
+let isManualCheck = false;
+
+export function checkForUpdates(manual = false): void {
+  isManualCheck = manual;
   const isDev = process.env.ELECTRON_RENDERER_URL !== undefined;
 
   // Sync prerelease setting before checking
@@ -318,8 +324,9 @@ export function installUpdate(): void {
     return;
   }
 
-  // Quit and install will happen automatically due to autoInstallOnAppQuit
-  autoUpdater.quitAndInstall(false, true);
+  // isSilent=true: don't show installer UI on macOS
+  // isForceRunAfter=true: relaunch app after install
+  autoUpdater.quitAndInstall(true, true);
 }
 
 export function getUpdateStatus(): UpdateStatus {

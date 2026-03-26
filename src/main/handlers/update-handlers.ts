@@ -14,9 +14,9 @@ export function registerUpdateHandlers(): void {
     return getUpdateStatus();
   });
 
-  // Check for updates manually
+  // Check for updates manually (user-triggered)
   ipcMain.handle('update:check', () => {
-    checkForUpdates();
+    checkForUpdates(true);
     return { success: true };
   });
 
