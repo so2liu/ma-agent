@@ -11,6 +11,7 @@ import type {
   SerializedAttachmentPayload
 } from '../../shared/types/ipc';
 import { runtimeEventToIpc } from '../lib/agent-runtime';
+import { codingAgentManager } from '../lib/coding-agent';
 import { getApiKey, getOpenAIApiKey, getWorkspaceDir } from '../lib/config';
 import { isScheduledTaskExecuting } from '../lib/schedule-state';
 import {
@@ -72,7 +73,55 @@ function getMissingApiKeyMessage(): string | null {
     : 'OpenAI API key is not configured. Add your OpenAI API key in Settings or set OPENAI_API_KEY.';
 }
 
+/**
+ * Format a coding task event as a system-reminder message for the Pi Agent.
+ */
+function formatTaskNotification(taskId: string, event: { type: string; message: string }): string {
+  const typeLabels: Record<string, string> = {
+    question: '需要决策',
+    completed: '已完成',
+    error: '出错'
+  };
+
+  const task = codingAgentManager.getTask(taskId);
+  const taskName = task?.name ?? taskId;
+  const label = typeLabels[event.type] ?? event.type;
+
+  return `<system-reminder>
+后台编程任务 "${taskName}" (${taskId}) 状态更新：${label}
+
+${event.message}
+
+${event.type === 'question' ? '请决定是否自行回答（使用 respond_to_task 工具），或将问题转述给用户。' : ''}
+</system-reminder>`;
+}
+
+/**
+ * Wire up the coding agent manager to inject notifications into the owning chat session.
+ * Returns true if delivered, false if the session was not available (queued for later).
+ */
+function setupCodingAgentNotifications(): void {
+  codingAgentManager.onTaskNotification = (chatId, taskId, event) => {
+    const session = sessionManager.get(chatId);
+    if (!session) {
+      console.log(
+        `[CodingAgent] Session ${chatId} not found for notification: task=${taskId}, type=${event.type}`
+      );
+      return false;
+    }
+
+    const notificationText = formatTaskNotification(taskId, event);
+
+    void session.runtime.sendMessage({ text: notificationText }).catch((error) => {
+      console.error(`[CodingAgent] Failed to inject notification for task ${taskId}:`, error);
+    });
+    return true;
+  };
+}
+
 export function registerChatHandlers(getMainWindow: () => BrowserWindow | null): void {
+  // Set up coding agent notifications when handlers are registered
+  setupCodingAgentNotifications();
   ipcMain.handle('chat:send-message', async (_event, payload: SendMessagePayload) => {
     const normalizedPayload = payload ?? { chatId: '', text: '', attachments: [] };
     const chatId = normalizedPayload.chatId?.trim() ?? '';
@@ -104,6 +153,9 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
       const savedAttachments = await persistAttachments(attachments);
       const session = sessionManager.getOrCreate(chatId);
       bindRuntimeEvents(chatId, getMainWindow);
+
+      // Deliver any pending coding task notifications for this chat
+      codingAgentManager.drainPendingNotifications(chatId);
 
       void session.runtime
         .sendMessage({ text, attachments: savedAttachments })
@@ -172,6 +224,8 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
 
     try {
       unbindRuntimeEvents(chatId);
+      // Stop any background coding tasks owned by this chat
+      await codingAgentManager.stopTasksForChat(chatId);
       await sessionManager.destroy(chatId);
       return { success: true };
     } catch (error) {

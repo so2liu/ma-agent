@@ -6,6 +6,7 @@ import { registerAnalyticsHandlers } from './handlers/analytics-handlers';
 import { registerCanvasHandlers } from './handlers/canvas-handlers';
 import { registerAppHandlers } from './handlers/app-handlers';
 import { registerChatHandlers } from './handlers/chat-handlers';
+import { registerCodingTaskHandlers } from './handlers/coding-task-handlers';
 import { registerConfigHandlers } from './handlers/config-handlers';
 import { registerConversationHandlers } from './handlers/conversation-handlers';
 import { registerDbHandlers } from './handlers/db-handlers';
@@ -120,6 +121,7 @@ app.whenReady().then(async () => {
   // Register all IPC handlers
   registerConfigHandlers();
   registerChatHandlers(() => mainWindow);
+  registerCodingTaskHandlers(() => mainWindow);
   registerConversationHandlers();
   registerProjectHandlers();
   registerShellHandlers();

@@ -19,6 +19,7 @@ import WorkspacePanel from '@/components/WorkspacePanel';
 import DropZoneOverlay from '@/components/DropZoneOverlay';
 import FileTree from '@/components/FileTree';
 import BackgroundTaskIndicator from '@/components/BackgroundTaskIndicator';
+import CodingTaskPanel from '@/components/CodingTaskPanel';
 import FloatingTaskPanel from '@/components/FloatingTaskPanel';
 import MessageList from '@/components/MessageList';
 import ResizeHandle from '@/components/ResizeHandle';
@@ -235,7 +236,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   const appsRef = useRef(apps);
   appsRef.current = apps;
   const projectIdForNewChatRef = useRef<string | null>(null);
-  const { messages, setMessages, isLoading, setIsLoading, backgroundTasks, retryStatus, sessionId } =
+  const { messages, setMessages, isLoading, setIsLoading, backgroundTasks, codingTasks, retryStatus, sessionId } =
     useClaudeChat(activeChatId);
   const { track } = useAnalytics();
   const isOnline = useOnlineStatus();
@@ -1145,6 +1146,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 customModelIds={customModelIds}
                 floatingPanel={
                   <>
+                    <CodingTaskPanel codingTasks={codingTasks} />
                     <BackgroundTaskIndicator backgroundTasks={backgroundTasks} />
                     <FloatingTaskPanel messages={messages} />
                     {canvasChanges.totalChanges > 0 && (

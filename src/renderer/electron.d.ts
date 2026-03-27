@@ -1,6 +1,7 @@
 import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
 import type { SimpleElement } from '../shared/types/canvas';
 import type { TaskNotificationEvent, TaskProgressEvent } from '../shared/types/background-task';
+import type { CodingTaskUpdateEvent } from '../shared/types/coding-task';
 import type {
   AutoDetectResult,
   ChatModelPreference,
@@ -446,6 +447,9 @@ export interface ElectronAPI {
     onSessionUpdated: (callback: (data: ChatSessionUpdatedEvent) => void) => () => void;
     onTaskProgress: (callback: (data: TaskProgressEvent) => void) => () => void;
     onTaskNotification: (callback: (data: TaskNotificationEvent) => void) => () => void;
+  };
+  codingTask: {
+    onUpdate: (callback: (data: CodingTaskUpdateEvent) => void) => () => void;
   };
   config: {
     getWorkspaceDir: () => Promise<WorkspaceResponse>;
