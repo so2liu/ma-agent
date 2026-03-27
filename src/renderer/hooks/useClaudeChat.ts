@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { BackgroundTask } from '../../shared/types/background-task';
+import type { CodingTaskState } from '../../shared/types/coding-task';
 import type { Message } from '@/types/chat';
 import {
   getChatStateSnapshot,
@@ -18,6 +19,7 @@ export function useClaudeChat(chatId: string | null): {
   isLoading: boolean;
   setIsLoading: Dispatch<SetStateAction<boolean>>;
   backgroundTasks: Map<string, BackgroundTask>;
+  codingTasks: Map<string, CodingTaskState>;
   retryStatus: ActiveRetryStatus | null;
   sessionId: string | null;
 } {
@@ -62,6 +64,7 @@ export function useClaudeChat(chatId: string | null): {
     isLoading: state?.isLoading ?? false,
     setIsLoading,
     backgroundTasks: state?.backgroundTasks ?? new Map(),
+    codingTasks: state?.codingTasks ?? new Map(),
     retryStatus: state?.retryStatus ?? null,
     sessionId: state?.sessionId ?? null
   };

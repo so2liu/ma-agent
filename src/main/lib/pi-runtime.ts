@@ -34,6 +34,7 @@ import type {
   RuntimeMessage
 } from './agent-runtime';
 import { buildPlainTextWithAttachments } from '../handlers/chat-helpers';
+import { createCodingAgentTools } from './coding-agent';
 
 const TOOL_NAME_MAP: Record<string, string> = {
   read: 'Read',
@@ -287,8 +288,13 @@ export class PiRuntime implements AgentRuntime {
   private toolStreamIndexes = new Map<string, number>();
   private generation = 0;
   private modelPreference: ChatModelPreference;
+  private chatId: string;
 
-  constructor(modelPreference: ChatModelPreference = currentModelPreference) {
+  constructor(
+    chatId: string,
+    modelPreference: ChatModelPreference = currentModelPreference
+  ) {
+    this.chatId = chatId;
     this.modelPreference = modelPreference;
   }
 
@@ -469,6 +475,7 @@ export class PiRuntime implements AgentRuntime {
       model,
       thinkingLevel: 'medium',
       tools: createCodingTools(cwd),
+      customTools: createCodingAgentTools(this.chatId),
       resourceLoader,
       sessionManager
     });

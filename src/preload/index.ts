@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
 import type { SimpleElement } from '../shared/types/canvas';
 import type { TaskNotificationEvent, TaskProgressEvent } from '../shared/types/background-task';
+import type { CodingTaskUpdateEvent } from '../shared/types/coding-task';
 import type {
   ChatModelPreference,
   CustomModelIds,
@@ -197,6 +198,14 @@ contextBridge.exposeInMainWorld('electron', {
         callback(data);
       ipcRenderer.on('chat:task-notification', listener);
       return () => ipcRenderer.removeListener('chat:task-notification', listener);
+    }
+  },
+  codingTask: {
+    onUpdate: (callback: (data: CodingTaskUpdateEvent) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: CodingTaskUpdateEvent) =>
+        callback(data);
+      ipcRenderer.on('coding-task:update', listener);
+      return () => ipcRenderer.removeListener('coding-task:update', listener);
     }
   },
   config: {

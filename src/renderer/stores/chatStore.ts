@@ -1,5 +1,6 @@
 import type { AnalyticsEventType } from '../../shared/types/analytics';
 import type { BackgroundTask } from '../../shared/types/background-task';
+import type { CodingTaskState } from '../../shared/types/coding-task';
 import type {
   ChatContentBlockStopEvent,
   ChatDebugMessageEvent,
@@ -38,6 +39,7 @@ export interface ChatState {
   isStreaming: boolean;
   sessionId: string | null;
   backgroundTasks: Map<string, BackgroundTask>;
+  codingTasks: Map<string, CodingTaskState>;
   retryStatus: ActiveRetryStatus | null;
   debugMessages: string[];
   subscribers: Set<() => void>;
@@ -82,6 +84,7 @@ function createChatState(): ChatState {
     isStreaming: false,
     sessionId: null,
     backgroundTasks: new Map(),
+    codingTasks: new Map(),
     retryStatus: null,
     debugMessages: [],
     subscribers: new Set(),
@@ -638,6 +641,7 @@ function finalizeStream(
   state.isLoading = false;
   state.retryStatus = null;
   state.backgroundTasks = new Map();
+  // Note: codingTasks are NOT cleared here — they persist across assistant turns
   state.lastError = lastError;
   window.electron.analytics.trackEvent({ type: analyticsType, timestamp: Date.now() });
   return state;
@@ -851,6 +855,40 @@ function initGlobalListeners(): void {
     state.backgroundTasks = next;
     notifySubscribers(state);
   });
+  window.electron.codingTask.onUpdate((data) => {
+    if (!data.chatId) {
+      return;
+    }
+
+    const state = getOrCreateStateInternal(data.chatId);
+    const next = new Map(state.codingTasks);
+    const existing = next.get(data.taskId);
+
+    const outputLines = existing?.outputLines ?? [];
+    if (data.outputLine) {
+      outputLines.push(data.outputLine);
+      // Keep last 100 lines in renderer
+      if (outputLines.length > 100) {
+        outputLines.splice(0, outputLines.length - 100);
+      }
+    }
+
+    // Clear stale fields when status changes (e.g. waiting→running clears pendingQuestion)
+    const statusChanged = existing && existing.status !== data.status;
+    next.set(data.taskId, {
+      taskId: data.taskId,
+      name: data.name,
+      engine: data.engine,
+      status: data.status,
+      outputLines,
+      pendingQuestion:
+        data.pendingQuestion ?? (statusChanged ? null : (existing?.pendingQuestion ?? null)),
+      result: data.result ?? (statusChanged ? null : (existing?.result ?? null)),
+      error: data.error ?? (statusChanged ? null : (existing?.error ?? null))
+    });
+    state.codingTasks = next;
+    notifySubscribers(state);
+  });
 }
 
 export function getOrCreateState(chatId: string): ChatState {
@@ -915,6 +953,7 @@ export function replaceChatState(
   if (typeof data.lastError !== 'undefined') state.lastError = data.lastError;
   state.debugMessages = [];
   state.backgroundTasks = new Map();
+  state.codingTasks = new Map();
   state.isDirty = false;
   if (state.saveTimeoutId !== null) {
     window.clearTimeout(state.saveTimeoutId);

@@ -8,7 +8,7 @@ export interface ManagedSession {
 }
 
 function createManagedSession(chatId: string): ManagedSession {
-  const runtime = new PiRuntime();
+  const runtime = new PiRuntime(chatId);
   const session: ManagedSession = {
     chatId,
     runtime,
