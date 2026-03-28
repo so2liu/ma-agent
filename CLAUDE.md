@@ -5,17 +5,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-pnpm install         # Install dependencies
-pnpm run dev         # Dev mode (downloads binaries + builds skills + electron-vite dev)
-pnpm run build       # Production build (electron-vite build)
-pnpm run build:mac   # Build + package for macOS
-pnpm run build:win   # Build + package for Windows
-pnpm run typecheck   # TypeScript type checking (tsc --noEmit)
-pnpm run lint        # ESLint (flat config, max-warnings=0)
-pnpm run test        # Test runner (uses bun test internally)
-pnpm run format      # Prettier (with import sort + tailwind plugin)
-pnpm run format:check # Prettier check only
+bun install          # Install dependencies
+bun run dev          # Dev mode (downloads binaries + builds skills + electron-vite dev)
+bun run build        # Production build (electron-vite build)
+bun run build:mac    # Build + package for macOS
+bun run build:win    # Build + package for Windows
+bun run typecheck    # TypeScript type checking (tsc --noEmit)
+bun run lint         # ESLint (flat config, max-warnings=0)
+bun run test         # Test runner (bun test)
+bun run format       # Prettier (with import sort + tailwind plugin)
+bun run format:check # Prettier check only
 ```
+
+> **工具链选型**: Bun 作为包管理器和脚本运行器，Node.js 作为 Electron 运行时。
 
 ## Architecture
 
@@ -102,7 +104,7 @@ Skills live in `.claude/skills/<name>/` with `SKILL.md` + TypeScript tools in `s
 
 ## Workflow
 
-After code changes, always run: `pnpm run lint && pnpm run typecheck && pnpm run test`
+After code changes, always run: `bun run lint && bun run typecheck && bun run test`
 
 Commit messages follow Conventional Commits format.
 

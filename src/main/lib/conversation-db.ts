@@ -3,6 +3,8 @@ import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { app } from 'electron';
 
+import { getFeishuConfig } from './config';
+
 export interface Conversation {
   id: string;
   title: string;
@@ -11,6 +13,7 @@ export interface Conversation {
   updatedAt: number; // Unix timestamp
   sessionId?: string | null;
   projectId?: string | null;
+  isFeishu?: boolean;
 }
 
 /** Lightweight version returned by listConversations — no full messages payload */
@@ -46,9 +49,20 @@ interface ConversationFile {
   updatedAt: number;
   sessionId?: string | null;
   projectId?: string | null;
+  isFeishu?: boolean;
 }
 
 let conversationsDir: string | null = null;
+const FEISHU_CONVERSATION_TITLE = '飞书机器人';
+
+function inferFeishuConversation(id: string, title: string): boolean {
+  const feishuConversationId = getFeishuConfig()?.conversationId?.trim();
+  return title === FEISHU_CONVERSATION_TITLE || id === feishuConversationId;
+}
+
+function isFeishuConversationFile(conversation: Pick<ConversationFile, 'id' | 'title' | 'isFeishu'>): boolean {
+  return conversation.isFeishu === true || inferFeishuConversation(conversation.id, conversation.title);
+}
 
 function getConversationsDir(): string {
   if (!conversationsDir) {
@@ -98,10 +112,12 @@ export function closeDatabase(): void {
 export function createConversation(
   title: string,
   messages: unknown[],
-  sessionId?: string | null
+  sessionId?: string | null,
+  options?: { isFeishu?: boolean }
 ): Conversation {
   const id = Date.now().toString();
   const now = Date.now();
+  const isFeishu = options?.isFeishu ?? inferFeishuConversation(id, title);
 
   const conversationFile: ConversationFile = {
     id,
@@ -109,7 +125,8 @@ export function createConversation(
     messages,
     createdAt: now,
     updatedAt: now,
-    sessionId
+    sessionId,
+    isFeishu
   };
 
   writeConversationFile(conversationFile);
@@ -120,7 +137,8 @@ export function createConversation(
     messages: JSON.stringify(messages),
     createdAt: now,
     updatedAt: now,
-    sessionId
+    sessionId,
+    isFeishu
   };
 }
 
@@ -168,7 +186,8 @@ export function getConversation(id: string): Conversation | null {
     createdAt: conversationFile.createdAt,
     updatedAt: conversationFile.updatedAt,
     sessionId: conversationFile.sessionId ?? null,
-    projectId: conversationFile.projectId ?? null
+    projectId: conversationFile.projectId ?? null,
+    isFeishu: isFeishuConversationFile(conversationFile)
   };
 }
 
@@ -287,7 +306,8 @@ export function listConversations(limit: number = 100): ConversationSummary[] {
     createdAt: conversationFile.createdAt,
     updatedAt: conversationFile.updatedAt,
     sessionId: conversationFile.sessionId ?? null,
-    projectId: conversationFile.projectId ?? null
+    projectId: conversationFile.projectId ?? null,
+    isFeishu: isFeishuConversationFile(conversationFile)
   }));
 }
 
@@ -377,6 +397,11 @@ export async function searchConversations(query: string): Promise<ConversationSe
 }
 
 export function deleteConversation(id: string): void {
+  const conversationFile = readConversationFile(id);
+  if (conversationFile && isFeishuConversationFile(conversationFile)) {
+    throw new Error('Feishu conversation cannot be deleted');
+  }
+
   const filePath = getConversationFilePath(id);
   if (existsSync(filePath)) {
     unlinkSync(filePath);

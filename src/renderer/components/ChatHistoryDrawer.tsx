@@ -51,6 +51,11 @@ export default function ChatHistoryDrawer({
 
   const handleDelete = async (e: React.MouseEvent, conversationId: string) => {
     e.stopPropagation();
+    const conversation = conversations.find((item) => item.id === conversationId);
+    if (conversation?.isFeishu) {
+      return;
+    }
+
     if (confirm('确定要删除此对话吗？此操作无法撤销。')) {
       try {
         const chatId = getChatIdForConversation(conversationId);
@@ -210,13 +215,15 @@ export default function ChatHistoryDrawer({
                               <span>{formatRelativeDate(conversation.updatedAt)}</span>
                             </div>
                           </div>
-                          <button
-                            onClick={(e) => handleDelete(e, conversation.id)}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-transparent text-neutral-400 opacity-0 transition-colors duration-150 group-hover:opacity-100 hover:border-black/10 hover:bg-black/5 hover:text-neutral-700 dark:hover:border-white/10 dark:hover:bg-white/5 dark:hover:text-neutral-200"
-                            aria-label="删除对话"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {!conversation.isFeishu && (
+                            <button
+                              onClick={(e) => handleDelete(e, conversation.id)}
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-transparent text-neutral-400 opacity-0 transition-colors duration-150 group-hover:opacity-100 hover:border-black/10 hover:bg-black/5 hover:text-neutral-700 dark:hover:border-white/10 dark:hover:bg-white/5 dark:hover:text-neutral-200"
+                              aria-label="删除对话"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );

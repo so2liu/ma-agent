@@ -39,6 +39,8 @@ interface ChatInputProps {
   onChange: (value: string) => void;
   onSend: () => void;
   isLoading: boolean;
+  disabled?: boolean;
+  disabledPlaceholder?: string;
   onStopStreaming?: () => void;
   autoFocus?: boolean;
   attachments?: {
@@ -64,6 +66,8 @@ export default function ChatInput({
   onChange,
   onSend,
   isLoading,
+  disabled = false,
+  disabledPlaceholder = '输入你想让我做的事...',
   onStopStreaming,
   autoFocus = false,
   attachments = [],
@@ -82,8 +86,10 @@ export default function ChatInput({
   const dragCounterRef = useRef(0);
   const [isDragActive, setIsDragActive] = useState(false);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
-  const computedCanSend = canSend ?? (Boolean(value.trim()) || attachments.length > 0);
-  const slash = useSlashCommand(value);
+  const displayValue = disabled ? '' : value;
+  const computedCanSend =
+    !disabled && (canSend ?? (Boolean(value.trim()) || attachments.length > 0));
+  const slash = useSlashCommand(displayValue);
   const isDisabled = isModelPreferenceUpdating || customModelActive;
   const currentModel = useMemo(
     () => mapModelPreference(modelPreference, customModelIds),
@@ -104,10 +110,10 @@ export default function ChatInput({
   };
 
   useEffect(() => {
-    if (autoFocus) {
+    if (autoFocus && !disabled) {
       queryTextarea()?.focus();
     }
-  }, [autoFocus, queryTextarea]);
+  }, [autoFocus, disabled, queryTextarea]);
 
   const handleSlashSelect = useCallback(
     (item: Parameters<typeof SlashCommandMenu>[0]['items'][number]) => {
@@ -124,6 +130,7 @@ export default function ChatInput({
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (disabled) return;
     if (e.nativeEvent.isComposing) return;
 
     if (slash.isOpen) {
@@ -161,6 +168,8 @@ export default function ChatInput({
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (disabled) return;
+
     const clipboardData = e.clipboardData;
     if (!clipboardData) return;
 
@@ -182,6 +191,7 @@ export default function ChatInput({
     Array.from(event.dataTransfer?.types ?? []).includes('Files');
 
   const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    if (disabled) return;
     if (!isFileDrag(event)) return;
     event.preventDefault();
     dragCounterRef.current += 1;
@@ -189,6 +199,7 @@ export default function ChatInput({
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (disabled) return;
     if (!isFileDrag(event)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
@@ -196,6 +207,7 @@ export default function ChatInput({
   };
 
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    if (disabled) return;
     if (!isFileDrag(event)) return;
     event.preventDefault();
     dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
@@ -203,6 +215,7 @@ export default function ChatInput({
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    if (disabled) return;
     if (!isFileDrag(event)) return;
     event.preventDefault();
     dragCounterRef.current = 0;
@@ -229,12 +242,15 @@ export default function ChatInput({
           multiple
           className="hidden"
           onChange={(e) => {
+            if (disabled) {
+              e.target.value = '';
+              return;
+            }
             if (e.target.files?.length) onFilesSelected?.(e.target.files);
             e.target.value = '';
           }}
         />
 
-        {/* PromptInput IS the visual container — no wrapper div with its own border/shadow */}
         <PromptInput
           disableAttachments
           onSubmit={() => {
@@ -244,7 +260,7 @@ export default function ChatInput({
           multiple
           className={`rounded-3xl bg-card/95 p-2 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl ${
             isDragActive ? 'ring-2 ring-ring/60' : 'ring-1 ring-border'
-          }`}
+          } ${disabled ? 'opacity-70' : ''}`}
         >
           <PromptInputBody>
             <PromptInputHeader className="gap-2 px-1 pb-0">
@@ -280,13 +296,14 @@ export default function ChatInput({
             </PromptInputHeader>
 
             <PromptInputTextarea
-              value={value}
+              value={displayValue}
               onChange={(e) => onChange(e.currentTarget.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder="输入你想让我做的事..."
+              placeholder={disabled ? disabledPlaceholder : '输入你想让我做的事...'}
+              disabled={disabled}
               rows={1}
-              className="px-3 py-2 text-sm leading-6 text-foreground placeholder:text-muted-foreground"
+              className={`px-3 py-2 text-sm leading-6 text-foreground placeholder:text-muted-foreground ${disabled ? 'cursor-not-allowed select-none' : ''}`}
             />
 
             <PromptInputFooter className="w-full items-center justify-between gap-3 px-2 py-2">
@@ -294,6 +311,7 @@ export default function ChatInput({
                 <PromptInputButton
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
+                  disabled={disabled}
                   className="rounded-full border border-border bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   aria-label="添加附件"
                   title="添加附件"
@@ -310,7 +328,7 @@ export default function ChatInput({
                   <ModelSelectorTrigger asChild>
                     <PromptInputButton
                       type="button"
-                      disabled={isDisabled}
+                      disabled={isDisabled || disabled}
                       className="h-8 rounded-full border border-border bg-muted px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                       title={
                         customModelActive
@@ -376,7 +394,10 @@ export default function ChatInput({
                   isLoading ? (onStopStreaming ? 'streaming' : 'submitted') : undefined
                 }
                 onClick={isLoading && onStopStreaming ? onStopStreaming : undefined}
-                disabled={isLoading && onStopStreaming ? false : !computedCanSend || isLoading}
+                disabled={
+                  disabled ||
+                  (isLoading && onStopStreaming ? false : !computedCanSend || isLoading)
+                }
                 className={`rounded-lg ${
                   isLoading && onStopStreaming
                     ? 'bg-secondary text-secondary-foreground hover:bg-accent'

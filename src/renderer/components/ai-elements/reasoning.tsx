@@ -77,7 +77,7 @@ export const Reasoning = memo(
 
     return (
       <ReasoningContext.Provider
-        value={{ isStreaming, isOpen, setIsOpen, duration: durationProp }}
+        value={{ isStreaming: isStreaming ?? false, isOpen: isOpen ?? true, setIsOpen, duration: durationProp }}
       >
         <Collapsible
           className={cn("not-prose mb-4", className)}

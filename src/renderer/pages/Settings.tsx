@@ -4,6 +4,7 @@ import {
   Cpu,
   FolderOpen,
   Loader2,
+  MessageCircle,
   RefreshCw,
   Shield,
   Settings2,
@@ -14,6 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Switch } from '@/components/ui/switch';
+import { FeishuSettings } from '@/components/settings/FeishuSettings';
 import type { UpdateChannel } from '@/electron';
 
 import type {
@@ -47,6 +49,7 @@ const NAV_ITEMS = [
   { id: 'workspace', label: '工作目录', icon: FolderOpen },
   { id: 'update', label: '更新通道', icon: RefreshCw },
   { id: 'privacy', label: '数据与隐私', icon: Shield },
+  { id: 'feishu', label: '飞书机器人', icon: MessageCircle },
   { id: 'debug', label: '调试模式', icon: Terminal },
   { id: 'developer', label: '开发者信息', icon: Wrench }
 ] as const;
@@ -1559,6 +1562,12 @@ function Settings() {
                   disabled={isSavingAnalytics || !analyticsEnabled}
                 />
               </div>
+            </section>
+
+            <div className="border-t border-neutral-100 dark:border-neutral-800" />
+
+            <section ref={(el) => { sectionRefs.current['feishu'] = el; }} className="space-y-3">
+              <FeishuSettings />
             </section>
 
             <div className="border-t border-neutral-100 dark:border-neutral-800" />

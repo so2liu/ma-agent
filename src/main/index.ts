@@ -3,13 +3,14 @@ import { join } from 'path';
 import { app, BrowserWindow, Menu } from 'electron';
 
 import { registerAnalyticsHandlers } from './handlers/analytics-handlers';
-import { registerCanvasHandlers } from './handlers/canvas-handlers';
 import { registerAppHandlers } from './handlers/app-handlers';
+import { registerCanvasHandlers } from './handlers/canvas-handlers';
 import { registerChatHandlers } from './handlers/chat-handlers';
 import { registerCodingTaskHandlers } from './handlers/coding-task-handlers';
 import { registerConfigHandlers } from './handlers/config-handlers';
 import { registerConversationHandlers } from './handlers/conversation-handlers';
 import { registerDbHandlers } from './handlers/db-handlers';
+import { registerFeishuHandlers, startFeishuBotIfEnabled } from './handlers/feishu-handlers';
 import { registerProjectHandlers } from './handlers/project-handlers';
 import { registerScheduleHandlers } from './handlers/schedule-handlers';
 import { registerShellHandlers } from './handlers/shell-handlers';
@@ -18,6 +19,7 @@ import { registerUpdateHandlers } from './handlers/update-handlers';
 import { registerWorkspaceHandlers, restartFileWatcher } from './handlers/workspace-handlers';
 import { shutdownAnalytics, trackEvent } from './lib/analytics-service';
 import { buildEnhancedPath, ensureWorkspaceDir } from './lib/config';
+import { feishuBot } from './lib/feishu/feishu-bot';
 import { appManager } from './lib/sandbox/app-manager';
 import { startScheduler, stopScheduler } from './lib/scheduler';
 import { skillDiscovery } from './lib/skill-discovery';
@@ -131,6 +133,7 @@ app.whenReady().then(async () => {
   registerDbHandlers();
   registerSkillHandlers(() => mainWindow);
   registerScheduleHandlers();
+  registerFeishuHandlers();
   registerAnalyticsHandlers();
   registerCanvasHandlers(() => mainWindow);
 
@@ -155,6 +158,7 @@ app.whenReady().then(async () => {
         console.error('Failed to start skill discovery:', error);
       });
       startScheduler();
+      void startFeishuBotIfEnabled();
     })
     .catch((error) => {
       console.error('Failed to ensure workspace directory:', error);
@@ -177,6 +181,7 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   trackEvent({ type: 'app_closed', timestamp: Date.now() });
+  feishuBot.stop();
   shutdownAnalytics().catch((error) => {
     console.error('Error shutting down analytics:', error);
   });
