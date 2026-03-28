@@ -50,7 +50,7 @@ type RespondToTaskInput = Static<typeof RespondToTaskParams>;
  * @param chatId The chat session these tools belong to — used to route notifications.
  */
 export function createCodingAgentTools(chatId: string): ToolDefinition[] {
-  const startTask: ToolDefinition<typeof StartCodingTaskParams> = {
+  const startTask: ToolDefinition = {
     name: 'start_coding_task',
     label: 'Start Coding Task',
     description:
@@ -78,7 +78,7 @@ export function createCodingAgentTools(chatId: string): ToolDefinition[] {
     }
   };
 
-  const checkTask: ToolDefinition<typeof TaskIdParams> = {
+  const checkTask: ToolDefinition = {
     name: 'check_task',
     label: 'Check Coding Task',
     description: 'Check the status and recent output of a background coding task.',
@@ -93,7 +93,7 @@ export function createCodingAgentTools(chatId: string): ToolDefinition[] {
     }
   };
 
-  const respondToTask: ToolDefinition<typeof RespondToTaskParams> = {
+  const respondToTask: ToolDefinition = {
     name: 'respond_to_task',
     label: 'Respond to Coding Task',
     description:
@@ -115,7 +115,7 @@ export function createCodingAgentTools(chatId: string): ToolDefinition[] {
     }
   };
 
-  const listTasks: ToolDefinition<typeof EmptyParams> = {
+  const listTasks: ToolDefinition = {
     name: 'list_tasks',
     label: 'List Coding Tasks',
     description: 'List all background coding tasks and their current status.',
@@ -138,7 +138,7 @@ export function createCodingAgentTools(chatId: string): ToolDefinition[] {
     }
   };
 
-  const stopTask: ToolDefinition<typeof TaskIdParams> = {
+  const stopTask: ToolDefinition = {
     name: 'stop_task',
     label: 'Stop Coding Task',
     description: 'Stop a running or waiting coding task.',
@@ -157,7 +157,5 @@ export function createCodingAgentTools(chatId: string): ToolDefinition[] {
     }
   };
 
-  // Cast needed: ToolDefinition<TSchema> uses contravariant renderCall which
-  // makes typed definitions not directly assignable to the base type
-  return [startTask, checkTask, respondToTask, listTasks, stopTask] as unknown as ToolDefinition[];
+  return [startTask, checkTask, respondToTask, listTasks, stopTask];
 }
