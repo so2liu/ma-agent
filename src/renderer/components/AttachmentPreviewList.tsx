@@ -1,6 +1,15 @@
-import { Paperclip, X } from 'lucide-react';
+import { Paperclip } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import {
+  Attachment,
+  AttachmentInfo,
+  AttachmentPreview,
+  AttachmentRemove,
+  Attachments
+} from '@/components/ai-elements/attachments';
+import { mapAttachment } from '@/lib/ai-elements-adapters';
+import type { MessageAttachment } from '@/types/chat';
 import { formatFileSize } from '@/utils/formatFileSize';
 
 export interface AttachmentPreviewItem {
@@ -8,7 +17,10 @@ export interface AttachmentPreviewItem {
   name: string;
   size: number;
   isImage?: boolean;
+  mimeType?: string;
   previewUrl?: string;
+  savedPath?: string;
+  relativePath?: string;
   footnoteLines?: string[];
 }
 
@@ -33,6 +45,34 @@ export default function AttachmentPreviewList({
     return new Set(previewErrorIds.filter((id) => validIds.has(id)));
   }, [attachments, previewErrorIds]);
 
+  const mappedAttachments = useMemo(
+    () =>
+      attachments.map((attachment) => {
+        const normalizedAttachment: MessageAttachment = {
+          id: attachment.id,
+          name: attachment.name,
+          size: attachment.size,
+          mimeType:
+            attachment.mimeType ??
+            (attachment.isImage ? 'image/*' : 'application/octet-stream'),
+          previewUrl: attachment.previewUrl,
+          savedPath: attachment.savedPath,
+          relativePath: attachment.relativePath,
+          isImage: attachment.isImage
+        };
+        const mapped = mapAttachment(normalizedAttachment);
+
+        return {
+          original: attachment,
+          mapped:
+            previewErrorIdSet.has(attachment.id) ?
+              { ...mapped, url: '' }
+            : mapped
+        };
+      }),
+    [attachments, previewErrorIdSet]
+  );
+
   const markPreviewError = (attachmentId: string) => {
     setPreviewErrorIds((prev) => (prev.includes(attachmentId) ? prev : [...prev, attachmentId]));
   };
@@ -47,64 +87,57 @@ export default function AttachmentPreviewList({
   }
 
   return (
-    <div className={`flex flex-wrap gap-3 ${className}`}>
-      {attachments.map((attachment) => {
-        const showImagePreview =
-          attachment.isImage && attachment.previewUrl && !previewErrorIdSet.has(attachment.id);
+    <Attachments variant="list" className={className}>
+      {mappedAttachments.map(({ original: attachment, mapped }) => {
+        const footnoteLines =
+          attachment.footnoteLines ?? [attachment.relativePath ?? attachment.savedPath].filter(Boolean);
+        const showImagePreview = mapped.mediaType.startsWith('image/') && Boolean(mapped.url);
 
         return (
-          <div
+          <Attachment
             key={attachment.id}
-            className={`relative rounded-2xl border border-neutral-200/80 bg-neutral-50 shadow-sm dark:border-neutral-700/60 dark:bg-neutral-800/40 ${cardClassName}`}
+            data={mapped}
+            onRemove={onRemove ? () => handleRemove(attachment.id) : undefined}
+            className={`min-w-[14rem] rounded-2xl border-neutral-200/80 bg-neutral-50 shadow-sm dark:border-neutral-700/60 dark:bg-neutral-800/40 ${cardClassName}`}
           >
             {showImagePreview ?
-              <div className={`relative overflow-hidden rounded-2xl ${imageDimensions}`}>
+              <div className={`overflow-hidden rounded-xl ${imageDimensions}`}>
                 <img
-                  src={attachment.previewUrl}
+                  src={mapped.url}
                   alt={attachment.name}
                   className="h-full w-full object-cover"
                   onError={() => markPreviewError(attachment.id)}
                   loading="lazy"
                 />
-                <div className="absolute inset-x-1 bottom-1 rounded-md bg-neutral-900/70 px-1 py-0.5 text-[10px] font-medium text-white/90">
-                  <span className="block truncate">{attachment.name}</span>
-                </div>
               </div>
-            : <div className="flex min-w-[14rem] items-center gap-3 px-3 py-2">
-                <div className="rounded-full bg-neutral-200 p-2 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-200">
-                  <Paperclip className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-neutral-900 dark:text-neutral-100">
-                    {attachment.name}
-                  </p>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                    {formatFileSize(attachment.size)}
-                  </p>
-                  {attachment.footnoteLines?.map((line, index) => (
-                    <p
-                      key={`${attachment.id}-footnote-${index}`}
-                      className="text-[11px] text-neutral-500 dark:text-neutral-400"
-                    >
-                      {line}
-                    </p>
-                  ))}
-                </div>
-              </div>
+            : <AttachmentPreview
+                fallbackIcon={<Paperclip className="h-4 w-4 text-neutral-600 dark:text-neutral-200" />}
+                className="bg-neutral-200 dark:bg-neutral-700"
+              />
             }
+            <div className="min-w-0 flex-1">
+              <AttachmentInfo className="text-xs font-medium text-neutral-900 dark:text-neutral-100" />
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                {formatFileSize(attachment.size)}
+              </p>
+              {footnoteLines.map((line, index) => (
+                <p
+                  key={`${attachment.id}-footnote-${index}`}
+                  className="truncate text-[11px] text-neutral-500 dark:text-neutral-400"
+                >
+                  {line}
+                </p>
+              ))}
+            </div>
             {onRemove && (
-              <button
-                type="button"
-                aria-label={`删除 ${attachment.name}`}
-                onClick={() => handleRemove(attachment.id)}
-                className="absolute top-1.5 right-1.5 rounded-full bg-white/90 p-1 text-neutral-600 shadow-sm transition hover:bg-white dark:bg-neutral-900/80 dark:text-neutral-200"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              <AttachmentRemove
+                label={`删除 ${attachment.name}`}
+                className="text-neutral-600 dark:text-neutral-200"
+              />
             )}
-          </div>
+          </Attachment>
         );
       })}
-    </div>
+    </Attachments>
   );
 }

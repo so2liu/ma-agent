@@ -1,15 +1,20 @@
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
-import Markdown from '@/components/Markdown';
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger
+} from '@/components/ai-elements/reasoning';
 import {
   getThinkingBadgeConfig,
-  getThinkingLabel,
   getToolBadgeConfig,
   getToolLabel
 } from '@/components/tools/toolBadgeConfig';
-import { ThinkingHeader } from '@/components/tools/utils';
 import ToolUse from '@/components/ToolUse';
+import { Badge } from '@/components/ui/badge';
+import { mapThinkingToReasoning } from '@/lib/ai-elements-adapters';
+import { cn } from '@/lib/utils';
 import type { ContentBlock, ToolUseSimple } from '@/types/chat';
 
 interface BlockGroupProps {
@@ -20,43 +25,85 @@ interface BlockGroupProps {
 }
 
 interface ThinkingBadgeProps {
-  content: string;
-  isComplete?: boolean;
-  durationMs?: number;
+  block: ContentBlock;
   isExpanded: boolean;
   onToggle: () => void;
 }
 
-function ThinkingBadge({
-  content,
-  isComplete = false,
-  durationMs,
+function GroupBadgeButton({
+  chevronClassName,
+  disabled = false,
+  icon,
+  iconClassName,
   isExpanded,
+  label,
   onToggle
-}: ThinkingBadgeProps) {
-  const hasContent = content?.trim().length > 0;
-  const config = getThinkingBadgeConfig();
-  const label = getThinkingLabel(isComplete, durationMs);
-
+}: {
+  chevronClassName?: string;
+  disabled?: boolean;
+  icon: ReactNode;
+  iconClassName?: string;
+  isExpanded: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
   return (
     <button
       type="button"
-      onClick={() => hasContent && onToggle()}
-      disabled={!hasContent}
-      className={`inline-flex items-center gap-1 rounded-md border ${config.colors.border} ${config.colors.bg} px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${config.colors.text} transition-colors ${config.colors.hoverBg} ${
-        !hasContent ? 'cursor-default opacity-60' : 'cursor-pointer'
-      }`}
+      onClick={() => !disabled && onToggle()}
+      disabled={disabled}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-xs text-muted-foreground shadow-xs transition-colors',
+        disabled ? 'cursor-default opacity-65' : 'cursor-pointer hover:bg-accent hover:text-accent-foreground'
+      )}
     >
-      {config.icon && <span className="shrink-0">{config.icon}</span>}
-      <span>{label}</span>
-      {hasContent && (
-        <span className={config.colors.chevron}>
+      <span className={cn('shrink-0', iconClassName)}>{icon}</span>
+      <span className="font-medium">{label}</span>
+      {!disabled && (
+        <span className={cn('text-muted-foreground/80', chevronClassName)}>
           {isExpanded ?
-            <ChevronUp className="size-2.5" />
-          : <ChevronDown className="size-2.5" />}
+            <ChevronUp className="size-3" />
+          : <ChevronDown className="size-3" />}
         </span>
       )}
     </button>
+  );
+}
+
+function getReasoningLabel(block: ContentBlock): string {
+  const reasoning = mapThinkingToReasoning(block);
+
+  if (reasoning.isStreaming) {
+    return '思考中';
+  }
+
+  if (reasoning.duration) {
+    return `${reasoning.duration}秒`;
+  }
+
+  return '思考完成';
+}
+
+function ThinkingBadge({
+  block,
+  isExpanded,
+  onToggle
+}: ThinkingBadgeProps) {
+  const reasoning = mapThinkingToReasoning(block);
+  const content = reasoning.content;
+  const hasContent = content?.trim().length > 0;
+  const config = getThinkingBadgeConfig();
+
+  return (
+    <GroupBadgeButton
+      chevronClassName={config.colors.iconColor}
+      disabled={!hasContent}
+      icon={config.icon}
+      iconClassName={config.colors.iconColor}
+      isExpanded={isExpanded}
+      label={getReasoningLabel(block)}
+      onToggle={onToggle}
+    />
   );
 }
 
@@ -74,24 +121,15 @@ function ToolBadge({ tool, isExpanded, onToggle }: ToolBadgeProps) {
   const hasDetails = tool.result || tool.inputJson || tool.parsedInput;
 
   return (
-    <button
-      type="button"
-      onClick={() => hasDetails && onToggle()}
+    <GroupBadgeButton
+      chevronClassName={config.colors.iconColor}
       disabled={!hasDetails}
-      className={`inline-flex items-center gap-1 rounded-md border ${config.colors.border} ${config.colors.bg} px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${config.colors.text} transition-colors ${config.colors.hoverBg} ${
-        !hasDetails ? 'cursor-default opacity-60' : 'cursor-pointer'
-      }`}
-    >
-      {config.icon && <span className="shrink-0">{config.icon}</span>}
-      <span>{label}</span>
-      {hasDetails && (
-        <span className={config.colors.chevron}>
-          {isExpanded ?
-            <ChevronUp className="size-2.5" />
-          : <ChevronDown className="size-2.5" />}
-        </span>
-      )}
-    </button>
+      icon={config.icon}
+      iconClassName={config.colors.iconColor}
+      isExpanded={isExpanded}
+      label={label}
+      onToggle={onToggle}
+    />
   );
 }
 
@@ -148,9 +186,7 @@ export default function BlockGroup({
               return (
                 <ThinkingBadge
                   key={`thinking-${index}`}
-                  content={block.thinking || ''}
-                  isComplete={block.isComplete}
-                  durationMs={block.thinkingDurationMs}
+                  block={block}
                   isExpanded={isExpanded}
                   onToggle={toggleGroup}
                 />
@@ -172,57 +208,73 @@ export default function BlockGroup({
       : <button
           type="button"
           onClick={toggleGroup}
-          className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200/60 bg-neutral-50/80 px-2 py-1 text-[11px] font-medium text-neutral-500 transition-colors hover:bg-neutral-100/80 dark:border-neutral-700/40 dark:bg-neutral-800/40 dark:text-neutral-400 dark:hover:bg-neutral-700/40"
+          className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-xs text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground"
         >
           <ChevronDown className="size-3" />
-          <span>
-            {[
-              thinkingCount > 0 && `${thinkingCount} 次思考`,
-              toolCount > 0 && `${toolCount} 个操作`
-            ]
-              .filter(Boolean)
-              .join(', ')}
-          </span>
+          {thinkingCount > 0 && (
+            <Badge variant="secondary" className="rounded-full bg-muted/70 text-[11px]">
+              {thinkingCount} 次思考
+            </Badge>
+          )}
+          {toolCount > 0 && (
+            <Badge variant="secondary" className="rounded-full bg-muted/70 text-[11px]">
+              {toolCount} 个操作
+            </Badge>
+          )}
         </button>
       }
       {isExpanded && hasExpandableContent && (
-        <div className="expanded-block-section mt-3 ml-3 pl-2.5">
-          <div className="space-y-4">
+        <div className="expanded-block-section mt-3 space-y-3">
             {blocks.map((block, index) => {
               if (block.type === 'thinking') {
-                const config = getThinkingBadgeConfig();
-                // Use border color from config, adjusting opacity for expanded content
-                const borderColor = config.colors.border
-                  .replace('/60', '/50')
-                  .replace('/30', '/50');
+                const reasoning = mapThinkingToReasoning(block);
                 return (
-                  <div key={`thinking-expanded-${index}`} className="my-2">
-                    <ThinkingHeader
-                      isComplete={block.isComplete || false}
-                      durationMs={block.thinkingDurationMs}
+                  <Reasoning
+                    key={`thinking-expanded-${index}`}
+                    className="mb-0 w-full rounded-xl border border-border/60 bg-background/70 px-3 py-2 shadow-xs"
+                    defaultOpen={false}
+                    duration={reasoning.duration}
+                    isStreaming={reasoning.isStreaming}
+                    onOpenChange={(open) => {
+                      if (open !== isExpanded) {
+                        toggleGroup();
+                      }
+                    }}
+                    open={isExpanded}
+                  >
+                    <ReasoningTrigger
+                      className={cn(
+                        'rounded-lg px-2 py-1.5',
+                        reasoning.content.trim() ? 'hover:bg-muted/60' : 'cursor-default hover:bg-transparent'
+                      )}
+                      disabled={!reasoning.content.trim()}
+                      getThinkingMessage={(streaming, duration) => {
+                        if (streaming) {
+                          return '思考中';
+                        }
+                        if (duration) {
+                          return `思考了 ${duration} 秒`;
+                        }
+                        return '思考完成';
+                      }}
                     />
-                    {block.thinking && (
-                      <div
-                        className={`thinking-expanded-content mt-1.5 ml-3 border-l ${borderColor} pl-3 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400`}
-                      >
-                        <div className="prose prose-sm max-w-none prose-neutral dark:prose-invert">
-                          <Markdown>{block.thinking}</Markdown>
-                        </div>
-                      </div>
+                    {reasoning.content.trim() && (
+                      <ReasoningContent className="px-2 pb-2">
+                        {reasoning.content}
+                      </ReasoningContent>
                     )}
-                  </div>
+                  </Reasoning>
                 );
               }
               if (block.type === 'tool_use' && block.tool) {
                 return (
-                  <div key={`tool-expanded-${index}`} className="my-2">
+                  <div key={`tool-expanded-${index}`}>
                     <ToolUse tool={block.tool} />
                   </div>
                 );
               }
               return null;
             })}
-          </div>
         </div>
       )}
     </div>

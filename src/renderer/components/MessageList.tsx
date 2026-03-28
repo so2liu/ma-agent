@@ -1,12 +1,16 @@
 import { Loader2 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton
+} from '@/components/ai-elements/conversation';
 import type { Deliverable } from '@/components/DeliverableCard';
 import Message from '@/components/Message';
 import type { Message as MessageType } from '@/types/chat';
-
-const BOTTOM_SNAP_THRESHOLD_PX = 32;
+import { useStickToBottomContext } from 'stick-to-bottom';
 
 interface MessageListProps {
   messages: MessageType[];
@@ -18,18 +22,16 @@ interface MessageListProps {
   onOpenSettings?: () => void;
 }
 
-export default function MessageList({
+function VirtualizedConversationMessages({
   messages,
   isLoading,
   bottomPadding,
-  onDeliverablePreview,
   conversationId,
+  onDeliverablePreview,
   onRetryMessage,
   onOpenSettings
 }: MessageListProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const isAutoScrollEnabledRef = useRef(true);
-  const previousItemCountRef = useRef(0);
+  const { scrollRef } = useStickToBottomContext();
   const totalItems = messages.length + (isLoading ? 1 : 0);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual is safe here, component is not memoized
@@ -55,89 +57,91 @@ export default function MessageList({
     overscan: 5
   });
 
-  useEffect(() => {
-    const element = scrollRef.current;
-    if (!element) {
-      return;
-    }
-
-    const handleScroll = () => {
-      const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
-      isAutoScrollEnabledRef.current = distanceFromBottom <= BOTTOM_SNAP_THRESHOLD_PX;
-    };
-
-    handleScroll();
-    element.addEventListener('scroll', handleScroll, { passive: true });
-    return () => element.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Reset auto-scroll when switching conversations
-  useEffect(() => {
-    isAutoScrollEnabledRef.current = true;
-  }, [conversationId]);
-
-  // Track last message content length for streaming auto-scroll
-  const lastMessage = messages[messages.length - 1];
-  const lastMessageContentLength =
-    lastMessage ?
-      typeof lastMessage.content === 'string' ? lastMessage.content.length
-      : lastMessage.content.reduce((acc, block) => {
-          return acc + (block.text?.length ?? 0) + (block.thinking?.length ?? 0);
-        }, lastMessage.content.length)
-    : 0;
-
-  useEffect(() => {
-    if (!isAutoScrollEnabledRef.current || totalItems === 0) {
-      previousItemCountRef.current = totalItems;
-      return;
-    }
-
-    virtualizer.scrollToIndex(totalItems - 1, { align: 'end' });
-    previousItemCountRef.current = totalItems;
-  }, [totalItems, lastMessageContentLength, virtualizer]);
-
   const totalHeight = virtualizer.getTotalSize() + (bottomPadding ?? 0);
 
+  if (totalItems === 0) {
+    return (
+      <div className="mx-auto flex min-h-full max-w-3xl items-center justify-center">
+        <ConversationEmptyState
+          title="有什么可以帮你的？"
+          description="输入消息开始对话"
+        />
+      </div>
+    );
+  }
+
   return (
-    <div
-      ref={scrollRef}
-      className="relative flex-1 overflow-y-auto px-3 pt-14 pb-3"
+    <div className="relative" style={{ height: totalHeight }}>
+      {virtualizer.getVirtualItems().map((virtualItem) => {
+        const isLoadingRow = isLoading && virtualItem.index === totalItems - 1;
+        const message = messages[virtualItem.index];
+
+        return (
+          <div
+            key={virtualItem.key}
+            ref={virtualizer.measureElement}
+            className="absolute top-0 left-0 w-full"
+            style={{ transform: `translateY(${virtualItem.start}px)` }}
+          >
+            <div className="mx-auto max-w-3xl">
+              {isLoadingRow ?
+                <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-neutral-400 dark:text-neutral-500">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>正在回复…</span>
+                </div>
+              : message && (
+                  <Message
+                    message={message}
+                    isLoading={isLoading && virtualItem.index === messages.length - 1}
+                    onDeliverablePreview={onDeliverablePreview}
+                    conversationId={conversationId}
+                    onRetryMessage={onRetryMessage}
+                    onOpenSettings={onOpenSettings}
+                  />
+                )
+              }
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function MessageList({
+  messages,
+  isLoading,
+  bottomPadding,
+  onDeliverablePreview,
+  conversationId,
+  onRetryMessage,
+  onOpenSettings
+}: MessageListProps) {
+  return (
+    <Conversation
+      key={conversationId ?? 'new-conversation'}
+      className="relative flex-1"
       style={{ background: 'var(--color-content-bg)' }}
     >
-      <div className="relative" style={{ height: totalHeight }}>
-        {virtualizer.getVirtualItems().map((virtualItem) => {
-          const isLoadingRow = isLoading && virtualItem.index === totalItems - 1;
-          const message = messages[virtualItem.index];
-
-          return (
-            <div
-              key={virtualItem.key}
-              ref={virtualizer.measureElement}
-              className="absolute top-0 left-0 w-full"
-              style={{ transform: `translateY(${virtualItem.start}px)` }}
-            >
-              <div className="mx-auto max-w-3xl">
-                {isLoadingRow ?
-                  <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-neutral-400 dark:text-neutral-500">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    <span>正在回复…</span>
-                  </div>
-                : message && (
-                    <Message
-                      message={message}
-                      isLoading={isLoading && virtualItem.index === messages.length - 1}
-                      onDeliverablePreview={onDeliverablePreview}
-                      conversationId={conversationId}
-                      onRetryMessage={onRetryMessage}
-                      onOpenSettings={onOpenSettings}
-                    />
-                  )
-                }
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+      <ConversationContent
+        className="relative min-h-full gap-0 p-0"
+        scrollClassName="h-full overflow-y-auto px-3 pt-14 pb-3"
+      >
+        <VirtualizedConversationMessages
+          messages={messages}
+          isLoading={isLoading}
+          bottomPadding={bottomPadding}
+          onDeliverablePreview={onDeliverablePreview}
+          conversationId={conversationId}
+          onRetryMessage={onRetryMessage}
+          onOpenSettings={onOpenSettings}
+        />
+      </ConversationContent>
+      <ConversationScrollButton
+        className="shadow-sm supports-[backdrop-filter]:bg-background/80"
+        size="icon-sm"
+        style={{ bottom: (bottomPadding ?? 0) + 16 }}
+      />
+    </Conversation>
   );
 }

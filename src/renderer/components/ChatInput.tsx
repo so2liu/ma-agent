@@ -1,13 +1,38 @@
-import { ArrowUp, Loader2, Paperclip, Square } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Loader2, Paperclip, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import AttachmentPreviewList from '@/components/AttachmentPreviewList';
 import SlashCommandMenu from '@/components/SlashCommandMenu';
+import {
+  ModelSelector,
+  ModelSelectorContent,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorInput,
+  ModelSelectorItem,
+  ModelSelectorList,
+  ModelSelectorLogo,
+  ModelSelectorName,
+  ModelSelectorTrigger
+} from '@/components/ai-elements/model-selector';
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputButton,
+  PromptInputFooter,
+  PromptInputHeader,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools
+} from '@/components/ai-elements/prompt-input';
 import { useSlashCommand } from '@/hooks/useSlashCommand';
+import { mapModelPreference } from '@/lib/ai-elements-adapters';
 
 import type { ChatModelPreference, CustomModelIds } from '../../shared/types/ipc';
 import { DEFAULT_MODEL_NAMES, MODEL_LABELS, MODEL_TOOLTIPS } from '../../shared/types/ipc';
+
+const MAX_ATTACHMENT_BYTES = 32 * 1024 * 1024;
+const MODEL_OPTIONS: ChatModelPreference[] = ['fast', 'smart-sonnet', 'smart-opus'];
 
 interface ChatInputProps {
   value: string;
@@ -16,7 +41,6 @@ interface ChatInputProps {
   isLoading: boolean;
   onStopStreaming?: () => void;
   autoFocus?: boolean;
-  onHeightChange?: (height: number) => void;
   attachments?: {
     id: string;
     file: File;
@@ -33,7 +57,6 @@ interface ChatInputProps {
   isModelPreferenceUpdating?: boolean;
   customModelActive?: boolean;
   customModelIds?: CustomModelIds;
-  floatingPanel?: ReactNode;
 }
 
 export default function ChatInput({
@@ -43,7 +66,6 @@ export default function ChatInput({
   isLoading,
   onStopStreaming,
   autoFocus = false,
-  onHeightChange,
   attachments = [],
   onFilesSelected,
   onRemoveAttachment,
@@ -53,70 +75,51 @@ export default function ChatInput({
   onModelPreferenceChange,
   isModelPreferenceUpdating = false,
   customModelActive = false,
-  customModelIds = {},
-  floatingPanel
+  customModelIds = {}
 }: ChatInputProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const MIN_TEXTAREA_HEIGHT = 44;
-  const MAX_TEXTAREA_HEIGHT = 200;
-  const lastReportedHeightRef = useRef<number | null>(null);
   const dragCounterRef = useRef(0);
   const [isDragActive, setIsDragActive] = useState(false);
-  const computedCanSend = canSend ?? Boolean(value.trim());
+  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
+  const computedCanSend = canSend ?? (Boolean(value.trim()) || attachments.length > 0);
   const slash = useSlashCommand(value);
-
-  const MODEL_OPTIONS: ChatModelPreference[] = ['fast', 'smart-sonnet', 'smart-opus'];
-  const [hoveredModel, setHoveredModel] = useState<ChatModelPreference | null>(null);
-
   const isDisabled = isModelPreferenceUpdating || customModelActive;
+  const currentModel = useMemo(
+    () => mapModelPreference(modelPreference, customModelIds),
+    [customModelIds, modelPreference]
+  );
 
-  const modelPillClass = (isActive: boolean) =>
-    `rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-      isActive ?
-        'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100'
-      : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white'
-    } ${isDisabled ? 'opacity-70' : ''}`;
+  const queryTextarea = useCallback(
+    () => containerRef.current?.querySelector<HTMLTextAreaElement>('textarea[name="message"]') ?? null,
+    []
+  );
 
   const handleModelPreferenceSelect = (preference: ChatModelPreference) => {
     if (preference === modelPreference) return;
     if (isDisabled) return;
+    setIsModelSelectorOpen(false);
     onModelPreferenceChange(preference);
   };
 
-  const reportHeight = useCallback(
-    (height: number) => {
-      if (!onHeightChange) return;
-      const roundedHeight = Math.round(height);
-      if (lastReportedHeightRef.current === roundedHeight) return;
-      lastReportedHeightRef.current = roundedHeight;
-      onHeightChange(roundedHeight);
-    },
-    [onHeightChange]
-  );
-
-  const adjustTextareaHeight = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    textarea.style.height = 'auto';
-    const measuredHeight = Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT);
-    textarea.style.height = `${Math.max(measuredHeight, MIN_TEXTAREA_HEIGHT)}px`;
-  };
-
-  // Auto-focus when autoFocus is true
   useEffect(() => {
-    if (autoFocus && textareaRef.current) {
-      textareaRef.current.focus();
+    if (autoFocus) {
+      queryTextarea()?.focus();
     }
-  }, [autoFocus]);
+  }, [autoFocus, queryTextarea]);
 
   const handleSlashSelect = useCallback(
     (item: Parameters<typeof SlashCommandMenu>[0]['items'][number]) => {
       onChange(`/${item.name} `);
-      textareaRef.current?.focus();
+      requestAnimationFrame(() => {
+        const textarea = queryTextarea();
+        if (!textarea) return;
+        textarea.focus();
+        const nextPosition = textarea.value.length;
+        textarea.setSelectionRange(nextPosition, nextPosition);
+      });
     },
-    [onChange]
+    [onChange, queryTextarea]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -182,15 +185,15 @@ export default function ChatInput({
   };
 
   const handleInputContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Only focus if clicking on the container itself, not on interactive elements
     const target = e.target as HTMLElement;
-    if (target.tagName !== 'TEXTAREA' && target.tagName !== 'BUTTON' && textareaRef.current) {
-      textareaRef.current.focus();
+    if (
+      target.closest(
+        'button, input, textarea, a, [role="dialog"], [role="option"], [cmdk-item], [data-slot="command-item"]'
+      )
+    ) {
+      return;
     }
-  };
-
-  const handleTextareaInput = () => {
-    adjustTextareaHeight();
+    queryTextarea()?.focus();
   };
 
   const handleRemoveAttachmentClick = (attachmentId: string) => {
@@ -245,34 +248,8 @@ export default function ChatInput({
     }
   };
 
-  useEffect(() => {
-    adjustTextareaHeight();
-  }, [value]);
-
-  useLayoutEffect(() => {
-    const element = containerRef.current;
-    if (!element) return;
-
-    reportHeight(element.getBoundingClientRect().height);
-
-    if (typeof ResizeObserver === 'undefined') {
-      return;
-    }
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      reportHeight(entry.contentRect.height);
-    });
-
-    observer.observe(element);
-
-    return () => observer.disconnect();
-  }, [reportHeight]);
-
   return (
-    <div ref={containerRef} className="px-4 pt-6 pb-5 [-webkit-app-region:no-drag]">
-      {floatingPanel && <div className="mb-2">{floatingPanel}</div>}
+    <div ref={containerRef} className="px-4 pb-5 [-webkit-app-region:no-drag]">
       <div className="mx-auto max-w-3xl">
         <div
           className={`rounded-3xl bg-white/95 p-2 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:bg-neutral-900/90 dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] ${
@@ -294,132 +271,157 @@ export default function ChatInput({
             onChange={handleFileInputChange}
           />
 
-          {attachments.length > 0 && (
-            <AttachmentPreviewList
-              attachments={attachments.map((attachment) => ({
-                id: attachment.id,
-                name: attachment.file.name,
-                size: attachment.file.size,
-                isImage: attachment.isImage,
-                previewUrl: attachment.previewUrl
-              }))}
-              onRemove={handleRemoveAttachmentClick}
-              className="mb-2 px-2"
-            />
-          )}
-
-          {attachmentError && (
-            <p className="px-3 pb-2 text-xs text-red-600 dark:text-red-400">{attachmentError}</p>
-          )}
-
-          {slash.isOpen && (
-            <div className="px-1 pb-1">
-              <SlashCommandMenu
-                items={slash.items}
-                selectedIndex={slash.selectedIndex}
-                onSelect={handleSlashSelect}
-                onHover={slash.setSelectedIndex}
-              />
-            </div>
-          )}
-
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            placeholder="输入你想让我做的事..."
-            rows={1}
-            className="w-full resize-none border-0 bg-transparent px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:outline-none dark:text-neutral-100 dark:placeholder-neutral-500"
-            style={{
-              minHeight: `${MIN_TEXTAREA_HEIGHT}px`,
-              maxHeight: `${MAX_TEXTAREA_HEIGHT}px`
+          <PromptInput
+            disableAttachments
+            onSubmit={() => {
+              if (!isLoading && computedCanSend) {
+                onSend();
+              }
             }}
-            onInput={handleTextareaInput}
-          />
-          <div className="flex flex-wrap items-center justify-between gap-3 px-2 pt-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleAttachmentButtonClick}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200/80 bg-neutral-100 text-neutral-600 transition hover:bg-neutral-200 focus:ring-2 focus:ring-neutral-400 focus:outline-none dark:border-neutral-700/70 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:ring-neutral-500"
-                title="添加附件"
-              >
-                <Paperclip className="h-4 w-4" />
-              </button>
-              <div className="relative">
-                <div
-                  role="radiogroup"
-                  aria-label="选择模型"
-                  className="flex h-10 items-center gap-1 rounded-full border border-neutral-200/80 bg-neutral-100 px-1.5 py-1 transition dark:border-neutral-700/70 dark:bg-neutral-800"
-                  title={
-                    customModelActive ? '已启用自定义模型，前往设置 > 开发者信息修改' : undefined
-                  }
-                >
-                  {customModelActive ?
-                    <span className="px-2.5 py-1 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-                      自定义模型
-                    </span>
-                  : MODEL_OPTIONS.map((pref) => (
-                      <button
-                        key={pref}
-                        type="button"
-                        aria-pressed={modelPreference === pref}
-                        onClick={() => handleModelPreferenceSelect(pref)}
-                        disabled={isDisabled}
-                        className={modelPillClass(modelPreference === pref)}
-                        onMouseEnter={() => setHoveredModel(pref)}
-                        onMouseLeave={() => setHoveredModel(null)}
-                      >
-                        {MODEL_LABELS[pref]}
-                      </button>
-                    ))
-                  }
-                </div>
-                {hoveredModel && !customModelActive && (
-                  <div className="absolute bottom-full left-0 z-50 mb-2 w-56 rounded-xl border border-neutral-200/80 bg-white/95 p-3 shadow-lg backdrop-blur-xl dark:border-neutral-700/70 dark:bg-neutral-800/95">
-                    <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-100">
-                      {MODEL_LABELS[hoveredModel]}
-                    </p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
-                      {MODEL_TOOLTIPS[hoveredModel].description}
-                    </p>
-                    <div className="mt-2 border-t border-neutral-100 pt-2 dark:border-neutral-700">
-                      <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
-                        当前模型：
-                        {customModelIds[hoveredModel] || DEFAULT_MODEL_NAMES[hoveredModel]}
-                      </p>
-                      <p className="mt-0.5 text-[10px] text-neutral-400 dark:text-neutral-500">
-                        推荐：{MODEL_TOOLTIPS[hoveredModel].suggestions.join('、')}
-                      </p>
-                    </div>
-                    <p className="mt-1.5 text-[10px] text-neutral-400 dark:text-neutral-500">
-                      可在设置中更换模型
-                    </p>
+            maxFileSize={MAX_ATTACHMENT_BYTES}
+            multiple
+            className="w-full"
+          >
+            <PromptInputBody>
+              <PromptInputHeader className="gap-2 px-1 pb-0">
+                {attachments.length > 0 && (
+                  <AttachmentPreviewList
+                    attachments={attachments.map((attachment) => ({
+                      id: attachment.id,
+                      name: attachment.file.name,
+                      size: attachment.file.size,
+                      mimeType: attachment.file.type || 'application/octet-stream',
+                      isImage: attachment.isImage,
+                      previewUrl: attachment.previewUrl
+                    }))}
+                    onRemove={handleRemoveAttachmentClick}
+                    className="w-full px-2 pt-1"
+                  />
+                )}
+
+                {attachmentError && (
+                  <p className="w-full px-2 text-xs text-red-600 dark:text-red-400">
+                    {attachmentError}
+                  </p>
+                )}
+
+                {slash.isOpen && (
+                  <div className="w-full px-1">
+                    <SlashCommandMenu
+                      items={slash.items}
+                      selectedIndex={slash.selectedIndex}
+                      onSelect={handleSlashSelect}
+                      onHover={slash.setSelectedIndex}
+                    />
                   </div>
                 )}
-              </div>
-              {isModelPreferenceUpdating && (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-neutral-400 dark:text-neutral-300" />
-              )}
-            </div>
-            <button
-              onClick={isLoading && onStopStreaming ? onStopStreaming : onSend}
-              disabled={isLoading && onStopStreaming ? false : !computedCanSend || isLoading}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                isLoading && onStopStreaming ?
-                  'bg-neutral-200 text-neutral-900 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600'
-                : 'bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200'
-              }`}
-            >
-              {isLoading ?
-                onStopStreaming ?
-                  <Square className="h-5 w-5" />
-                : <Loader2 className="h-5 w-5 animate-spin" />
-              : <ArrowUp className="h-5 w-5" />}
-            </button>
-          </div>
+              </PromptInputHeader>
+
+              <PromptInputTextarea
+                value={value}
+                onChange={(e) => onChange(e.currentTarget.value)}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                placeholder="输入你想让我做的事..."
+                className="min-h-[44px] max-h-[200px] border-0 px-3 py-2 text-sm leading-6 text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-0 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+              />
+
+              <PromptInputFooter className="flex-wrap items-center gap-3 px-2 pt-2">
+                <PromptInputTools className="flex-wrap items-center gap-2">
+                  <PromptInputButton
+                    type="button"
+                    onClick={handleAttachmentButtonClick}
+                    className="rounded-full border border-neutral-200/80 bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:border-neutral-700/70 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                    aria-label="添加附件"
+                    title="添加附件"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </PromptInputButton>
+
+                  <ModelSelector
+                    open={slash.isOpen ? false : isModelSelectorOpen}
+                    onOpenChange={(nextOpen) => {
+                      if (slash.isOpen) return;
+                      setIsModelSelectorOpen(nextOpen);
+                    }}
+                  >
+                    <ModelSelectorTrigger asChild>
+                      <PromptInputButton
+                        type="button"
+                        disabled={isDisabled}
+                        className="h-8 rounded-full border border-neutral-200/80 bg-neutral-100 px-3 text-xs font-medium text-neutral-700 hover:bg-neutral-200 dark:border-neutral-700/70 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                        title={
+                          customModelActive ? '已启用自定义模型，前往设置 > 开发者信息修改' : currentModel.id
+                        }
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        <span>{customModelActive ? '自定义模型' : MODEL_LABELS[modelPreference]}</span>
+                        {isModelPreferenceUpdating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      </PromptInputButton>
+                    </ModelSelectorTrigger>
+                    <ModelSelectorContent
+                      className="sm:max-w-md"
+                      title="选择模型"
+                    >
+                      <ModelSelectorInput placeholder="搜索模型档位" />
+                      <ModelSelectorList>
+                        <ModelSelectorEmpty>没有匹配的模型</ModelSelectorEmpty>
+                        <ModelSelectorGroup heading="模型档位">
+                          {MODEL_OPTIONS.map((preference) => {
+                            const mappedModel = mapModelPreference(preference, customModelIds);
+
+                            return (
+                              <ModelSelectorItem
+                                key={preference}
+                                value={`${preference} ${MODEL_LABELS[preference]} ${mappedModel.name} ${mappedModel.id}`}
+                                onSelect={() => handleModelPreferenceSelect(preference)}
+                                disabled={isDisabled}
+                                className="items-start gap-3 py-3"
+                              >
+                                <ModelSelectorLogo provider={mappedModel.provider} className="mt-0.5" />
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <ModelSelectorName className="font-medium text-sm text-neutral-900 dark:text-neutral-100">
+                                      {MODEL_LABELS[preference]}
+                                    </ModelSelectorName>
+                                    {modelPreference === preference && (
+                                      <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] font-medium text-white dark:bg-neutral-100 dark:text-neutral-900">
+                                        当前
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                                    {MODEL_TOOLTIPS[preference].description}
+                                  </p>
+                                  <p className="truncate text-[11px] text-neutral-400 dark:text-neutral-500">
+                                    {mappedModel.name}
+                                    {' · '}
+                                    {mappedModel.id || DEFAULT_MODEL_NAMES[preference]}
+                                  </p>
+                                </div>
+                              </ModelSelectorItem>
+                            );
+                          })}
+                        </ModelSelectorGroup>
+                      </ModelSelectorList>
+                    </ModelSelectorContent>
+                  </ModelSelector>
+                </PromptInputTools>
+
+                <PromptInputSubmit
+                  type={isLoading && onStopStreaming ? 'button' : 'submit'}
+                  status={isLoading ? (onStopStreaming ? 'streaming' : 'submitted') : undefined}
+                  onClick={isLoading && onStopStreaming ? onStopStreaming : undefined}
+                  disabled={isLoading && onStopStreaming ? false : !computedCanSend || isLoading}
+                  className={`rounded-lg ${
+                    isLoading && onStopStreaming ?
+                      'bg-neutral-200 text-neutral-900 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600'
+                    : 'bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200'
+                  }`}
+                />
+              </PromptInputFooter>
+            </PromptInputBody>
+          </PromptInput>
         </div>
       </div>
     </div>

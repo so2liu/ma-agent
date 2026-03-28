@@ -217,7 +217,6 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
 ) {
   const [inputValue, setInputValue] = useState('');
   const [activeChatId, setActiveChatId] = useState<string>(() => crypto.randomUUID());
-  const [chatInputHeight, setChatInputHeight] = useState(0);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isGlobalDragActive, setIsGlobalDragActive] = useState(false);
@@ -934,16 +933,16 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     setInput: (text: string) => setInputValue(text)
   }));
 
-  const INPUT_BOTTOM_OFFSET = 48;
-  const DEFAULT_BOTTOM_PADDING = 160;
-  const messageListBottomPadding =
-    chatInputHeight > 0 ? chatInputHeight + INPUT_BOTTOM_OFFSET : DEFAULT_BOTTOM_PADDING;
   const retryMessage =
     retryStatus ?
       retryStatus.secondsRemaining > 0 ?
         `AI 正忙，等待重试中（${retryStatus.secondsRemaining}s）…`
       : 'AI 正忙，正在重试…'
     : null;
+  const canSendMessage =
+    Boolean(inputValue.trim()) ||
+    pendingAttachments.length > 0 ||
+    canvasChanges.totalChanges > 0;
 
   const handleModelPreferenceChange = async (preference: ChatModelPreference) => {
     if (preference === modelPreference) return;
@@ -1070,11 +1069,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 attachments={pendingAttachments}
                 onFilesSelected={handleFilesSelected}
                 onRemoveAttachment={handleRemoveAttachment}
-                canSend={
-                  Boolean(inputValue.trim()) ||
-                  pendingAttachments.length > 0 ||
-                  canvasChanges.totalChanges > 0
-                }
+                canSend={canSendMessage}
                 attachmentError={attachmentError}
                 modelPreference={modelPreference}
                 onModelPreferenceChange={handleModelPreferenceChange}
@@ -1105,7 +1100,6 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
             <MessageList
               messages={messages}
               isLoading={isLoading}
-              bottomPadding={messageListBottomPadding}
               conversationId={currentConversationId}
               onRetryMessage={
                 lastSubmittedPayloadRef.current?.hasAttachments ? undefined : handleRetryLastMessage
@@ -1121,7 +1115,18 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 })
               }
             />
-            <div className="absolute inset-x-0 bottom-0 z-10">
+            <div className="shrink-0 pt-6">
+              <div className="mx-auto mb-2 flex max-w-3xl flex-col gap-2 px-4">
+                <CodingTaskPanel codingTasks={codingTasks} />
+                <BackgroundTaskIndicator backgroundTasks={backgroundTasks} />
+                <FloatingTaskPanel messages={messages} />
+                {canvasChanges.totalChanges > 0 && (
+                  <CanvasChangeAttachment
+                    changesByFile={canvasChanges.changesByFile}
+                    onDismiss={canvasChanges.clearChanges}
+                  />
+                )}
+              </div>
               <ChatInput
                 value={inputValue}
                 onChange={setInputValue}
@@ -1129,34 +1134,16 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 isLoading={isLoading}
                 onStopStreaming={handleStopStreaming}
                 autoFocus
-                onHeightChange={setChatInputHeight}
                 attachments={pendingAttachments}
                 onFilesSelected={handleFilesSelected}
                 onRemoveAttachment={handleRemoveAttachment}
-                canSend={
-                  Boolean(inputValue.trim()) ||
-                  pendingAttachments.length > 0 ||
-                  canvasChanges.totalChanges > 0
-                }
+                canSend={canSendMessage}
                 attachmentError={attachmentError}
                 modelPreference={modelPreference}
                 onModelPreferenceChange={handleModelPreferenceChange}
                 isModelPreferenceUpdating={isModelPreferenceUpdating}
                 customModelActive={customModelActive}
                 customModelIds={customModelIds}
-                floatingPanel={
-                  <>
-                    <CodingTaskPanel codingTasks={codingTasks} />
-                    <BackgroundTaskIndicator backgroundTasks={backgroundTasks} />
-                    <FloatingTaskPanel messages={messages} />
-                    {canvasChanges.totalChanges > 0 && (
-                      <CanvasChangeAttachment
-                        changesByFile={canvasChanges.changesByFile}
-                        onDismiss={canvasChanges.clearChanges}
-                      />
-                    )}
-                  </>
-                }
               />
             </div>
           </>

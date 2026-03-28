@@ -1,46 +1,23 @@
 import type { ToolUseSimple, WebSearchInput } from '@/types/chat';
 
-import { CollapsibleTool } from './CollapsibleTool';
-import { InlineCode, ToolHeader } from './utils';
+import { CollapsibleTool, getToolDisplayInput } from './CollapsibleTool';
 
 interface WebSearchToolProps {
   tool: ToolUseSimple;
 }
 
 export default function WebSearchTool({ tool }: WebSearchToolProps) {
-  const input = tool.parsedInput as WebSearchInput;
+  const input = tool.parsedInput as WebSearchInput | undefined;
 
-  if (!input) {
-    return (
-      <div className="my-0.5">
-        <ToolHeader tool={tool} toolName={tool.name} />
-      </div>
-    );
-  }
-
-  const collapsedContent = (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <ToolHeader tool={tool} toolName={tool.name} />
-      <InlineCode>{input.query}</InlineCode>
-    </div>
+  return (
+    <CollapsibleTool
+      tool={tool}
+      title={input?.query ? `搜索 ${input.query}` : '搜索'}
+      input={getToolDisplayInput(tool)}
+      inputLanguage="json"
+      errorText={tool.isError ? tool.result : undefined}
+      output={tool.isError ? undefined : tool.result}
+      outputLanguage="markdown"
+    />
   );
-
-  const expandedContent = (
-    <div className="space-y-1.5">
-      {(input.allowed_domains || input.blocked_domains) && (
-        <div className="text-[10px] text-neutral-600 dark:text-neutral-400">
-          {input.allowed_domains && <div>允许的域名: {input.allowed_domains.join(', ')}</div>}
-          {input.blocked_domains && <div>屏蔽的域名: {input.blocked_domains.join(', ')}</div>}
-        </div>
-      )}
-
-      {tool.result && (
-        <pre className="overflow-x-auto rounded bg-neutral-100/50 px-2 py-1 font-mono text-sm break-words whitespace-pre-wrap text-neutral-600 dark:bg-neutral-950/50 dark:text-neutral-300">
-          {tool.result}
-        </pre>
-      )}
-    </div>
-  );
-
-  return <CollapsibleTool collapsedContent={collapsedContent} expandedContent={expandedContent} />;
 }
