@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { ArrowDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { useCallback } from "react";
-import { StickToBottom, useStickToBottomContext } from "stick-to-bottom";
+import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
