@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/hover-card";
 import {
   InputGroup,
-  InputGroupAddon,
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
@@ -812,12 +811,12 @@ export const PromptInput = ({
         />
       )}
       <form
-        className={cn("w-full", className)}
+        className={cn("w-full min-w-0", className)}
         onSubmit={handleSubmit}
         ref={formRef}
         {...props}
       >
-        <InputGroup className="overflow-hidden">{children}</InputGroup>
+        <InputGroup className="min-w-0 flex-wrap overflow-hidden">{children}</InputGroup>
       </form>
     </>
   );
@@ -837,7 +836,7 @@ export const PromptInputBody = ({
   className,
   ...props
 }: PromptInputBodyProps) => (
-  <div className={cn("contents", className)} {...props} />
+  <div className={cn("contents min-w-0", className)} {...props} />
 );
 
 export type PromptInputTextareaProps = ComponentProps<
@@ -928,7 +927,7 @@ export const PromptInputTextarea = ({
 
   return (
     <InputGroupTextarea
-      className={cn("field-sizing-content max-h-48 min-h-16", className)}
+      className={cn("max-h-48 min-h-16 w-full min-w-0 self-stretch", className)}
       name="message"
       onCompositionEnd={() => setIsComposing(false)}
       onCompositionStart={() => setIsComposing(true)}
@@ -941,34 +940,23 @@ export const PromptInputTextarea = ({
   );
 };
 
-export type PromptInputHeaderProps = Omit<
-  ComponentProps<typeof InputGroupAddon>,
-  "align"
->;
+export type PromptInputHeaderProps = HTMLAttributes<HTMLDivElement>;
 
 export const PromptInputHeader = ({
   className,
   ...props
 }: PromptInputHeaderProps) => (
-  <InputGroupAddon
-    align="block-end"
-    className={cn("order-first flex-wrap gap-1", className)}
-    {...props}
-  />
+  <div className={cn("order-first flex w-full basis-full flex-wrap gap-1", className)} {...props} />
 );
 
-export type PromptInputFooterProps = Omit<
-  ComponentProps<typeof InputGroupAddon>,
-  "align"
->;
+export type PromptInputFooterProps = HTMLAttributes<HTMLDivElement>;
 
 export const PromptInputFooter = ({
   className,
   ...props
 }: PromptInputFooterProps) => (
-  <InputGroupAddon
-    align="block-end"
-    className={cn("justify-between gap-1", className)}
+  <div
+    className={cn("order-last flex shrink-0 items-center gap-1 self-end", className)}
     {...props}
   />
 );

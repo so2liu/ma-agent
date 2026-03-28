@@ -1,5 +1,4 @@
 import { Loader2 } from 'lucide-react';
-import { useVirtualizer } from '@tanstack/react-virtual';
 
 import {
   Conversation,
@@ -10,7 +9,6 @@ import {
 import type { Deliverable } from '@/components/DeliverableCard';
 import Message from '@/components/Message';
 import type { Message as MessageType } from '@/types/chat';
-import { useStickToBottomContext } from 'stick-to-bottom';
 
 interface MessageListProps {
   messages: MessageType[];
@@ -22,7 +20,7 @@ interface MessageListProps {
   onOpenSettings?: () => void;
 }
 
-function VirtualizedConversationMessages({
+function ConversationMessages({
   messages,
   isLoading,
   bottomPadding,
@@ -31,35 +29,7 @@ function VirtualizedConversationMessages({
   onRetryMessage,
   onOpenSettings
 }: MessageListProps) {
-  const { scrollRef } = useStickToBottomContext();
-  const totalItems = messages.length + (isLoading ? 1 : 0);
-
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual is safe here, component is not memoized
-  const virtualizer = useVirtualizer({
-    count: totalItems,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: (index) => {
-      if (isLoading && index === totalItems - 1) {
-        return 40;
-      }
-
-      const message = messages[index];
-      if (!message) {
-        return 120;
-      }
-
-      if (message.role === 'user') {
-        return 96;
-      }
-
-      return typeof message.content === 'string' ? 220 : 280;
-    },
-    overscan: 5
-  });
-
-  const totalHeight = virtualizer.getTotalSize() + (bottomPadding ?? 0);
-
-  if (totalItems === 0) {
+  if (messages.length === 0 && !isLoading) {
     return (
       <div className="mx-auto flex min-h-full max-w-3xl items-center justify-center">
         <ConversationEmptyState
@@ -71,39 +41,26 @@ function VirtualizedConversationMessages({
   }
 
   return (
-    <div className="relative" style={{ height: totalHeight }}>
-      {virtualizer.getVirtualItems().map((virtualItem) => {
-        const isLoadingRow = isLoading && virtualItem.index === totalItems - 1;
-        const message = messages[virtualItem.index];
+    <div className="flex flex-col" style={{ paddingBottom: bottomPadding ?? 0 }}>
+      {messages.map((message, index) => (
+        <div key={message.id} className="mx-auto w-full max-w-3xl">
+          <Message
+            message={message}
+            isLoading={isLoading && index === messages.length - 1}
+            onDeliverablePreview={onDeliverablePreview}
+            conversationId={conversationId}
+            onRetryMessage={onRetryMessage}
+            onOpenSettings={onOpenSettings}
+          />
+        </div>
+      ))}
 
-        return (
-          <div
-            key={virtualItem.key}
-            ref={virtualizer.measureElement}
-            className="absolute top-0 left-0 w-full"
-            style={{ transform: `translateY(${virtualItem.start}px)` }}
-          >
-            <div className="mx-auto max-w-3xl">
-              {isLoadingRow ?
-                <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-neutral-400 dark:text-neutral-500">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>正在回复…</span>
-                </div>
-              : message && (
-                  <Message
-                    message={message}
-                    isLoading={isLoading && virtualItem.index === messages.length - 1}
-                    onDeliverablePreview={onDeliverablePreview}
-                    conversationId={conversationId}
-                    onRetryMessage={onRetryMessage}
-                    onOpenSettings={onOpenSettings}
-                  />
-                )
-              }
-            </div>
-          </div>
-        );
-      })}
+      {isLoading && (
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-3 py-1.5 text-xs text-neutral-400 dark:text-neutral-500">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>正在回复…</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -127,7 +84,7 @@ export default function MessageList({
         className="relative min-h-full gap-0 p-0"
         scrollClassName="h-full overflow-y-auto px-3 pt-14 pb-3"
       >
-        <VirtualizedConversationMessages
+        <ConversationMessages
           messages={messages}
           isLoading={isLoading}
           bottomPadding={bottomPadding}

@@ -12,6 +12,7 @@ import {
   type ReactElement,
   type ReactNode
 } from 'react';
+import { createPortal } from 'react-dom';
 
 import { cn } from '@/lib/utils';
 
@@ -102,14 +103,14 @@ export function DialogContent({
   const { open, onOpenChange } = useDialogContext();
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  if (!open) {
+  if (!open || typeof document === 'undefined') {
     return null;
   }
 
-  return (
+  return createPortal(
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4"
       onClick={(event) => {
         if (event.target === overlayRef.current) {
           onOpenChange(false);
@@ -120,7 +121,8 @@ export function DialogContent({
       <div
         {...props}
         className={cn(
-          'relative z-50 w-full max-w-md rounded-xl border border-neutral-200 bg-white p-6 shadow-lg dark:border-neutral-700 dark:bg-neutral-900',
+          'relative z-50 my-auto w-full max-w-md rounded-xl border border-neutral-200 bg-white p-6 shadow-lg dark:border-neutral-700 dark:bg-neutral-900',
+          'max-h-[calc(100vh-2rem)] overflow-y-auto',
           className
         )}
       >
@@ -136,7 +138,8 @@ export function DialogContent({
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
