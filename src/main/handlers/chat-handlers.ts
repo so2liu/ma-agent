@@ -101,7 +101,7 @@ ${event.type === 'question' ? '请决定是否自行回答（使用 respond_to_t
  * Returns true if delivered, false if the session was not available (queued for later).
  */
 function setupCodingAgentNotifications(): void {
-  codingAgentManager.onTaskNotification = (chatId, taskId, event) => {
+  codingAgentManager.onTaskNotification = async (chatId, taskId, event) => {
     const session = sessionManager.get(chatId);
     if (!session) {
       console.log(
@@ -112,10 +112,13 @@ function setupCodingAgentNotifications(): void {
 
     const notificationText = formatTaskNotification(taskId, event);
 
-    void session.runtime.sendMessage({ text: notificationText }).catch((error) => {
+    try {
+      await session.runtime.sendMessage({ text: notificationText });
+      return true;
+    } catch (error) {
       console.error(`[CodingAgent] Failed to inject notification for task ${taskId}:`, error);
-    });
-    return true;
+      return false;
+    }
   };
 }
 
@@ -155,7 +158,7 @@ export function registerChatHandlers(getMainWindow: () => BrowserWindow | null):
       bindRuntimeEvents(chatId, getMainWindow);
 
       // Deliver any pending coding task notifications for this chat
-      codingAgentManager.drainPendingNotifications(chatId);
+      await codingAgentManager.drainPendingNotifications(chatId);
 
       void session.runtime
         .sendMessage({ text, attachments: savedAttachments })

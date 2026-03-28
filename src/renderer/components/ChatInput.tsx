@@ -14,6 +14,7 @@ interface ChatInputProps {
   onChange: (value: string) => void;
   onSend: () => void;
   isLoading: boolean;
+  hasRunningTasks?: boolean;
   onStopStreaming?: () => void;
   autoFocus?: boolean;
   onHeightChange?: (height: number) => void;
@@ -41,6 +42,7 @@ export default function ChatInput({
   onChange,
   onSend,
   isLoading,
+  hasRunningTasks = false,
   onStopStreaming,
   autoFocus = false,
   onHeightChange,
@@ -404,21 +406,29 @@ export default function ChatInput({
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-neutral-400 dark:text-neutral-300" />
               )}
             </div>
-            <button
-              onClick={isLoading && onStopStreaming ? onStopStreaming : onSend}
-              disabled={isLoading && onStopStreaming ? false : !computedCanSend || isLoading}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                isLoading && onStopStreaming ?
-                  'bg-neutral-200 text-neutral-900 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600'
-                : 'bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200'
-              }`}
-            >
-              {isLoading ?
-                onStopStreaming ?
-                  <Square className="h-5 w-5" />
-                : <Loader2 className="h-5 w-5 animate-spin" />
-              : <ArrowUp className="h-5 w-5" />}
-            </button>
+            <div className="flex items-center gap-2">
+              {hasRunningTasks && !isLoading && (
+                <span className="relative flex h-2.5 w-2.5" title="后台任务执行中">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
+                </span>
+              )}
+              <button
+                onClick={isLoading && onStopStreaming ? onStopStreaming : onSend}
+                disabled={isLoading && onStopStreaming ? false : !computedCanSend || isLoading}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  isLoading && onStopStreaming ?
+                    'bg-neutral-200 text-neutral-900 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600'
+                  : 'bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200'
+                }`}
+              >
+                {isLoading ?
+                  onStopStreaming ?
+                    <Square className="h-5 w-5" />
+                  : <Loader2 className="h-5 w-5 animate-spin" />
+                : <ArrowUp className="h-5 w-5" />}
+              </button>
+            </div>
           </div>
         </div>
       </div>

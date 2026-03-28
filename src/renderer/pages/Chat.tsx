@@ -938,6 +938,9 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   const DEFAULT_BOTTOM_PADDING = 160;
   const messageListBottomPadding =
     chatInputHeight > 0 ? chatInputHeight + INPUT_BOTTOM_OFFSET : DEFAULT_BOTTOM_PADDING;
+  const hasRunningTasks = Array.from(codingTasks.values()).some(
+    (t) => t.status === 'running' || t.status === 'waiting'
+  );
   const retryMessage =
     retryStatus ?
       retryStatus.secondsRemaining > 0 ?
@@ -1065,6 +1068,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 onChange={setInputValue}
                 onSend={handleSendMessage}
                 isLoading={isLoading}
+                hasRunningTasks={hasRunningTasks}
                 onStopStreaming={handleStopStreaming}
                 autoFocus
                 attachments={pendingAttachments}
@@ -1127,6 +1131,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 onChange={setInputValue}
                 onSend={handleSendMessage}
                 isLoading={isLoading}
+                hasRunningTasks={hasRunningTasks}
                 onStopStreaming={handleStopStreaming}
                 autoFocus
                 onHeightChange={setChatInputHeight}
