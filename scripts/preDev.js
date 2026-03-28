@@ -12,6 +12,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 console.log('Preparing development environment...\n');
 
+// Step 0: Ensure Electron binary is installed (may be missing in git worktrees)
+const electronDistDir = join(__dirname, '..', 'node_modules', 'electron', 'dist');
+if (!existsSync(electronDistDir)) {
+  console.log('Electron binary not found, installing...');
+  const electronInstallResult = spawnSync('node', ['-e', "require('electron/install.js')"], {
+    stdio: 'inherit',
+    cwd: join(__dirname, '..')
+  });
+  if (electronInstallResult.status !== 0) {
+    console.error('\n❌ Failed to install Electron binary');
+    process.exit(1);
+  }
+  console.log('✓ Electron binary installed\n');
+}
+
 // Step 1: Download runtime binaries
 const downloadBinariesScript = join(__dirname, 'downloadRuntimeBinaries.js');
 const downloadResult = spawnSync('node', [downloadBinariesScript], {
