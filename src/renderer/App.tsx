@@ -33,10 +33,13 @@ export default function App() {
   const chatRef = useRef<ChatHandle>(null);
 
   useEffect(() => {
-    window.electron.config
-      .getApiKeyStatus()
-      .then(({ status }) => {
-        const isFirstLaunch = !status.configured && !localStorage.getItem('onboarding-done');
+    Promise.all([
+      window.electron.config.getApiKeyStatus(),
+      window.electron.config.getOpenAIConfig()
+    ])
+      .then(([{ status }, openaiStatus]) => {
+        const anyKeyConfigured = status.configured || openaiStatus.apiKeyConfigured;
+        const isFirstLaunch = !anyKeyConfigured && !localStorage.getItem('onboarding-done');
         setShowOnboarding(isFirstLaunch);
       })
       .catch(() => setShowOnboarding(false));
