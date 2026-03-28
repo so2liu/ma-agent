@@ -137,7 +137,7 @@ function CollapsibleCodeBlock({
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
-          className="mt-2 inline-flex rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          className="mt-2 inline-flex rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         >
           {isExpanded ? '收起代码' : '展开完整代码'}
         </button>
@@ -194,8 +194,8 @@ function DeliverableArtifactCard({
   return (
     <Artifact
       className={cn(
-        'w-fit max-w-sm border-neutral-200/80 bg-gradient-to-r from-neutral-50 to-white shadow-sm transition-all dark:border-neutral-700/60 dark:from-neutral-800/60 dark:to-neutral-800/40',
-        onPreview && 'cursor-pointer hover:border-neutral-300 hover:shadow-md dark:hover:border-neutral-600'
+        'w-fit max-w-sm border-border bg-card shadow-sm transition-colors',
+        onPreview && 'cursor-pointer hover:bg-accent/40'
       )}
       onClick={handlePreview}
       onKeyDown={
@@ -213,14 +213,14 @@ function DeliverableArtifactCard({
     >
       <ArtifactHeader className="gap-3 border-b-0 bg-transparent px-3.5 py-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-300">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
             <Icon className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <ArtifactTitle className="truncate text-sm text-neutral-800 dark:text-neutral-200">
+            <ArtifactTitle className="truncate text-sm text-foreground">
               {deliverable.fileName}
             </ArtifactTitle>
-            <ArtifactDescription className="text-[11px] text-neutral-400 dark:text-neutral-500">
+            <ArtifactDescription className="text-[11px] text-muted-foreground/70">
               {config.label} · 点击预览
             </ArtifactDescription>
           </div>
@@ -315,7 +315,7 @@ function AssistantMessageActions({
             onClick={handleCopy}
             tooltip="复制回复"
             label="复制回复"
-            className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+            className="text-muted-foreground hover:text-foreground"
           >
             <Copy className="h-3.5 w-3.5" />
           </MessageAction>
@@ -327,8 +327,8 @@ function AssistantMessageActions({
               tooltip="有帮助"
               label="有帮助"
               className={cn(
-                'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200',
-                feedbackRating === 'positive' && 'text-green-600 hover:text-green-600 dark:text-green-400 dark:hover:text-green-400'
+                'text-muted-foreground hover:text-foreground',
+                feedbackRating === 'positive' && 'text-emerald-600 hover:text-emerald-600'
               )}
             >
               <ThumbsUp className="h-3.5 w-3.5" />
@@ -338,8 +338,8 @@ function AssistantMessageActions({
               tooltip="需改进"
               label="需改进"
               className={cn(
-                'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200',
-                feedbackRating === 'negative' && 'text-red-600 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400'
+                'text-muted-foreground hover:text-foreground',
+                feedbackRating === 'negative' && 'text-destructive hover:text-destructive'
               )}
             >
               <ThumbsDown className="h-3.5 w-3.5" />
@@ -347,12 +347,12 @@ function AssistantMessageActions({
           </>
         )}
         {hasSubmittedFeedback && (
-          <span className="ml-1 text-xs text-neutral-400 dark:text-neutral-500">谢谢反馈</span>
+          <span className="ml-1 text-xs text-muted-foreground/70">谢谢反馈</span>
         )}
         {message.errorMeta?.actionType === 'settings' && onOpenSettings && (
           <MessageAction
             onClick={onOpenSettings}
-            className="rounded-full border border-neutral-200 px-3 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="rounded-full border border-border bg-background px-3 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             size="sm"
             variant="outline"
             label="前往设置"
@@ -364,7 +364,7 @@ function AssistantMessageActions({
         {message.errorMeta?.actionType === 'retry' && onRetryMessage && (
           <MessageAction
             onClick={onRetryMessage}
-            className="rounded-full border border-neutral-200 px-3 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="rounded-full border border-border bg-background px-3 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             size="sm"
             variant="outline"
             label="手动重试"
@@ -378,7 +378,7 @@ function AssistantMessageActions({
             onClick={() => {
               navigator.clipboard.writeText(message.errorMeta?.rawError ?? '').catch(() => {});
             }}
-            className="rounded-full border border-neutral-200 px-3 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="rounded-full border border-border bg-background px-3 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             size="sm"
             variant="outline"
             label="复制错误详情"
@@ -434,7 +434,7 @@ const Message = forwardRef<HTMLDivElement, MessageProps>(function Message(
     return (
       <div ref={ref}>
         <AIMessage from="user" className="px-1">
-          <MessageContent className="relative max-w-[min(34rem,calc(100%-2rem))] rounded-2xl border border-neutral-200/70 bg-white px-3 py-2 text-base leading-relaxed text-neutral-900 shadow-sm shadow-black/5 group-[.is-user]:bg-white group-[.is-user]:px-3 group-[.is-user]:py-2 group-[.is-user]:text-neutral-900 dark:border-neutral-800/60 dark:bg-neutral-900/70 dark:text-neutral-50 dark:shadow-black/30 dark:group-[.is-user]:bg-neutral-900/70 dark:group-[.is-user]:text-neutral-50">
+          <MessageContent className="relative max-w-[min(34rem,calc(100%-2rem))] rounded-2xl border border-border bg-card px-3 py-2 text-base leading-relaxed text-foreground shadow-sm group-[.is-user]:bg-card group-[.is-user]:px-3 group-[.is-user]:py-2 group-[.is-user]:text-foreground">
             {hasText && (
               <MessageResponse className="text-base leading-relaxed" components={messageComponents}>
                 {userContent}

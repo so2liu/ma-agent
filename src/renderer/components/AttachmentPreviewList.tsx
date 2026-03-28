@@ -98,7 +98,7 @@ export default function AttachmentPreviewList({
             key={attachment.id}
             data={mapped}
             onRemove={onRemove ? () => handleRemove(attachment.id) : undefined}
-            className={`min-w-[14rem] rounded-2xl border-neutral-200/80 bg-neutral-50 shadow-sm dark:border-neutral-700/60 dark:bg-neutral-800/40 ${cardClassName}`}
+            className={`min-w-[14rem] rounded-2xl border-border bg-card shadow-sm ${cardClassName}`}
           >
             {showImagePreview ?
               <div className={`overflow-hidden rounded-xl ${imageDimensions}`}>
@@ -111,19 +111,19 @@ export default function AttachmentPreviewList({
                 />
               </div>
             : <AttachmentPreview
-                fallbackIcon={<Paperclip className="h-4 w-4 text-neutral-600 dark:text-neutral-200" />}
-                className="bg-neutral-200 dark:bg-neutral-700"
+                fallbackIcon={<Paperclip className="h-4 w-4 text-muted-foreground" />}
+                className="bg-muted"
               />
             }
             <div className="min-w-0 flex-1">
-              <AttachmentInfo className="text-xs font-medium text-neutral-900 dark:text-neutral-100" />
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+              <AttachmentInfo className="text-xs font-medium text-foreground" />
+              <p className="text-[11px] text-muted-foreground">
                 {formatFileSize(attachment.size)}
               </p>
               {footnoteLines.map((line, index) => (
                 <p
                   key={`${attachment.id}-footnote-${index}`}
-                  className="truncate text-[11px] text-neutral-500 dark:text-neutral-400"
+                  className="truncate text-[11px] text-muted-foreground"
                 >
                   {line}
                 </p>
@@ -132,7 +132,7 @@ export default function AttachmentPreviewList({
             {onRemove && (
               <AttachmentRemove
                 label={`删除 ${attachment.name}`}
-                className="text-neutral-600 dark:text-neutral-200"
+                className="text-muted-foreground hover:text-foreground"
               />
             )}
           </Attachment>

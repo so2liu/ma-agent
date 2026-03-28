@@ -26,7 +26,7 @@ export default function BashTool({ tool }: BashToolProps) {
     <CollapsibleTool tool={tool} title={input.description || '执行命令'}>
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         {input.run_in_background && (
-          <span className="rounded-full border border-blue-200/60 bg-blue-50 px-2 py-0.5 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
+          <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-muted-foreground">
             后台
           </span>
         )}

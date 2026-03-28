@@ -252,10 +252,8 @@ export default function ChatInput({
     <div ref={containerRef} className="px-4 pb-5 [-webkit-app-region:no-drag]">
       <div className="mx-auto max-w-3xl">
         <div
-          className={`rounded-3xl bg-white/95 p-2 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:bg-neutral-900/90 dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] ${
-            isDragActive ?
-              'ring-2 ring-neutral-400/80 dark:ring-neutral-500/80'
-            : 'ring-1 ring-neutral-200/80 dark:ring-neutral-700/70'
+          className={`rounded-3xl bg-card/95 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl ${
+            isDragActive ? 'ring-2 ring-ring/60' : 'ring-1 ring-border'
           }`}
           onClick={handleInputContainerClick}
           onDragEnter={handleDragEnter}
@@ -280,7 +278,7 @@ export default function ChatInput({
             }}
             maxFileSize={MAX_ATTACHMENT_BYTES}
             multiple
-            className="w-full"
+            className="w-full rounded-[inherit] bg-transparent"
           >
             <PromptInputBody>
               <PromptInputHeader className="gap-2 px-1 pb-0">
@@ -300,7 +298,7 @@ export default function ChatInput({
                 )}
 
                 {attachmentError && (
-                  <p className="w-full px-2 text-xs text-red-600 dark:text-red-400">
+                  <p className="w-full px-2 text-xs text-destructive">
                     {attachmentError}
                   </p>
                 )}
@@ -323,7 +321,7 @@ export default function ChatInput({
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 placeholder="输入你想让我做的事..."
-                className="min-h-[44px] max-h-[200px] border-0 px-3 py-2 text-sm leading-6 text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-0 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+                className="min-h-[52px] max-h-[200px] border-0 px-3 py-2 text-sm leading-6 text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
               />
 
               <PromptInputFooter className="flex-wrap items-center gap-3 px-2 pt-2">
@@ -331,7 +329,7 @@ export default function ChatInput({
                   <PromptInputButton
                     type="button"
                     onClick={handleAttachmentButtonClick}
-                    className="rounded-full border border-neutral-200/80 bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:border-neutral-700/70 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                    className="rounded-full border border-border bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     aria-label="添加附件"
                     title="添加附件"
                   >
@@ -349,7 +347,7 @@ export default function ChatInput({
                       <PromptInputButton
                         type="button"
                         disabled={isDisabled}
-                        className="h-8 rounded-full border border-neutral-200/80 bg-neutral-100 px-3 text-xs font-medium text-neutral-700 hover:bg-neutral-200 dark:border-neutral-700/70 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                        className="h-8 rounded-full border border-border bg-muted px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                         title={
                           customModelActive ? '已启用自定义模型，前往设置 > 开发者信息修改' : currentModel.id
                         }
@@ -380,20 +378,20 @@ export default function ChatInput({
                               >
                                 <ModelSelectorLogo provider={mappedModel.provider} className="mt-0.5" />
                                 <div className="min-w-0 flex-1 space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <ModelSelectorName className="font-medium text-sm text-neutral-900 dark:text-neutral-100">
+                                <div className="flex items-center gap-2">
+                                    <ModelSelectorName className="text-sm font-medium text-foreground">
                                       {MODEL_LABELS[preference]}
                                     </ModelSelectorName>
                                     {modelPreference === preference && (
-                                      <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] font-medium text-white dark:bg-neutral-100 dark:text-neutral-900">
+                                      <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
                                         当前
                                       </span>
                                     )}
                                   </div>
-                                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                                  <p className="text-xs text-muted-foreground">
                                     {MODEL_TOOLTIPS[preference].description}
                                   </p>
-                                  <p className="truncate text-[11px] text-neutral-400 dark:text-neutral-500">
+                                  <p className="truncate text-[11px] text-muted-foreground/70">
                                     {mappedModel.name}
                                     {' · '}
                                     {mappedModel.id || DEFAULT_MODEL_NAMES[preference]}
@@ -415,8 +413,8 @@ export default function ChatInput({
                   disabled={isLoading && onStopStreaming ? false : !computedCanSend || isLoading}
                   className={`rounded-lg ${
                     isLoading && onStopStreaming ?
-                      'bg-neutral-200 text-neutral-900 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600'
-                    : 'bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200'
+                      'bg-secondary text-secondary-foreground hover:bg-accent'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
                   }`}
                 />
               </PromptInputFooter>

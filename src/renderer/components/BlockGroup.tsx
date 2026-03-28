@@ -7,6 +7,7 @@ import {
   ReasoningTrigger
 } from '@/components/ai-elements/reasoning';
 import {
+  type ToolBadgeConfig,
   getThinkingBadgeConfig,
   getToolBadgeConfig,
   getToolLabel
@@ -31,18 +32,16 @@ interface ThinkingBadgeProps {
 }
 
 function GroupBadgeButton({
-  chevronClassName,
+  colors,
   disabled = false,
   icon,
-  iconClassName,
   isExpanded,
   label,
   onToggle
 }: {
-  chevronClassName?: string;
+  colors: ToolBadgeConfig['colors'];
   disabled?: boolean;
   icon: ReactNode;
-  iconClassName?: string;
   isExpanded: boolean;
   label: string;
   onToggle: () => void;
@@ -53,14 +52,17 @@ function GroupBadgeButton({
       onClick={() => !disabled && onToggle()}
       disabled={disabled}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-xs text-muted-foreground shadow-xs transition-colors',
-        disabled ? 'cursor-default opacity-65' : 'cursor-pointer hover:bg-accent hover:text-accent-foreground'
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs shadow-xs transition-colors',
+        colors.border,
+        colors.bg,
+        colors.text,
+        disabled ? 'cursor-default opacity-65' : cn('cursor-pointer hover:text-accent-foreground', colors.hoverBg)
       )}
     >
-      <span className={cn('shrink-0', iconClassName)}>{icon}</span>
+      <span className={cn('shrink-0', colors.iconColor)}>{icon}</span>
       <span className="font-medium">{label}</span>
       {!disabled && (
-        <span className={cn('text-muted-foreground/80', chevronClassName)}>
+        <span className={cn(colors.chevron)}>
           {isExpanded ?
             <ChevronUp className="size-3" />
           : <ChevronDown className="size-3" />}
@@ -96,10 +98,9 @@ function ThinkingBadge({
 
   return (
     <GroupBadgeButton
-      chevronClassName={config.colors.iconColor}
+      colors={config.colors}
       disabled={!hasContent}
       icon={config.icon}
-      iconClassName={config.colors.iconColor}
       isExpanded={isExpanded}
       label={getReasoningLabel(block)}
       onToggle={onToggle}
@@ -122,10 +123,9 @@ function ToolBadge({ tool, isExpanded, onToggle }: ToolBadgeProps) {
 
   return (
     <GroupBadgeButton
-      chevronClassName={config.colors.iconColor}
+      colors={config.colors}
       disabled={!hasDetails}
       icon={config.icon}
-      iconClassName={config.colors.iconColor}
       isExpanded={isExpanded}
       label={label}
       onToggle={onToggle}
@@ -224,14 +224,14 @@ export default function BlockGroup({
         </button>
       }
       {isExpanded && hasExpandableContent && (
-        <div className="expanded-block-section mt-3 space-y-3">
+        <div className="expanded-block-section mt-3">
             {blocks.map((block, index) => {
               if (block.type === 'thinking') {
                 const reasoning = mapThinkingToReasoning(block);
                 return (
                   <Reasoning
                     key={`thinking-expanded-${index}`}
-                    className="mb-0 w-full rounded-xl border border-border/60 bg-background/70 px-3 py-2 shadow-xs"
+                    className="mb-0 w-full rounded-xl border border-border bg-card px-3 py-2 shadow-sm"
                     defaultOpen={false}
                     duration={reasoning.duration}
                     isStreaming={reasoning.isStreaming}
@@ -245,7 +245,7 @@ export default function BlockGroup({
                     <ReasoningTrigger
                       className={cn(
                         'rounded-lg px-2 py-1.5',
-                        reasoning.content.trim() ? 'hover:bg-muted/60' : 'cursor-default hover:bg-transparent'
+                        reasoning.content.trim() ? 'hover:bg-accent/60' : 'cursor-default hover:bg-transparent'
                       )}
                       disabled={!reasoning.content.trim()}
                       getThinkingMessage={(streaming, duration) => {

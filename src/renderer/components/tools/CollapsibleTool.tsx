@@ -65,7 +65,7 @@ export function CollapsibleTool({
 
   return (
     <Tool
-      className="group my-0.5 overflow-hidden rounded-xl border-border/60 bg-background/70 shadow-none"
+      className="group my-0.5 rounded-xl border-border bg-card shadow-sm"
       onOpenChange={hasExpandedContent ? setIsExpanded : undefined}
       open={hasExpandedContent ? isExpanded : false}
     >
@@ -76,7 +76,7 @@ export function CollapsibleTool({
         type={tool.name}
       />
       {hasExpandedContent && (
-        <ToolContent className="border-t border-border/60">
+        <ToolContent className="border-t border-border">
           <ToolInput input={input} language={inputLanguage} />
           {children && <div className="space-y-3 p-4">{children}</div>}
           <ToolOutput

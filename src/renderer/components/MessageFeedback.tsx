@@ -60,7 +60,7 @@ function FeedbackDialogContent({
         </DialogHeader>
 
         <div className="space-y-2">
-          <p className="text-xs font-medium text-neutral-600 dark:text-neutral-300">请选择原因</p>
+          <p className="text-xs font-medium text-muted-foreground">请选择原因</p>
           <div className="flex flex-wrap gap-2">
             {NEGATIVE_REASONS.map((reason) => (
               <button
@@ -70,8 +70,8 @@ function FeedbackDialogContent({
                 className={cn(
                   'rounded-full border px-2.5 py-1 text-[11px] transition',
                   selectedReason === reason.id ?
-                    'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
-                  : 'border-neutral-200 text-neutral-600 hover:border-neutral-300 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-neutral-600'
+                    'bg-primary text-primary-foreground border-primary'
+                  : 'border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 )}
               >
                 {reason.label}
@@ -81,12 +81,12 @@ function FeedbackDialogContent({
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs font-medium text-neutral-600 dark:text-neutral-300">补充说明</p>
+          <p className="text-xs font-medium text-muted-foreground">补充说明</p>
           <Textarea
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             placeholder="补充说明（可选）"
-            className="min-h-24 resize-y border-neutral-200 bg-neutral-50 text-sm shadow-none dark:border-neutral-700 dark:bg-neutral-900"
+            className="min-h-24 resize-y border-border bg-muted text-sm shadow-none"
             rows={4}
           />
         </div>

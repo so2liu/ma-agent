@@ -27,7 +27,7 @@ export default function EditTool({ tool }: EditToolProps) {
           {input.file_path}
         </code>
         {input.replace_all && (
-          <span className="rounded-full border border-orange-200/60 bg-orange-50 px-2 py-0.5 text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
+          <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-muted-foreground">
             全部替换
           </span>
         )}

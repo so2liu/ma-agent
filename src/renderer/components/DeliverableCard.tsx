@@ -42,8 +42,8 @@ export default function DeliverableCard({ deliverable, onPreview }: DeliverableC
   return (
     <Artifact
       className={cn(
-        'w-fit max-w-sm border-neutral-200/80 bg-gradient-to-r from-neutral-50 to-white shadow-sm transition-all dark:border-neutral-700/60 dark:from-neutral-800/60 dark:to-neutral-800/40',
-        onPreview && 'cursor-pointer hover:border-neutral-300 hover:shadow-md dark:hover:border-neutral-600'
+        'w-fit max-w-sm border-border bg-card shadow-sm transition-colors',
+        onPreview && 'cursor-pointer hover:bg-accent/40'
       )}
       onClick={handlePreview}
       onKeyDown={
@@ -61,14 +61,14 @@ export default function DeliverableCard({ deliverable, onPreview }: DeliverableC
     >
       <ArtifactHeader className="gap-3 border-b-0 bg-transparent px-3.5 py-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-300">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
             <Icon className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <ArtifactTitle className="truncate text-sm text-neutral-800 dark:text-neutral-200">
+            <ArtifactTitle className="truncate text-sm text-foreground">
               {deliverable.fileName}
             </ArtifactTitle>
-            <ArtifactDescription className="text-[11px] text-neutral-400 dark:text-neutral-500">
+            <ArtifactDescription className="text-[11px] text-muted-foreground/70">
               {config.label} · 点击预览
             </ArtifactDescription>
           </div>
