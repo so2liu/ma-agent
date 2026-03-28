@@ -91,7 +91,8 @@ export default function ChatInput({
   );
 
   const queryTextarea = useCallback(
-    () => containerRef.current?.querySelector<HTMLTextAreaElement>('textarea[name="message"]') ?? null,
+    () =>
+      containerRef.current?.querySelector<HTMLTextAreaElement>('textarea[name="message"]') ?? null,
     []
   );
 
@@ -123,7 +124,6 @@ export default function ChatInput({
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Skip during IME composition (e.g. pinyin input)
     if (e.nativeEvent.isComposing) return;
 
     if (slash.isOpen) {
@@ -170,45 +170,12 @@ export default function ChatInput({
     if (fileItems.length > 0) {
       e.preventDefault();
       const files: File[] = [];
-
       for (const item of fileItems) {
         const file = item.getAsFile();
-        if (file) {
-          files.push(file);
-        }
+        if (file) files.push(file);
       }
-
-      if (files.length > 0) {
-        onFilesSelected?.(files);
-      }
+      if (files.length > 0) onFilesSelected?.(files);
     }
-  };
-
-  const handleInputContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    if (
-      target.closest(
-        'button, input, textarea, a, [role="dialog"], [role="option"], [cmdk-item], [data-slot="command-item"]'
-      )
-    ) {
-      return;
-    }
-    queryTextarea()?.focus();
-  };
-
-  const handleRemoveAttachmentClick = (attachmentId: string) => {
-    onRemoveAttachment?.(attachmentId);
-  };
-
-  const handleAttachmentButtonClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files?.length) {
-      onFilesSelected?.(event.target.files);
-    }
-    event.target.value = '';
   };
 
   const isFileDrag = (event: React.DragEvent) =>
@@ -232,9 +199,7 @@ export default function ChatInput({
     if (!isFileDrag(event)) return;
     event.preventDefault();
     dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
-    if (dragCounterRef.current === 0) {
-      setIsDragActive(false);
-    }
+    if (dragCounterRef.current === 0) setIsDragActive(false);
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -249,179 +214,178 @@ export default function ChatInput({
   };
 
   return (
-    <div ref={containerRef} className="px-4 pb-5 [-webkit-app-region:no-drag]">
+    <div
+      ref={containerRef}
+      className="px-4 pb-5 [-webkit-app-region:no-drag]"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="mx-auto max-w-3xl">
-        <div
-          className={`w-full min-w-0 rounded-3xl bg-card/95 p-2 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl ${
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) onFilesSelected?.(e.target.files);
+            e.target.value = '';
+          }}
+        />
+
+        {/* PromptInput IS the visual container — no wrapper div with its own border/shadow */}
+        <PromptInput
+          disableAttachments
+          onSubmit={() => {
+            if (!isLoading && computedCanSend) onSend();
+          }}
+          maxFileSize={MAX_ATTACHMENT_BYTES}
+          multiple
+          className={`rounded-3xl bg-card/95 p-2 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl ${
             isDragActive ? 'ring-2 ring-ring/60' : 'ring-1 ring-border'
           }`}
-          onClick={handleInputContainerClick}
-          onDragEnter={handleDragEnter}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={handleFileInputChange}
-          />
-
-          <PromptInput
-            disableAttachments
-            onSubmit={() => {
-              if (!isLoading && computedCanSend) {
-                onSend();
-              }
-            }}
-            maxFileSize={MAX_ATTACHMENT_BYTES}
-            multiple
-            className="w-full min-w-0 rounded-[inherit] bg-transparent"
-          >
-            <PromptInputBody>
-              <PromptInputHeader className="gap-2 px-1 pb-0">
-                {attachments.length > 0 && (
-                  <AttachmentPreviewList
-                    attachments={attachments.map((attachment) => ({
-                      id: attachment.id,
-                      name: attachment.file.name,
-                      size: attachment.file.size,
-                      mimeType: attachment.file.type || 'application/octet-stream',
-                      isImage: attachment.isImage,
-                      previewUrl: attachment.previewUrl
-                    }))}
-                    onRemove={handleRemoveAttachmentClick}
-                    className="w-full px-2 pt-1"
-                  />
-                )}
-
-                {attachmentError && (
-                  <p className="w-full px-2 text-xs text-destructive">
-                    {attachmentError}
-                  </p>
-                )}
-
-                {slash.isOpen && (
-                  <div className="w-full px-1">
-                    <SlashCommandMenu
-                      items={slash.items}
-                      selectedIndex={slash.selectedIndex}
-                      onSelect={handleSlashSelect}
-                      onHover={slash.setSelectedIndex}
-                    />
-                  </div>
-                )}
-              </PromptInputHeader>
-
-              <PromptInputTextarea
-                value={value}
-                onChange={(e) => onChange(e.currentTarget.value)}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                placeholder="输入你想让我做的事..."
-                rows={1}
-                className="min-h-[24px] max-h-[200px] basis-auto overflow-y-auto px-3 py-2 text-sm leading-6 text-foreground placeholder:text-muted-foreground [scrollbar-width:none] [&::-webkit-resizer]:hidden [&::-webkit-scrollbar]:hidden"
-              />
-
-              <PromptInputFooter className="w-full items-center justify-between gap-3 px-2 py-2">
-                <PromptInputTools className="flex-wrap items-center gap-2">
-                  <PromptInputButton
-                    type="button"
-                    onClick={handleAttachmentButtonClick}
-                    className="rounded-full border border-border bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                    aria-label="添加附件"
-                    title="添加附件"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                  </PromptInputButton>
-
-                  <ModelSelector
-                    open={slash.isOpen ? false : isModelSelectorOpen}
-                    onOpenChange={(nextOpen) => {
-                      if (slash.isOpen) return;
-                      setIsModelSelectorOpen(nextOpen);
-                    }}
-                  >
-                    <ModelSelectorTrigger asChild>
-                      <PromptInputButton
-                        type="button"
-                        disabled={isDisabled}
-                        className="h-8 rounded-full border border-border bg-muted px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                        title={
-                          customModelActive ? '已启用自定义模型，前往设置 > 开发者信息修改' : currentModel.id
-                        }
-                      >
-                        <Sparkles className="h-3.5 w-3.5" />
-                        <span>{customModelActive ? '自定义模型' : MODEL_LABELS[modelPreference]}</span>
-                        {isModelPreferenceUpdating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                      </PromptInputButton>
-                    </ModelSelectorTrigger>
-                    <ModelSelectorContent
-                      className="sm:max-w-md"
-                      title="选择模型"
-                    >
-                      <ModelSelectorInput placeholder="搜索模型档位" />
-                      <ModelSelectorList>
-                        <ModelSelectorEmpty>没有匹配的模型</ModelSelectorEmpty>
-                        <ModelSelectorGroup heading="模型档位">
-                          {MODEL_OPTIONS.map((preference) => {
-                            const mappedModel = mapModelPreference(preference, customModelIds);
-
-                            return (
-                              <ModelSelectorItem
-                                key={preference}
-                                value={`${preference} ${MODEL_LABELS[preference]} ${mappedModel.name} ${mappedModel.id}`}
-                                onSelect={() => handleModelPreferenceSelect(preference)}
-                                disabled={isDisabled}
-                                className="items-start gap-3 py-3"
-                              >
-                                <ModelSelectorLogo provider={mappedModel.provider} className="mt-0.5" />
-                                <div className="min-w-0 flex-1 space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <ModelSelectorName className="text-sm font-medium text-foreground">
-                                      {MODEL_LABELS[preference]}
-                                    </ModelSelectorName>
-                                    {modelPreference === preference && (
-                                      <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
-                                        当前
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {MODEL_TOOLTIPS[preference].description}
-                                  </p>
-                                  <p className="truncate text-[11px] text-muted-foreground/70">
-                                    {mappedModel.name}
-                                    {' · '}
-                                    {mappedModel.id || DEFAULT_MODEL_NAMES[preference]}
-                                  </p>
-                                </div>
-                              </ModelSelectorItem>
-                            );
-                          })}
-                        </ModelSelectorGroup>
-                      </ModelSelectorList>
-                    </ModelSelectorContent>
-                  </ModelSelector>
-                </PromptInputTools>
-
-                <PromptInputSubmit
-                  type={isLoading && onStopStreaming ? 'button' : 'submit'}
-                  status={isLoading ? (onStopStreaming ? 'streaming' : 'submitted') : undefined}
-                  onClick={isLoading && onStopStreaming ? onStopStreaming : undefined}
-                  disabled={isLoading && onStopStreaming ? false : !computedCanSend || isLoading}
-                  className={`rounded-lg ${
-                    isLoading && onStopStreaming ?
-                      'bg-secondary text-secondary-foreground hover:bg-accent'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  }`}
+          <PromptInputBody>
+            <PromptInputHeader className="gap-2 px-1 pb-0">
+              {attachments.length > 0 && (
+                <AttachmentPreviewList
+                  attachments={attachments.map((a) => ({
+                    id: a.id,
+                    name: a.file.name,
+                    size: a.file.size,
+                    mimeType: a.file.type || 'application/octet-stream',
+                    isImage: a.isImage,
+                    previewUrl: a.previewUrl
+                  }))}
+                  onRemove={(id) => onRemoveAttachment?.(id)}
+                  className="w-full px-2 pt-1"
                 />
-              </PromptInputFooter>
-            </PromptInputBody>
-          </PromptInput>
-        </div>
+              )}
+
+              {attachmentError && (
+                <p className="w-full px-2 text-xs text-destructive">{attachmentError}</p>
+              )}
+
+              {slash.isOpen && (
+                <div className="w-full px-1">
+                  <SlashCommandMenu
+                    items={slash.items}
+                    selectedIndex={slash.selectedIndex}
+                    onSelect={handleSlashSelect}
+                    onHover={slash.setSelectedIndex}
+                  />
+                </div>
+              )}
+            </PromptInputHeader>
+
+            <PromptInputTextarea
+              value={value}
+              onChange={(e) => onChange(e.currentTarget.value)}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              placeholder="输入你想让我做的事..."
+              rows={1}
+              className="px-3 py-2 text-sm leading-6 text-foreground placeholder:text-muted-foreground"
+            />
+
+            <PromptInputFooter className="w-full items-center justify-between gap-3 px-2 py-2">
+              <PromptInputTools className="flex-wrap items-center gap-2">
+                <PromptInputButton
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-full border border-border bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  aria-label="添加附件"
+                  title="添加附件"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </PromptInputButton>
+
+                <ModelSelector
+                  open={slash.isOpen ? false : isModelSelectorOpen}
+                  onOpenChange={(v) => {
+                    if (!slash.isOpen) setIsModelSelectorOpen(v);
+                  }}
+                >
+                  <ModelSelectorTrigger asChild>
+                    <PromptInputButton
+                      type="button"
+                      disabled={isDisabled}
+                      className="h-8 rounded-full border border-border bg-muted px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      title={
+                        customModelActive
+                          ? '已启用自定义模型，前往设置 > 开发者信息修改'
+                          : currentModel.id
+                      }
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>
+                        {customModelActive ? '自定义模型' : MODEL_LABELS[modelPreference]}
+                      </span>
+                      {isModelPreferenceUpdating && (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      )}
+                    </PromptInputButton>
+                  </ModelSelectorTrigger>
+                  <ModelSelectorContent className="sm:max-w-md" title="选择模型">
+                    <ModelSelectorInput placeholder="搜索模型档位" />
+                    <ModelSelectorList>
+                      <ModelSelectorEmpty>没有匹配的模型</ModelSelectorEmpty>
+                      <ModelSelectorGroup heading="模型档位">
+                        {MODEL_OPTIONS.map((pref) => {
+                          const m = mapModelPreference(pref, customModelIds);
+                          return (
+                            <ModelSelectorItem
+                              key={pref}
+                              value={`${pref} ${MODEL_LABELS[pref]} ${m.name} ${m.id}`}
+                              onSelect={() => handleModelPreferenceSelect(pref)}
+                              disabled={isDisabled}
+                              className="items-start gap-3 py-3"
+                            >
+                              <ModelSelectorLogo provider={m.provider} className="mt-0.5" />
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <ModelSelectorName className="text-sm font-medium text-foreground">
+                                    {MODEL_LABELS[pref]}
+                                  </ModelSelectorName>
+                                  {modelPreference === pref && (
+                                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
+                                      当前
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {MODEL_TOOLTIPS[pref].description}
+                                </p>
+                                <p className="truncate text-[11px] text-muted-foreground/70">
+                                  {m.name} · {m.id || DEFAULT_MODEL_NAMES[pref]}
+                                </p>
+                              </div>
+                            </ModelSelectorItem>
+                          );
+                        })}
+                      </ModelSelectorGroup>
+                    </ModelSelectorList>
+                  </ModelSelectorContent>
+                </ModelSelector>
+              </PromptInputTools>
+
+              <PromptInputSubmit
+                type={isLoading && onStopStreaming ? 'button' : 'submit'}
+                status={
+                  isLoading ? (onStopStreaming ? 'streaming' : 'submitted') : undefined
+                }
+                onClick={isLoading && onStopStreaming ? onStopStreaming : undefined}
+                disabled={isLoading && onStopStreaming ? false : !computedCanSend || isLoading}
+                className={`rounded-lg ${
+                  isLoading && onStopStreaming
+                    ? 'bg-secondary text-secondary-foreground hover:bg-accent'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                }`}
+              />
+            </PromptInputFooter>
+          </PromptInputBody>
+        </PromptInput>
       </div>
     </div>
   );
