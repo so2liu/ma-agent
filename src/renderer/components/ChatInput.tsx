@@ -14,6 +14,8 @@ interface ChatInputProps {
   onChange: (value: string) => void;
   onSend: () => void;
   isLoading: boolean;
+  disabled?: boolean;
+  disabledPlaceholder?: string;
   onStopStreaming?: () => void;
   autoFocus?: boolean;
   onHeightChange?: (height: number) => void;
@@ -41,6 +43,8 @@ export default function ChatInput({
   onChange,
   onSend,
   isLoading,
+  disabled = false,
+  disabledPlaceholder = '输入你想让我做的事...',
   onStopStreaming,
   autoFocus = false,
   onHeightChange,
@@ -64,8 +68,9 @@ export default function ChatInput({
   const lastReportedHeightRef = useRef<number | null>(null);
   const dragCounterRef = useRef(0);
   const [isDragActive, setIsDragActive] = useState(false);
-  const computedCanSend = canSend ?? Boolean(value.trim());
-  const slash = useSlashCommand(value);
+  const displayValue = disabled ? '' : value;
+  const computedCanSend = !disabled && (canSend ?? Boolean(value.trim()));
+  const slash = useSlashCommand(displayValue);
 
   const MODEL_OPTIONS: ChatModelPreference[] = ['fast', 'smart-sonnet', 'smart-opus'];
   const [hoveredModel, setHoveredModel] = useState<ChatModelPreference | null>(null);
@@ -106,10 +111,10 @@ export default function ChatInput({
 
   // Auto-focus when autoFocus is true
   useEffect(() => {
-    if (autoFocus && textareaRef.current) {
+    if (autoFocus && !disabled && textareaRef.current) {
       textareaRef.current.focus();
     }
-  }, [autoFocus]);
+  }, [autoFocus, disabled]);
 
   const handleSlashSelect = useCallback(
     (item: Parameters<typeof SlashCommandMenu>[0]['items'][number]) => {
@@ -120,6 +125,8 @@ export default function ChatInput({
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (disabled) return;
+
     // Skip during IME composition (e.g. pinyin input)
     if (e.nativeEvent.isComposing) return;
 
@@ -158,6 +165,8 @@ export default function ChatInput({
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (disabled) return;
+
     const clipboardData = e.clipboardData;
     if (!clipboardData) return;
 
@@ -182,6 +191,8 @@ export default function ChatInput({
   };
 
   const handleInputContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (disabled) return;
+
     // Only focus if clicking on the container itself, not on interactive elements
     const target = e.target as HTMLElement;
     if (target.tagName !== 'TEXTAREA' && target.tagName !== 'BUTTON' && textareaRef.current) {
@@ -198,10 +209,16 @@ export default function ChatInput({
   };
 
   const handleAttachmentButtonClick = () => {
+    if (disabled) return;
     fileInputRef.current?.click();
   };
 
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) {
+      event.target.value = '';
+      return;
+    }
+
     if (event.target.files?.length) {
       onFilesSelected?.(event.target.files);
     }
@@ -212,6 +229,7 @@ export default function ChatInput({
     Array.from(event.dataTransfer?.types ?? []).includes('Files');
 
   const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    if (disabled) return;
     if (!isFileDrag(event)) return;
     event.preventDefault();
     dragCounterRef.current += 1;
@@ -219,6 +237,7 @@ export default function ChatInput({
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (disabled) return;
     if (!isFileDrag(event)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
@@ -226,6 +245,7 @@ export default function ChatInput({
   };
 
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    if (disabled) return;
     if (!isFileDrag(event)) return;
     event.preventDefault();
     dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
@@ -235,6 +255,7 @@ export default function ChatInput({
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    if (disabled) return;
     if (!isFileDrag(event)) return;
     event.preventDefault();
     dragCounterRef.current = 0;
@@ -247,7 +268,7 @@ export default function ChatInput({
 
   useEffect(() => {
     adjustTextareaHeight();
-  }, [value]);
+  }, [displayValue]);
 
   useLayoutEffect(() => {
     const element = containerRef.current;
@@ -325,13 +346,16 @@ export default function ChatInput({
 
           <textarea
             ref={textareaRef}
-            value={value}
+            value={displayValue}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder="输入你想让我做的事..."
+            placeholder={disabled ? disabledPlaceholder : '输入你想让我做的事...'}
             rows={1}
-            className="w-full resize-none border-0 bg-transparent px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:outline-none dark:text-neutral-100 dark:placeholder-neutral-500"
+            disabled={disabled}
+            className={`w-full resize-none border-0 bg-transparent px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:outline-none disabled:cursor-not-allowed disabled:text-neutral-400 dark:text-neutral-100 dark:placeholder-neutral-500 dark:disabled:text-neutral-500 ${
+              disabled ? 'select-none' : ''
+            }`}
             style={{
               minHeight: `${MIN_TEXTAREA_HEIGHT}px`,
               maxHeight: `${MAX_TEXTAREA_HEIGHT}px`
@@ -343,7 +367,8 @@ export default function ChatInput({
               <button
                 type="button"
                 onClick={handleAttachmentButtonClick}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200/80 bg-neutral-100 text-neutral-600 transition hover:bg-neutral-200 focus:ring-2 focus:ring-neutral-400 focus:outline-none dark:border-neutral-700/70 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:ring-neutral-500"
+                disabled={disabled}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200/80 bg-neutral-100 text-neutral-600 transition hover:bg-neutral-200 focus:ring-2 focus:ring-neutral-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700/70 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:ring-neutral-500"
                 title="添加附件"
               >
                 <Paperclip className="h-4 w-4" />
@@ -367,7 +392,7 @@ export default function ChatInput({
                         type="button"
                         aria-pressed={modelPreference === pref}
                         onClick={() => handleModelPreferenceSelect(pref)}
-                        disabled={isDisabled}
+                        disabled={isDisabled || disabled}
                         className={modelPillClass(modelPreference === pref)}
                         onMouseEnter={() => setHoveredModel(pref)}
                         onMouseLeave={() => setHoveredModel(null)}
@@ -406,7 +431,9 @@ export default function ChatInput({
             </div>
             <button
               onClick={isLoading && onStopStreaming ? onStopStreaming : onSend}
-              disabled={isLoading && onStopStreaming ? false : !computedCanSend || isLoading}
+              disabled={
+                disabled || (isLoading && onStopStreaming ? false : !computedCanSend || isLoading)
+              }
               className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 isLoading && onStopStreaming ?
                   'bg-neutral-200 text-neutral-900 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600'

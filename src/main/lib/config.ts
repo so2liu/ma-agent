@@ -17,6 +17,7 @@ import type {
   OpenAIConfig
 } from '../../shared/types/ipc';
 import type { SkillManifest } from '../../shared/types/skill-manifest';
+import type { FeishuConfig } from './feishu/types';
 import { syncManifest } from './skill-manifest';
 
 export type UpdateChannel = 'stable' | 'nightly';
@@ -34,6 +35,7 @@ export interface AppConfig {
   agentProvider?: string;
   /** OpenAI provider configuration */
   openai?: OpenAIConfig;
+  feishu?: FeishuConfig;
 }
 
 const DEFAULT_MODEL_PREFERENCE: ChatModelPreference = 'fast';
@@ -545,6 +547,39 @@ export function getOpenAIBaseUrl(): string | null {
 export function getOpenAIModelId(): string | null {
   const storedId = loadConfig().openai?.modelId?.trim();
   return storedId || null;
+}
+
+export function getFeishuConfig(): FeishuConfig | null {
+  const feishuConfig = loadConfig().feishu;
+  const appId = feishuConfig?.appId?.trim();
+  const appSecret = feishuConfig?.appSecret?.trim();
+
+  if (!appId || !appSecret) {
+    return null;
+  }
+
+  return {
+    enabled: feishuConfig?.enabled ?? false,
+    appId,
+    appSecret,
+    conversationId: feishuConfig?.conversationId?.trim() || undefined
+  };
+}
+
+export function setFeishuConfig(feishuConfig: FeishuConfig): void {
+  const config = loadConfig();
+  config.feishu = {
+    enabled: feishuConfig.enabled,
+    appId: feishuConfig.appId.trim(),
+    appSecret: feishuConfig.appSecret.trim(),
+    conversationId: feishuConfig.conversationId?.trim() || undefined
+  };
+  saveConfig(config);
+}
+
+export function getFeishuEnabled(): boolean {
+  const feishuConfig = getFeishuConfig();
+  return feishuConfig?.enabled === true;
 }
 
 export function getUpdateChannel(): UpdateChannel {

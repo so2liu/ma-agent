@@ -1,6 +1,7 @@
+import type { FeishuConfig, FeishuConnectionStatus } from '../main/lib/feishu/types';
 import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
-import type { SimpleElement } from '../shared/types/canvas';
 import type { TaskNotificationEvent, TaskProgressEvent } from '../shared/types/background-task';
+import type { SimpleElement } from '../shared/types/canvas';
 import type { CodingTaskUpdateEvent } from '../shared/types/coding-task';
 import type {
   AutoDetectResult,
@@ -180,6 +181,7 @@ export interface Conversation {
   updatedAt: number;
   sessionId?: string | null;
   projectId?: string | null;
+  isFeishu?: boolean;
 }
 
 /** Lightweight version returned by conversation:list — no full messages payload */
@@ -513,6 +515,13 @@ export interface ElectronAPI {
       models: string[];
     }) => Promise<ModelRecommendation & { error?: string }>;
   };
+  feishu: {
+    getConfig: () => Promise<FeishuConfig | null>;
+    setConfig: (config: FeishuConfig) => Promise<void>;
+    getStatus: () => Promise<FeishuConnectionStatus>;
+    start: () => Promise<void>;
+    stop: () => Promise<void>;
+  };
   shell: {
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
   };
@@ -649,7 +658,10 @@ export interface ElectronAPI {
       elements?: SimpleElement[];
       error?: string;
     }>;
-    saveFile: (filePath: string, content: string) => Promise<{
+    saveFile: (
+      filePath: string,
+      content: string
+    ) => Promise<{
       success: boolean;
       error?: string;
     }>;
@@ -657,7 +669,10 @@ export interface ElectronAPI {
       success: boolean;
       error?: string;
     }>;
-    updateState: (filePath: string, elements: SimpleElement[]) => Promise<{
+    updateState: (
+      filePath: string,
+      elements: SimpleElement[]
+    ) => Promise<{
       success: boolean;
     }>;
     getState: (filePath: string) => Promise<{
@@ -665,11 +680,17 @@ export interface ElectronAPI {
       elements?: SimpleElement[];
       error?: string;
     }>;
-    applySdkResult: (filePath: string, intermediateElementsJson: string) => Promise<{
+    applySdkResult: (
+      filePath: string,
+      intermediateElementsJson: string
+    ) => Promise<{
       success: boolean;
       error?: string;
     }>;
-    screenshot: (filePath: string, outputPath: string) => Promise<{
+    screenshot: (
+      filePath: string,
+      outputPath: string
+    ) => Promise<{
       success: boolean;
       path?: string;
       error?: string;
@@ -680,11 +701,7 @@ export interface ElectronAPI {
     onScreenshotRequest: (
       callback: (data: { filePath: string; outputPath: string }) => void
     ) => () => void;
-    sendScreenshotResult: (result: {
-      success: boolean;
-      path?: string;
-      error?: string;
-    }) => void;
+    sendScreenshotResult: (result: { success: boolean; path?: string; error?: string }) => void;
   };
   update: {
     getStatus: () => Promise<UpdateStatus>;

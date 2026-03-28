@@ -1,8 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+import type { FeishuConfig, FeishuConnectionStatus } from '../main/lib/feishu/types';
 import type { AnalyticsEvent, AnalyticsSettings, MessageFeedback } from '../shared/types/analytics';
-import type { SimpleElement } from '../shared/types/canvas';
 import type { TaskNotificationEvent, TaskProgressEvent } from '../shared/types/background-task';
+import type { SimpleElement } from '../shared/types/canvas';
 import type { CodingTaskUpdateEvent } from '../shared/types/coding-task';
 import type {
   ChatModelPreference,
@@ -44,7 +45,9 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('chat:thinking-start', listener);
       return () => ipcRenderer.removeListener('chat:thinking-start', listener);
     },
-    onThinkingChunk: (callback: (data: { chatId: string; index: number; delta: string }) => void) => {
+    onThinkingChunk: (
+      callback: (data: { chatId: string; index: number; delta: string }) => void
+    ) => {
       const listener = (
         _event: Electron.IpcRendererEvent,
         data: { chatId: string; index: number; delta: string }
@@ -241,6 +244,13 @@ contextBridge.exposeInMainWorld('electron', {
     recommendModels: (params: { models: string[] }) =>
       ipcRenderer.invoke('config:recommend-models', params)
   },
+  feishu: {
+    getConfig: () => ipcRenderer.invoke('feishu:get-config') as Promise<FeishuConfig | null>,
+    setConfig: (config: FeishuConfig) => ipcRenderer.invoke('feishu:set-config', config),
+    getStatus: () => ipcRenderer.invoke('feishu:get-status') as Promise<FeishuConnectionStatus>,
+    start: () => ipcRenderer.invoke('feishu:start'),
+    stop: () => ipcRenderer.invoke('feishu:stop')
+  },
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)
   },
@@ -362,9 +372,7 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('canvas:elements-updated', listener);
       return () => ipcRenderer.removeListener('canvas:elements-updated', listener);
     },
-    onScreenshotRequest: (
-      callback: (data: { filePath: string; outputPath: string }) => void
-    ) => {
+    onScreenshotRequest: (callback: (data: { filePath: string; outputPath: string }) => void) => {
       const listener = (
         _event: Electron.IpcRendererEvent,
         data: { filePath: string; outputPath: string }
