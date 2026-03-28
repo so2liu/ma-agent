@@ -222,6 +222,8 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isGlobalDragActive, setIsGlobalDragActive] = useState(false);
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
+  const [isCurrentConversationFeishu, setIsCurrentConversationFeishu] = useState(false);
+  const [feishuConversationIds, setFeishuConversationIds] = useState<Set<string>>(() => new Set());
   const [modelPreference, setModelPreference] = useState<ChatModelPreference>('fast');
   const [isModelPreferenceUpdating, setIsModelPreferenceUpdating] = useState(false);
   const [customModelActive, setCustomModelActive] = useState(false);
@@ -375,6 +377,10 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
 
   const handleFilesSelected = useCallback(
     (fileList: FileList | File[]) => {
+      if (isCurrentConversationFeishu) {
+        return;
+      }
+
       const files = Array.from(fileList || []);
       if (files.length === 0) return;
 
@@ -416,7 +422,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
 
       void processFiles();
     },
-    [track, workspaceDir]
+    [isCurrentConversationFeishu, track, workspaceDir]
   );
 
   useEffect(() => {
@@ -429,6 +435,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     };
 
     const handleWindowDragEnter = (event: DragEvent) => {
+      if (isCurrentConversationFeishu) return;
       if (!isFileDrag(event)) return;
       event.preventDefault();
       globalDragCounterRef.current += 1;
@@ -436,6 +443,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     };
 
     const handleWindowDragOver = (event: DragEvent) => {
+      if (isCurrentConversationFeishu) return;
       if (!isFileDrag(event)) return;
       event.preventDefault();
       if (event.dataTransfer) {
@@ -445,6 +453,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     };
 
     const handleWindowDragLeave = (event: DragEvent) => {
+      if (isCurrentConversationFeishu) return;
       if (!isFileDrag(event)) return;
       event.preventDefault();
       globalDragCounterRef.current = Math.max(0, globalDragCounterRef.current - 1);
@@ -454,6 +463,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     };
 
     const handleWindowDrop = (event: DragEvent) => {
+      if (isCurrentConversationFeishu) return;
       if (!isFileDrag(event)) return;
 
       resetGlobalDragState();
@@ -489,7 +499,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
       window.removeEventListener('dragleave', handleWindowDragLeave);
       window.removeEventListener('drop', handleWindowDrop);
     };
-  }, [handleFilesSelected]);
+  }, [handleFilesSelected, isCurrentConversationFeishu]);
 
   const handleRemoveAttachment = (attachmentId: string) => {
     setPendingAttachments((prev) => {
@@ -698,6 +708,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
 
   const handleNewChat = async () => {
     clearPendingAttachments();
+    setIsCurrentConversationFeishu(false);
 
     try {
       if (messages.length > 0) {
@@ -744,6 +755,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
       if (existingChatId) {
         setActiveChatId(existingChatId);
         setCurrentConversationId(conversationId);
+        setIsCurrentConversationFeishu(feishuConversationIds.has(conversationId));
         setOpenTabs([]);
         setActiveTabId(null);
         artifactMap.clear();
@@ -776,8 +788,16 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
           loadedChatId,
           response.conversation.sessionId ?? null
         );
+        if (response.conversation.isFeishu) {
+          setFeishuConversationIds((prev) => {
+            const next = new Set(prev);
+            next.add(conversationId);
+            return next;
+          });
+        }
         setActiveChatId(loadedChatId);
         setCurrentConversationId(conversationId);
+        setIsCurrentConversationFeishu(Boolean(response.conversation.isFeishu));
         setOpenTabs([]);
         setActiveTabId(null);
         artifactMap.clear();
@@ -801,6 +821,8 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
   };
 
   const handleSendMessage = async () => {
+    if (isCurrentConversationFeishu) return;
+
     const trimmedMessage = inputValue.trim();
     const hasCanvasChanges = canvasChanges.totalChanges > 0;
     const hasSendableContent =
@@ -946,6 +968,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
     : null;
 
   const handleModelPreferenceChange = async (preference: ChatModelPreference) => {
+    if (isCurrentConversationFeishu) return;
     if (preference === modelPreference) return;
 
     const previousPreference = modelPreference;
@@ -973,7 +996,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
 
   return (
     <>
-      {isGlobalDragActive && <DropZoneOverlay />}
+      {isGlobalDragActive && !isCurrentConversationFeishu && <DropZoneOverlay />}
       <Group className="flex h-full overflow-hidden">
       {/* Chat area */}
       <Panel minSize="300px" className="relative flex flex-col overflow-hidden">
@@ -1065,6 +1088,8 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 onChange={setInputValue}
                 onSend={handleSendMessage}
                 isLoading={isLoading}
+                disabled={isCurrentConversationFeishu}
+                disabledPlaceholder="飞书会话仅支持从飞书端发送消息"
                 onStopStreaming={handleStopStreaming}
                 autoFocus
                 attachments={pendingAttachments}
@@ -1127,6 +1152,8 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
                 onChange={setInputValue}
                 onSend={handleSendMessage}
                 isLoading={isLoading}
+                disabled={isCurrentConversationFeishu}
+                disabledPlaceholder="飞书会话仅支持从飞书端发送消息"
                 onStopStreaming={handleStopStreaming}
                 autoFocus
                 onHeightChange={setChatInputHeight}

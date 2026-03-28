@@ -198,6 +198,12 @@ export default function Sidebar({
   }, [contextMenu]);
 
   const handleDelete = async (conversationId: string) => {
+    const conversation = conversations.find((item) => item.id === conversationId);
+    if (conversation?.isFeishu) {
+      setDeleteConfirm(null);
+      return;
+    }
+
     try {
       const chatId = getChatIdForConversation(conversationId);
       const response = await window.electron.conversation.delete(conversationId);
@@ -489,6 +495,11 @@ export default function Sidebar({
               <div className="truncate text-[13px] leading-tight text-neutral-800 dark:text-neutral-200">
                 {conversation.title}
               </div>
+              {conversation.isFeishu && (
+                <span className="shrink-0 rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+                  飞书
+                </span>
+              )}
               {status === 'running' && (
                 <span
                   className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-500"
@@ -504,16 +515,18 @@ export default function Sidebar({
               <span>{formatRelativeDate(conversation.updatedAt)}</span>
             </div>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setDeleteConfirm({ id: conversation.id, title: conversation.title });
-            }}
-            className="shrink-0 rounded p-0.5 text-neutral-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500 dark:text-neutral-600 dark:hover:text-red-400"
-            aria-label="删除任务"
-          >
-            <Trash2 className="h-3 w-3" />
-          </button>
+          {!conversation.isFeishu && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteConfirm({ id: conversation.id, title: conversation.title });
+              }}
+              className="shrink-0 rounded p-0.5 text-neutral-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500 dark:text-neutral-600 dark:hover:text-red-400"
+              aria-label="删除任务"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          )}
         </div>
       </div>
     );
