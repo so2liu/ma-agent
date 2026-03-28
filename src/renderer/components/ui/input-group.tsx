@@ -153,7 +153,7 @@ function InputGroupTextarea({
     <Textarea
       data-slot="input-group-control"
       className={cn(
-        "min-w-0 basis-0 flex-1 self-stretch resize-none rounded-none border-0 bg-transparent py-3 shadow-none focus-visible:ring-0 dark:bg-transparent",
+        "w-full min-w-0 basis-full resize-none rounded-none border-0 bg-transparent py-2.5 shadow-none focus-visible:ring-0 dark:bg-transparent",
         className
       )}
       {...props}

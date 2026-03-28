@@ -252,7 +252,7 @@ export default function ChatInput({
     <div ref={containerRef} className="px-4 pb-5 [-webkit-app-region:no-drag]">
       <div className="mx-auto max-w-3xl">
         <div
-          className={`w-full min-w-0 rounded-3xl bg-card/95 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl ${
+          className={`w-full min-w-0 rounded-3xl bg-card/95 p-2 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl ${
             isDragActive ? 'ring-2 ring-ring/60' : 'ring-1 ring-border'
           }`}
           onClick={handleInputContainerClick}
@@ -321,10 +321,10 @@ export default function ChatInput({
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 placeholder="输入你想让我做的事..."
-                className="min-h-[52px] max-h-[200px] w-full min-w-0 border-0 px-3 py-2 text-sm leading-6 text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
+                className="min-h-[44px] max-h-[200px] px-3 text-sm leading-6 text-foreground placeholder:text-muted-foreground"
               />
 
-              <PromptInputFooter className="flex-wrap items-center gap-3 px-2 pt-2">
+              <PromptInputFooter className="w-full items-center justify-between gap-3 px-2 py-2">
                 <PromptInputTools className="flex-wrap items-center gap-2">
                   <PromptInputButton
                     type="button"
