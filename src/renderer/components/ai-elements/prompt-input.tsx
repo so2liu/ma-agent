@@ -926,7 +926,7 @@ export const PromptInputTextarea = ({
 
   return (
     <InputGroupTextarea
-      className={cn("max-h-48 min-h-16 w-full min-w-0 self-stretch", className)}
+      className={cn("max-h-48 min-h-0 w-full min-w-0 self-stretch [field-sizing:content]", className)}
       name="message"
       onCompositionEnd={() => setIsComposing(false)}
       onCompositionStart={() => setIsComposing(true)}
