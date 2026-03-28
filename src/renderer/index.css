@@ -1,6 +1,33 @@
 @import 'tailwindcss';
 
 @plugin '@tailwindcss/typography';
+@source "../../node_modules/streamdown/dist/*.js";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
 
 /* macOS traffic-light safe area */
 :root {
@@ -9,6 +36,27 @@
   --color-sidebar-border: rgba(0, 0, 0, 0.08);
   --color-content-bg: #ffffff;
   --color-content-secondary: #f5f5f7;
+  --background: #ffffff;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --primary: #171717;
+  --primary-foreground: #fafafa;
+  --secondary: #f5f5f7;
+  --secondary-foreground: #171717;
+  --muted: #f5f5f7;
+  --muted-foreground: #6b7280;
+  --accent: #ececf0;
+  --accent-foreground: #171717;
+  --destructive: #dc2626;
+  --destructive-foreground: #fafafa;
+  --border: rgba(23, 23, 23, 0.08);
+  --input: rgba(23, 23, 23, 0.12);
+  --ring: rgba(115, 115, 115, 0.45);
+  --radius: 0.875rem;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,7 +65,40 @@
     --color-sidebar-border: rgba(255, 255, 255, 0.08);
     --color-content-bg: #1c1c1e;
     --color-content-secondary: #2c2c2e;
+    --background: #1c1c1e;
+    --foreground: #f5f5f5;
+    --card: #232326;
+    --card-foreground: #f5f5f5;
+    --popover: #232326;
+    --popover-foreground: #f5f5f5;
+    --primary: #fafafa;
+    --primary-foreground: #171717;
+    --secondary: #2c2c2e;
+    --secondary-foreground: #f5f5f5;
+    --muted: #2c2c2e;
+    --muted-foreground: #a1a1aa;
+    --accent: #3a3a3c;
+    --accent-foreground: #f5f5f5;
+    --destructive: #f87171;
+    --destructive-foreground: #171717;
+    --border: rgba(255, 255, 255, 0.12);
+    --input: rgba(255, 255, 255, 0.16);
+    --ring: rgba(212, 212, 216, 0.45);
+    color-scheme: dark;
   }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Resize handle default color from design tokens */
@@ -120,8 +201,8 @@ pre code {
 /* Tool container styling to mirror drawer cards */
 .tool-container {
   border-radius: 1rem;
-  border: 1px solid rgb(23 23 23 / 0.08);
-  background: rgb(255 255 255 / 0.95);
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
   padding: 0.75rem 1rem;
   box-shadow:
     0 4px 12px rgb(15 23 42 / 0.02),
@@ -132,84 +213,19 @@ pre code {
 }
 
 .tool-container:hover {
-  border-color: rgb(23 23 23 / 0.2);
+  background: var(--color-accent);
   box-shadow:
     0 6px 16px rgb(15 23 42 / 0.04),
     0 1px 4px rgb(15 23 42 / 0.04);
 }
 
-@media (prefers-color-scheme: dark) {
-  .tool-container {
-    border-color: rgb(82 82 82 / 0.8);
-    background: rgb(9 9 11 / 0.9);
-    box-shadow:
-      0 8px 16px rgb(0 0 0 / 0.25),
-      0 2px 4px rgb(0 0 0 / 0.2);
-  }
-
-  .tool-container:hover {
-    border-color: rgb(163 163 163 / 0.4);
-    box-shadow:
-      0 8px 16px rgb(0 0 0 / 0.28),
-      0 2px 4px rgb(0 0 0 / 0.2);
-  }
-}
-
-/* Create border with gaps for icons in expanded sections */
 .expanded-block-section {
-  position: relative;
-  background-image: linear-gradient(
-    to bottom,
-    rgb(229 229 229 / 0.3) 0%,
-    rgb(229 229 229 / 0.3) 100%
-  );
-  background-size: 1px 100%;
-  background-position: 0 0;
-  background-repeat: repeat-y;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  .expanded-block-section {
-    background-image: linear-gradient(to bottom, rgb(64 64 64 / 0.3) 0%, rgb(64 64 64 / 0.3) 100%);
-  }
-}
-
-/* Align tool call icons with border center and create gap */
-.expanded-block-section .flex.h-4.w-4.items-center.justify-center {
-  position: relative;
-  margin-left: -18.5px;
-  background-color: var(--color-content-bg);
-  z-index: 1;
-  padding: 3px 2px;
-  border-radius: 2px;
-}
-
-/* Align thinking badge icon with border center and create gap */
-.expanded-block-section .flex.items-center.gap-1\.5 {
-  position: relative;
-}
-
-.expanded-block-section .flex.items-center.gap-1\.5 > svg.size-3:first-child {
-  position: relative;
-  margin-left: -16.5px;
-  z-index: 1;
-}
-
-/* Create background gap for thinking icon using pseudo-element on parent */
-.expanded-block-section .flex.items-center.gap-1\.5::before {
-  content: '';
-  position: absolute;
-  left: -18.5px;
-  width: 20px;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 18px;
-  background-color: var(--color-content-bg);
-  border-radius: 2px;
-  z-index: 0;
-}
-
-/* Remove extra indent and border from expanded tool calls and thinking blocks */
 .expanded-block-section .collapsible-tool-expanded {
   margin-left: 0 !important;
   border-left: none !important;

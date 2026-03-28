@@ -1,5 +1,15 @@
 import { ExternalLink, FileImage, FileText, Globe } from 'lucide-react';
 
+import {
+  Artifact,
+  ArtifactAction,
+  ArtifactActions,
+  ArtifactDescription,
+  ArtifactHeader,
+  ArtifactTitle
+} from '@/components/ai-elements/artifact';
+import { cn } from '@/lib/utils';
+
 import type { ArtifactType } from '../../shared/file-extensions';
 
 export interface Deliverable {
@@ -27,25 +37,54 @@ export default function DeliverableCard({ deliverable, onPreview }: DeliverableC
   if (!config) return null;
 
   const Icon = config.icon;
+  const handlePreview = () => onPreview?.(deliverable);
 
   return (
-    <button
-      type="button"
-      onClick={() => onPreview?.(deliverable)}
-      className="group flex w-fit max-w-sm items-center gap-2.5 rounded-xl border border-neutral-200/80 bg-gradient-to-r from-neutral-50 to-white px-3.5 py-2.5 text-left shadow-sm transition-all hover:border-neutral-300 hover:shadow-md dark:border-neutral-700/60 dark:from-neutral-800/60 dark:to-neutral-800/40 dark:hover:border-neutral-600"
+    <Artifact
+      className={cn(
+        'w-fit max-w-sm border-border bg-card shadow-sm transition-colors',
+        onPreview && 'cursor-pointer hover:bg-accent/40'
+      )}
+      onClick={handlePreview}
+      onKeyDown={
+        onPreview ?
+          (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              handlePreview();
+            }
+          }
+        : undefined
+      }
+      role={onPreview ? 'button' : undefined}
+      tabIndex={onPreview ? 0 : undefined}
     >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-300">
-        <Icon className="h-4 w-4" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-neutral-800 dark:text-neutral-200">
-          {deliverable.fileName}
-        </p>
-        <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
-          {config.label} -- 点击预览
-        </p>
-      </div>
-      <ExternalLink className="h-3.5 w-3.5 shrink-0 text-neutral-300 transition-colors group-hover:text-neutral-500 dark:text-neutral-600 dark:group-hover:text-neutral-400" />
-    </button>
+      <ArtifactHeader className="gap-3 border-b-0 bg-transparent px-3.5 py-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <ArtifactTitle className="truncate text-sm text-foreground">
+              {deliverable.fileName}
+            </ArtifactTitle>
+            <ArtifactDescription className="text-[11px] text-muted-foreground/70">
+              {config.label} · 点击预览
+            </ArtifactDescription>
+          </div>
+        </div>
+        <ArtifactActions className="shrink-0">
+          <ArtifactAction
+            icon={ExternalLink}
+            label="预览"
+            tooltip="预览"
+            onClick={(event) => {
+              event.stopPropagation();
+              handlePreview();
+            }}
+          />
+        </ArtifactActions>
+      </ArtifactHeader>
+    </Artifact>
   );
 }

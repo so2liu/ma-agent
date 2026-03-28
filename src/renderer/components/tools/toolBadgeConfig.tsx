@@ -29,187 +29,115 @@ export interface ToolBadgeConfig {
   };
 }
 
+const TOOL_COLORS = {
+  amber: {
+    border: 'border-border',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    hoverBg: 'hover:bg-accent',
+    chevron: 'text-muted-foreground/70',
+    iconColor: 'text-muted-foreground'
+  },
+  blue: {
+    border: 'border-border',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    hoverBg: 'hover:bg-accent',
+    chevron: 'text-muted-foreground/70',
+    iconColor: 'text-muted-foreground'
+  },
+  cyan: {
+    border: 'border-border',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    hoverBg: 'hover:bg-accent',
+    chevron: 'text-muted-foreground/70',
+    iconColor: 'text-muted-foreground'
+  },
+  emerald: {
+    border: 'border-border',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    hoverBg: 'hover:bg-accent',
+    chevron: 'text-muted-foreground/70',
+    iconColor: 'text-muted-foreground'
+  },
+  indigo: {
+    border: 'border-border',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    hoverBg: 'hover:bg-accent',
+    chevron: 'text-muted-foreground/70',
+    iconColor: 'text-muted-foreground'
+  },
+  rose: {
+    border: 'border-border',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    hoverBg: 'hover:bg-accent',
+    chevron: 'text-muted-foreground/70',
+    iconColor: 'text-muted-foreground'
+  },
+  teal: {
+    border: 'border-border',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    hoverBg: 'hover:bg-accent',
+    chevron: 'text-muted-foreground/70',
+    iconColor: 'text-muted-foreground'
+  },
+  violet: {
+    border: 'border-border',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    hoverBg: 'hover:bg-accent',
+    chevron: 'text-muted-foreground/70',
+    iconColor: 'text-muted-foreground'
+  }
+} satisfies Record<string, ToolBadgeConfig['colors']>;
+
+const TOOL_ICONS: Record<string, ReactNode> = {
+  Bash: <Terminal className="size-2.5" />,
+  BashOutput: <Terminal className="size-2.5" />,
+  Edit: <FileEdit className="size-2.5" />,
+  Glob: <Search className="size-2.5" />,
+  Grep: <SearchCode className="size-2.5" />,
+  KillShell: <XCircle className="size-2.5" />,
+  NotebookEdit: <BookOpen className="size-2.5" />,
+  Read: <FileText className="size-2.5" />,
+  Skill: <Sparkles className="size-2.5" />,
+  Task: <Zap className="size-2.5" />,
+  TodoWrite: <ListTodo className="size-2.5" />,
+  WebFetch: <Globe className="size-2.5" />,
+  WebSearch: <Search className="size-2.5" />,
+  Write: <FilePen className="size-2.5" />
+};
+
+const TOOL_VARIANTS: Record<string, keyof typeof TOOL_COLORS> = {
+  Bash: 'amber',
+  BashOutput: 'amber',
+  Edit: 'emerald',
+  Glob: 'violet',
+  Grep: 'violet',
+  KillShell: 'amber',
+  NotebookEdit: 'teal',
+  Read: 'emerald',
+  Skill: 'rose',
+  Task: 'indigo',
+  TodoWrite: 'indigo',
+  WebFetch: 'cyan',
+  WebSearch: 'violet',
+  Write: 'emerald'
+};
+
 // Unified tool badge configuration - single source of truth
 export function getToolBadgeConfig(toolName: string): ToolBadgeConfig {
-  switch (toolName) {
-    // File operations - Green/Emerald
-    case 'Read':
-      return {
-        icon: <FileText className="size-2.5" />,
-        colors: {
-          border: 'border-emerald-200/60 dark:border-emerald-500/30',
-          bg: 'bg-emerald-50/80 dark:bg-emerald-500/10',
-          text: 'text-emerald-600 dark:text-emerald-400',
-          hoverBg: 'hover:bg-emerald-100/80 dark:hover:bg-emerald-500/20',
-          chevron: 'text-emerald-400 dark:text-emerald-500',
-          iconColor: 'text-emerald-500 dark:text-emerald-400'
-        }
-      };
-    case 'Write':
-      return {
-        icon: <FilePen className="size-2.5" />,
-        colors: {
-          border: 'border-emerald-200/60 dark:border-emerald-500/30',
-          bg: 'bg-emerald-50/80 dark:bg-emerald-500/10',
-          text: 'text-emerald-600 dark:text-emerald-400',
-          hoverBg: 'hover:bg-emerald-100/80 dark:hover:bg-emerald-500/20',
-          chevron: 'text-emerald-400 dark:text-emerald-500',
-          iconColor: 'text-emerald-500 dark:text-emerald-400'
-        }
-      };
-    case 'Edit':
-      return {
-        icon: <FileEdit className="size-2.5" />,
-        colors: {
-          border: 'border-emerald-200/60 dark:border-emerald-500/30',
-          bg: 'bg-emerald-50/80 dark:bg-emerald-500/10',
-          text: 'text-emerald-600 dark:text-emerald-400',
-          hoverBg: 'hover:bg-emerald-100/80 dark:hover:bg-emerald-500/20',
-          chevron: 'text-emerald-400 dark:text-emerald-500',
-          iconColor: 'text-emerald-500 dark:text-emerald-400'
-        }
-      };
-    // Terminal/Shell operations - Orange/Amber
-    case 'Bash':
-    case 'BashOutput':
-      return {
-        icon: <Terminal className="size-2.5" />,
-        colors: {
-          border: 'border-amber-200/60 dark:border-amber-500/30',
-          bg: 'bg-amber-50/80 dark:bg-amber-500/10',
-          text: 'text-amber-600 dark:text-amber-400',
-          hoverBg: 'hover:bg-amber-100/80 dark:hover:bg-amber-500/20',
-          chevron: 'text-amber-400 dark:text-amber-500',
-          iconColor: 'text-amber-500 dark:text-amber-400'
-        }
-      };
-    case 'KillShell':
-      return {
-        icon: <XCircle className="size-2.5" />,
-        colors: {
-          border: 'border-amber-200/60 dark:border-amber-500/30',
-          bg: 'bg-amber-50/80 dark:bg-amber-500/10',
-          text: 'text-amber-600 dark:text-amber-400',
-          hoverBg: 'hover:bg-amber-100/80 dark:hover:bg-amber-500/20',
-          chevron: 'text-amber-400 dark:text-amber-500',
-          iconColor: 'text-amber-500 dark:text-amber-400'
-        }
-      };
-    // Search operations - Purple/Violet
-    case 'Grep':
-      return {
-        icon: <SearchCode className="size-2.5" />,
-        colors: {
-          border: 'border-violet-200/60 dark:border-violet-500/30',
-          bg: 'bg-violet-50/80 dark:bg-violet-500/10',
-          text: 'text-violet-600 dark:text-violet-400',
-          hoverBg: 'hover:bg-violet-100/80 dark:hover:bg-violet-500/20',
-          chevron: 'text-violet-400 dark:text-violet-500',
-          iconColor: 'text-violet-500 dark:text-violet-400'
-        }
-      };
-    case 'Glob':
-      return {
-        icon: <Search className="size-2.5" />,
-        colors: {
-          border: 'border-violet-200/60 dark:border-violet-500/30',
-          bg: 'bg-violet-50/80 dark:bg-violet-500/10',
-          text: 'text-violet-600 dark:text-violet-400',
-          hoverBg: 'hover:bg-violet-100/80 dark:hover:bg-violet-500/20',
-          chevron: 'text-violet-400 dark:text-violet-500',
-          iconColor: 'text-violet-500 dark:text-violet-400'
-        }
-      };
-    case 'WebSearch':
-      return {
-        icon: <Search className="size-2.5" />,
-        colors: {
-          border: 'border-violet-200/60 dark:border-violet-500/30',
-          bg: 'bg-violet-50/80 dark:bg-violet-500/10',
-          text: 'text-violet-600 dark:text-violet-400',
-          hoverBg: 'hover:bg-violet-100/80 dark:hover:bg-violet-500/20',
-          chevron: 'text-violet-400 dark:text-violet-500',
-          iconColor: 'text-violet-500 dark:text-violet-400'
-        }
-      };
-    // Web operations - Blue/Cyan
-    case 'WebFetch':
-      return {
-        icon: <Globe className="size-2.5" />,
-        colors: {
-          border: 'border-cyan-200/60 dark:border-cyan-500/30',
-          bg: 'bg-cyan-50/80 dark:bg-cyan-500/10',
-          text: 'text-cyan-600 dark:text-cyan-400',
-          hoverBg: 'hover:bg-cyan-100/80 dark:hover:bg-cyan-500/20',
-          chevron: 'text-cyan-400 dark:text-cyan-500',
-          iconColor: 'text-cyan-500 dark:text-cyan-400'
-        }
-      };
-    // Task management - Indigo
-    case 'Task':
-      return {
-        icon: <Zap className="size-2.5" />,
-        colors: {
-          border: 'border-indigo-200/60 dark:border-indigo-500/30',
-          bg: 'bg-indigo-50/80 dark:bg-indigo-500/10',
-          text: 'text-indigo-600 dark:text-indigo-400',
-          hoverBg: 'hover:bg-indigo-100/80 dark:hover:bg-indigo-500/20',
-          chevron: 'text-indigo-400 dark:text-indigo-500',
-          iconColor: 'text-indigo-500 dark:text-indigo-400'
-        }
-      };
-    case 'TodoWrite':
-      return {
-        icon: <ListTodo className="size-2.5" />,
-        colors: {
-          border: 'border-indigo-200/60 dark:border-indigo-500/30',
-          bg: 'bg-indigo-50/80 dark:bg-indigo-500/10',
-          text: 'text-indigo-600 dark:text-indigo-400',
-          hoverBg: 'hover:bg-indigo-100/80 dark:hover:bg-indigo-500/20',
-          chevron: 'text-indigo-400 dark:text-indigo-500',
-          iconColor: 'text-indigo-500 dark:text-indigo-400'
-        }
-      };
-    // Skills - Pink/Rose
-    case 'Skill':
-      return {
-        icon: <Sparkles className="size-2.5" />,
-        colors: {
-          border: 'border-rose-200/60 dark:border-rose-500/30',
-          bg: 'bg-rose-50/80 dark:bg-rose-500/10',
-          text: 'text-rose-600 dark:text-rose-400',
-          hoverBg: 'hover:bg-rose-100/80 dark:hover:bg-rose-500/20',
-          chevron: 'text-rose-400 dark:text-rose-500',
-          iconColor: 'text-rose-500 dark:text-rose-400'
-        }
-      };
-    // Notebook - Teal
-    case 'NotebookEdit':
-      return {
-        icon: <BookOpen className="size-2.5" />,
-        colors: {
-          border: 'border-teal-200/60 dark:border-teal-500/30',
-          bg: 'bg-teal-50/80 dark:bg-teal-500/10',
-          text: 'text-teal-600 dark:text-teal-400',
-          hoverBg: 'hover:bg-teal-100/80 dark:hover:bg-teal-500/20',
-          chevron: 'text-teal-400 dark:text-teal-500',
-          iconColor: 'text-teal-500 dark:text-teal-400'
-        }
-      };
-    // Default - Blue (fallback)
-    default:
-      return {
-        icon: null,
-        colors: {
-          border: 'border-blue-200/60 dark:border-blue-500/30',
-          bg: 'bg-blue-50/80 dark:bg-blue-500/10',
-          text: 'text-blue-600 dark:text-blue-400',
-          hoverBg: 'hover:bg-blue-100/80 dark:hover:bg-blue-500/20',
-          chevron: 'text-blue-400 dark:text-blue-500',
-          iconColor: 'text-blue-500 dark:text-blue-400'
-        }
-      };
-  }
+  const variant = TOOL_VARIANTS[toolName] ?? 'blue';
+
+  return {
+    icon: TOOL_ICONS[toolName] ?? null,
+    colors: TOOL_COLORS[variant]
+  };
 }
 
 // Unified label generation logic - extracts compact label from tool
@@ -409,12 +337,12 @@ export function getThinkingBadgeConfig(): ToolBadgeConfig {
   return {
     icon: <Brain className="size-2.5" />,
     colors: {
-      border: 'border-purple-200/60 dark:border-purple-500/30',
-      bg: 'bg-purple-50/80 dark:bg-purple-500/10',
-      text: 'text-purple-600 dark:text-purple-400',
-      hoverBg: 'hover:bg-purple-100/80 dark:hover:bg-purple-500/20',
-      chevron: 'text-purple-400 dark:text-purple-500',
-      iconColor: 'text-purple-500 dark:text-purple-400'
+      border: 'border-border',
+      bg: 'bg-muted',
+      text: 'text-muted-foreground',
+      hoverBg: 'hover:bg-accent',
+      chevron: 'text-muted-foreground/70',
+      iconColor: 'text-muted-foreground'
     }
   };
 }

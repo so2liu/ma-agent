@@ -1,9 +1,9 @@
 import { ExternalLink, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createHighlighterCore, type HighlighterCore } from 'shiki/core';
-import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 
+import { CodeBlock, CodeBlockCopyButton } from '@/components/ai-elements/code-block';
 import Markdown from '@/components/Markdown';
+import { detectLanguage } from '@/lib/ai-elements-adapters';
 
 import type { ArtifactType } from '../../shared/file-extensions';
 
@@ -30,119 +30,15 @@ interface DiskLoadResult {
   error: string | null;
 }
 
-const EXT_TO_SHIKI_LANG: Record<string, string> = {
-  js: 'javascript',
-  jsx: 'jsx',
-  ts: 'typescript',
-  tsx: 'tsx',
-  py: 'python',
-  rb: 'ruby',
-  go: 'go',
-  rs: 'rust',
-  java: 'java',
-  c: 'c',
-  cpp: 'cpp',
-  h: 'c',
-  hpp: 'cpp',
-  sh: 'bash',
-  bash: 'bash',
-  css: 'css',
-  json: 'json',
-  yaml: 'yaml',
-  yml: 'yaml',
-  toml: 'toml',
-  xml: 'xml',
-  sql: 'sql',
-  graphql: 'graphql',
-  vue: 'vue',
-  svelte: 'svelte',
-  svg: 'xml',
-  html: 'html',
-  htm: 'html'
-};
-
-let highlighterPromise: Promise<HighlighterCore> | null = null;
-
-function getHighlighter(): Promise<HighlighterCore> {
-  if (!highlighterPromise) {
-    highlighterPromise = createHighlighterCore({
-      themes: [import('@shikijs/themes/github-dark')],
-      langs: [
-        import('@shikijs/langs/javascript'),
-        import('@shikijs/langs/jsx'),
-        import('@shikijs/langs/typescript'),
-        import('@shikijs/langs/tsx'),
-        import('@shikijs/langs/python'),
-        import('@shikijs/langs/ruby'),
-        import('@shikijs/langs/go'),
-        import('@shikijs/langs/rust'),
-        import('@shikijs/langs/java'),
-        import('@shikijs/langs/c'),
-        import('@shikijs/langs/cpp'),
-        import('@shikijs/langs/bash'),
-        import('@shikijs/langs/css'),
-        import('@shikijs/langs/json'),
-        import('@shikijs/langs/yaml'),
-        import('@shikijs/langs/toml'),
-        import('@shikijs/langs/xml'),
-        import('@shikijs/langs/sql'),
-        import('@shikijs/langs/graphql'),
-        import('@shikijs/langs/vue'),
-        import('@shikijs/langs/svelte'),
-        import('@shikijs/langs/html')
-      ],
-      engine: createJavaScriptRegexEngine()
-    }).catch((err) => {
-      highlighterPromise = null;
-      throw err;
-    });
-  }
-  return highlighterPromise;
-}
-
-function getShikiLang(fileName: string): string {
-  const ext = fileName.split('.').pop()?.toLowerCase() || '';
-  return EXT_TO_SHIKI_LANG[ext] || 'text';
-}
-
 function CodePreview({ content, fileName }: { content: string; fileName: string }) {
-  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
-  const lang = getShikiLang(fileName);
+  const language = detectLanguage(fileName);
 
-  useEffect(() => {
-    let cancelled = false;
-    getHighlighter()
-      .then((highlighter) => {
-        if (cancelled) return;
-        const supported = highlighter.getLoadedLanguages();
-        const html = highlighter.codeToHtml(content, {
-          lang: supported.includes(lang) ? lang : 'text',
-          theme: 'github-dark'
-        });
-        setHighlightedHtml(html);
-      })
-      .catch(() => {
-        if (!cancelled) setHighlightedHtml(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [content, lang]);
-
-  if (highlightedHtml) {
-    return (
-      <div
-        className="h-full overflow-auto p-4 text-sm [&_pre]:!bg-transparent"
-        dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-      />
-    );
-  }
-
-  // Fallback to plain text while loading
   return (
-    <pre className="h-full overflow-auto p-4 text-sm text-neutral-300">
-      <code>{content}</code>
-    </pre>
+    <div className="h-full overflow-auto p-4">
+      <CodeBlock code={content} language={language} showLineNumbers>
+        <CodeBlockCopyButton />
+      </CodeBlock>
+    </div>
   );
 }
 

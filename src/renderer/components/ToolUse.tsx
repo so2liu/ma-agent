@@ -2,7 +2,7 @@ import type { ToolUseSimple } from '@/types/chat';
 
 import BashOutputTool from './tools/BashOutputTool';
 import BashTool from './tools/BashTool';
-import { CollapsibleTool } from './tools/CollapsibleTool';
+import { CollapsibleTool, getToolDisplayInput } from './tools/CollapsibleTool';
 import EditTool from './tools/EditTool';
 import GlobTool from './tools/GlobTool';
 import GrepTool from './tools/GrepTool';
@@ -52,24 +52,16 @@ export default function ToolUse({ tool }: ToolUseProps) {
     case 'NotebookEdit':
       return <NotebookEditTool tool={tool} />;
     default: {
-      // Fallback for unknown tools - show raw JSON
-      const collapsedContent = (
-        <div className="text-sm text-neutral-600 dark:text-neutral-400">
-          <span className="font-medium">{tool.name}</span>
-        </div>
-      );
-
-      const expandedContent =
-        tool.inputJson ?
-          <div className="ml-5">
-            <pre className="overflow-x-auto rounded bg-neutral-50 px-2 py-1.5 font-mono text-sm wrap-break-word whitespace-pre-wrap text-neutral-700 dark:bg-neutral-900/50 dark:text-neutral-300">
-              {tool.inputJson}
-            </pre>
-          </div>
-        : null;
-
       return (
-        <CollapsibleTool collapsedContent={collapsedContent} expandedContent={expandedContent} />
+        <CollapsibleTool
+          tool={tool}
+          title={tool.name}
+          input={getToolDisplayInput(tool)}
+          inputLanguage="json"
+          errorText={tool.isError ? tool.result : undefined}
+          output={tool.isError ? undefined : tool.result}
+          outputLanguage="markdown"
+        />
       );
     }
   }

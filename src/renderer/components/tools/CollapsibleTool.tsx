@@ -1,48 +1,91 @@
-import { ChevronDown } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import type { BundledLanguage } from 'shiki';
+
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput
+} from '@/components/ai-elements/tool';
+import { mapToolState } from '@/lib/ai-elements-adapters';
+import type { ToolUseSimple } from '@/types/chat';
 
 interface CollapsibleToolProps {
-  collapsedContent: ReactNode;
-  expandedContent: ReactNode | null;
+  tool: ToolUseSimple;
+  title?: string;
+  input?: unknown;
+  inputLanguage?: BundledLanguage;
+  output?: unknown;
+  outputLanguage?: BundledLanguage;
+  errorText?: string;
+  children?: ReactNode;
   defaultExpanded?: boolean;
 }
 
+function hasDisplayValue(value: unknown): boolean {
+  if (value === null || value === undefined || value === false) {
+    return false;
+  }
+
+  if (typeof value === 'string') {
+    return value.length > 0;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  return true;
+}
+
+export function getToolDisplayInput(tool: ToolUseSimple): unknown {
+  const state = mapToolState(tool);
+  return state === 'input-streaming' ? tool.inputJson : (tool.parsedInput ?? tool.inputJson);
+}
+
 export function CollapsibleTool({
-  collapsedContent,
-  expandedContent,
+  tool,
+  title,
+  input,
+  inputLanguage,
+  output,
+  outputLanguage,
+  errorText,
+  children,
   defaultExpanded = false
 }: CollapsibleToolProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-
-  const hasExpandedContent = expandedContent !== null && expandedContent !== undefined;
+  const state = mapToolState(tool);
+  const hasExpandedContent =
+    hasDisplayValue(input) ||
+    hasDisplayValue(output) ||
+    hasDisplayValue(errorText) ||
+    hasDisplayValue(children);
 
   return (
-    <div className="my-0.5">
-      <button
-        type="button"
-        onClick={() => hasExpandedContent && setIsExpanded(!isExpanded)}
+    <Tool
+      className="group my-0.5 rounded-xl border-border bg-card shadow-sm"
+      onOpenChange={hasExpandedContent ? setIsExpanded : undefined}
+      open={hasExpandedContent ? isExpanded : false}
+    >
+      <ToolHeader
         disabled={!hasExpandedContent}
-        aria-expanded={isExpanded}
-        className={`flex w-full items-center gap-1.5 text-left transition-colors ${
-          hasExpandedContent ?
-            'cursor-pointer text-neutral-500 hover:text-neutral-600 dark:text-neutral-400 dark:hover:text-neutral-300'
-          : 'cursor-default text-neutral-400 dark:text-neutral-500'
-        }`}
-      >
-        <div className="flex-1">{collapsedContent}</div>
-        {hasExpandedContent && (
-          <span
-            className={`flex h-5 w-5 flex-shrink-0 items-center justify-center text-neutral-400 transition-transform duration-200 dark:text-neutral-500 ${isExpanded ? 'rotate-180' : ''}`}
-          >
-            <ChevronDown className="size-3" />
-          </span>
-        )}
-      </button>
-      {isExpanded && hasExpandedContent && (
-        <div className="collapsible-tool-expanded mt-1 ml-3 border-l border-neutral-200/30 pl-2.5 dark:border-neutral-700/30">
-          <div className="space-y-1.5">{expandedContent}</div>
-        </div>
+        state={state}
+        title={title ?? tool.name}
+        type={tool.name}
+      />
+      {hasExpandedContent && (
+        <ToolContent className="border-t border-border">
+          <ToolInput input={input} language={inputLanguage} />
+          {children && <div className="space-y-3 p-4">{children}</div>}
+          <ToolOutput
+            errorText={errorText}
+            language={outputLanguage}
+            output={output}
+          />
+        </ToolContent>
       )}
-    </div>
+    </Tool>
   );
 }
