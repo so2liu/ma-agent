@@ -44,11 +44,11 @@ export class CodingAgentManager {
 
   /**
    * Called when a task event should be relayed to the orchestrator.
-   * Signature: (chatId, taskId, event) => boolean (true if delivered).
+   * Signature: (chatId, taskId, event) => Promise<boolean> (true if delivered).
    * Wired by chat-handlers to inject system-reminder messages into PiRuntime.
    */
   onTaskNotification:
-    | ((chatId: string, taskId: string, event: CodingTaskEvent) => boolean)
+    | ((chatId: string, taskId: string, event: CodingTaskEvent) => Promise<boolean>)
     | null = null;
 
   /**
@@ -195,12 +195,12 @@ export class CodingAgentManager {
   }
 
   /** Drain pending notifications for a chat that just became active. */
-  drainPendingNotifications(chatId: string): void {
+  async drainPendingNotifications(chatId: string): Promise<void> {
     const toDeliver = this.pendingNotifications.filter((n) => n.chatId === chatId);
     this.pendingNotifications = this.pendingNotifications.filter((n) => n.chatId !== chatId);
 
     for (const notification of toDeliver) {
-      this.notifyOrchestrator(notification.taskId, notification.event);
+      await this.notifyOrchestrator(notification.taskId, notification.event);
     }
   }
 
@@ -256,7 +256,7 @@ export class CodingAgentManager {
         task.status = 'waiting';
         task.pendingQuestion = event.message;
         this.notifyUI(taskId, event);
-        this.notifyOrchestrator(taskId, event);
+        void this.notifyOrchestrator(taskId, event);
         break;
 
       case 'completed':
@@ -266,14 +266,17 @@ export class CodingAgentManager {
         task.status = 'completed';
         task.result = event.message;
         this.notifyUI(taskId, event);
-        this.notifyOrchestrator(taskId, event);
+        void this.notifyOrchestrator(taskId, event);
         break;
 
       case 'error':
+        if (task.status === 'failed') {
+          break;
+        }
         task.status = 'failed';
         task.error = event.message;
         this.notifyUI(taskId, event);
-        this.notifyOrchestrator(taskId, event);
+        void this.notifyOrchestrator(taskId, event);
         break;
     }
   }
@@ -288,13 +291,13 @@ export class CodingAgentManager {
   }
 
   /** Send notification to the orchestrator (Pi Agent). */
-  private notifyOrchestrator(taskId: string, event: CodingTaskEvent): void {
+  private async notifyOrchestrator(taskId: string, event: CodingTaskEvent): Promise<void> {
     const task = this.tasks.get(taskId);
     if (!task) {
       return;
     }
 
-    const delivered = this.onTaskNotification?.(task.chatId, taskId, event) ?? false;
+    const delivered = (await this.onTaskNotification?.(task.chatId, taskId, event)) ?? false;
     if (!delivered) {
       // Queue for later delivery when the session becomes active
       this.pendingNotifications.push({ chatId: task.chatId, taskId, event });

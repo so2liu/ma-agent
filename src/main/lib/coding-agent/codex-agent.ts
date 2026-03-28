@@ -7,7 +7,7 @@
 
 import { Codex } from '@openai/codex-sdk';
 
-import { getOpenAIApiKey } from '../config';
+import { buildClaudeSessionEnv, getOpenAIApiKey } from '../config';
 import type { CodingTaskEventHandler } from './types';
 
 export class CodexAgent {
@@ -28,7 +28,7 @@ export class CodexAgent {
       return;
     }
 
-    this.codex = new Codex({ apiKey });
+    this.codex = new Codex({ apiKey, env: buildClaudeSessionEnv() });
     this.thread = this.codex.startThread({
       workingDirectory: cwd,
       sandboxMode: 'workspace-write',
@@ -113,8 +113,10 @@ export class CodexAgent {
       if (this.abortController?.signal.aborted) {
         return;
       }
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      onEvent(taskId, { type: 'error', message: errorMessage });
+      if (!hadError) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        onEvent(taskId, { type: 'error', message: errorMessage });
+      }
     } finally {
       this.running = false;
       this.abortController = null;
