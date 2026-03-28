@@ -321,7 +321,7 @@ export default function ChatInput({
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 placeholder="输入你想让我做的事..."
-                className="min-h-[44px] max-h-[200px] px-3 text-sm leading-6 text-foreground placeholder:text-muted-foreground"
+                className="min-h-[44px] max-h-[200px] basis-auto px-3 text-sm leading-6 text-foreground placeholder:text-muted-foreground"
               />
 
               <PromptInputFooter className="w-full items-center justify-between gap-3 px-2 py-2">

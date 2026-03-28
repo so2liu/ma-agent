@@ -22,7 +22,6 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import {
-  InputGroup,
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
@@ -816,7 +815,7 @@ export const PromptInput = ({
         ref={formRef}
         {...props}
       >
-        <InputGroup className="min-w-0 flex-wrap border-0 shadow-none">{children}</InputGroup>
+        <div className="flex w-full min-w-0 flex-col">{children}</div>
       </form>
     </>
   );
@@ -946,7 +945,7 @@ export const PromptInputHeader = ({
   className,
   ...props
 }: PromptInputHeaderProps) => (
-  <div className={cn("order-first flex w-full basis-full flex-wrap gap-1", className)} {...props} />
+  <div className={cn("flex w-full flex-wrap gap-1", className)} {...props} />
 );
 
 export type PromptInputFooterProps = HTMLAttributes<HTMLDivElement>;
@@ -956,7 +955,7 @@ export const PromptInputFooter = ({
   ...props
 }: PromptInputFooterProps) => (
   <div
-    className={cn("order-last flex shrink-0 items-center gap-1 self-end", className)}
+    className={cn("flex shrink-0 items-center gap-1", className)}
     {...props}
   />
 );
