@@ -82,10 +82,18 @@ jobs:
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           DATE=$(date -u +%Y%m%d)
+          # Seconds since midnight UTC — always numeric, no leading zeros, monotonically increasing
+          HOUR=$(date -u +%H)
+          MIN=$(date -u +%M)
+          SEC=$(date -u +%S)
+          SECONDS_TODAY=$(( 10#$HOUR * 3600 + 10#$MIN * 60 + 10#$SEC ))
           BASE_VERSION=$(node -p "require('./package.json').version")
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
           NEXT_PATCH=$((PATCH + 1))
-          NIGHTLY_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-nightly.${DATE}.${SHORT_SHA}"
+          # Use UTC seconds-since-midnight instead of git SHA to ensure monotonic semver ordering.
+          # SHA in pre-release causes inconsistent comparison: all-digit SHAs are
+          # treated as integers by semver and always rank below alphanumeric SHAs.
+          NIGHTLY_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-nightly.${DATE}.${SECONDS_TODAY}"
           echo "nightly_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
           echo "nightly_tag=v${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
