@@ -11,6 +11,7 @@ import {
   submitFeedback,
   trackEvent
 } from '../lib/analytics-service';
+import { setSentryEnabled } from '../lib/sentry';
 
 export function registerAnalyticsHandlers(): void {
   ipcMain.handle('analytics:track-event', (_event, analyticsEvent: AnalyticsEvent) => {
@@ -26,6 +27,8 @@ export function registerAnalyticsHandlers(): void {
   });
 
   ipcMain.handle('analytics:set-settings', (_event, settings: Partial<AnalyticsSettings>) => {
-    return setAnalyticsSettings(settings);
+    const nextSettings = setAnalyticsSettings(settings);
+    setSentryEnabled(nextSettings.enabled);
+    return nextSettings;
   });
 }

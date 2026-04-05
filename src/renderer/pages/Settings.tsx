@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { FeishuSettings } from '@/components/settings/FeishuSettings';
 import type { UpdateChannel } from '@/electron';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 import type {
   ChatModelPreference,
@@ -76,6 +77,7 @@ type TestResult = {
 };
 
 function Settings() {
+  const { track } = useAnalytics();
   const [workspaceDir, setWorkspaceDir] = useState('');
   const [currentWorkspaceDir, setCurrentWorkspaceDir] = useState('');
   const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
@@ -345,6 +347,7 @@ function Settings() {
         const workspaceResponse = await window.electron.config.getWorkspaceDir();
         setCurrentWorkspaceDir(workspaceResponse.workspaceDir);
         setTimeout(() => setWorkspaceSaveStatus('idle'), 2000);
+        track('settings_changed', { settingKey: 'workspace' });
       } else {
         setWorkspaceSaveStatus('error');
         setTimeout(() => setWorkspaceSaveStatus('idle'), 3000);
@@ -364,6 +367,7 @@ function Settings() {
     try {
       await window.electron.config.setDebugMode(newValue);
       setDebugMode(newValue);
+      track('settings_changed', { settingKey: 'debugMode' });
     } catch {
       setDebugMode(previousValue);
     } finally {
@@ -381,6 +385,7 @@ function Settings() {
       setApiKeyInput('');
       setApiKeySaveState('success');
       setTimeout(() => setApiKeySaveState('idle'), 2000);
+      track('settings_changed', { settingKey: 'apiKey' });
     } catch {
       setApiKeySaveState('error');
       setTimeout(() => setApiKeySaveState('idle'), 2500);
@@ -399,6 +404,7 @@ function Settings() {
       setApiKeyInput('');
       setApiKeySaveState('success');
       setTimeout(() => setApiKeySaveState('idle'), 2000);
+      track('settings_changed', { settingKey: 'apiKey' });
     } catch {
       setApiKeySaveState('error');
       setTimeout(() => setApiKeySaveState('idle'), 2500);
@@ -416,6 +422,7 @@ function Settings() {
       setApiBaseUrl(response.apiBaseUrl || '');
       setBaseUrlSaveState('success');
       setTimeout(() => setBaseUrlSaveState('idle'), 2000);
+      track('settings_changed', { settingKey: 'baseUrl' });
     } catch {
       setBaseUrlSaveState('error');
       setTimeout(() => setBaseUrlSaveState('idle'), 2500);
@@ -433,6 +440,7 @@ function Settings() {
       setCustomModelIds(response.customModelIds || {});
       setModelIdsSaveState('success');
       setTimeout(() => setModelIdsSaveState('idle'), 2000);
+      track('settings_changed', { settingKey: 'modelIds' });
     } catch {
       setModelIdsSaveState('error');
       setTimeout(() => setModelIdsSaveState('idle'), 2500);
@@ -450,6 +458,7 @@ function Settings() {
       setCustomModelId(response.customModelId || '');
       setModelIdSaveState('success');
       setTimeout(() => setModelIdSaveState('idle'), 2000);
+      track('settings_changed', { settingKey: 'customModelId' });
     } catch {
       setModelIdSaveState('error');
       setTimeout(() => setModelIdSaveState('idle'), 2500);
@@ -479,6 +488,7 @@ function Settings() {
       setOpenaiApiKeyInput('');
       setOpenaiSaveState('success');
       setTimeout(() => setOpenaiSaveState('idle'), 2000);
+      track('settings_changed', { settingKey: 'openaiConfig' });
     } catch {
       setOpenaiSaveState('error');
       setTimeout(() => setOpenaiSaveState('idle'), 2500);
@@ -741,6 +751,7 @@ function Settings() {
     try {
       const response = await window.electron.update.setChannel(newChannel);
       setUpdateChannel(response.channel);
+      track('settings_changed', { settingKey: 'updateChannel' });
     } catch {
       // Revert on error
     } finally {
@@ -754,6 +765,7 @@ function Settings() {
     try {
       const settings = await window.electron.analytics.setSettings({ enabled: newValue });
       setAnalyticsEnabled(settings.enabled);
+      track('settings_changed', { settingKey: 'analytics' });
     } catch {
       setAnalyticsEnabled(!newValue);
     } finally {
@@ -769,6 +781,7 @@ function Settings() {
         shareConversationOnFeedback: newValue
       });
       setAnalyticsShareConversation(settings.shareConversationOnFeedback);
+      track('settings_changed', { settingKey: 'shareConversation' });
     } catch {
       setAnalyticsShareConversation(!newValue);
     } finally {

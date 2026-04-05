@@ -761,6 +761,7 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
         canvasChanges.clearChanges();
         prevArtifactCountRef.current = 0;
         isInitialLoadRef.current = true;
+        track('conversation_resumed');
         return;
       }
 
@@ -806,13 +807,14 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
         if (response.conversation.projectId) {
           setSelectedProjectId(response.conversation.projectId);
         } else {
-          // Legacy ungrouped conversation — select default project
+          // Legacy ungrouped conversation - select default project
           const projResponse = await window.electron.project.list();
           if (projResponse.success && projResponse.projects) {
             const defaultId = projResponse.projects.find((p) => p.isDefault)?.id ?? null;
             if (defaultId) setSelectedProjectId(defaultId);
           }
         }
+        track('conversation_resumed');
       }
     } catch (error) {
       console.error('Error loading conversation:', error);
@@ -1104,7 +1106,8 @@ const Chat = forwardRef<ChatHandle, ChatProps>(function Chat(
               />
             </div>
             <SkillCardGrid
-              onSelectSkill={(cmd) => {
+              onSelectSkill={(cmd, selectedCard) => {
+                track('skill_executed', { skillName: selectedCard.title });
                 setInputValue(cmd);
                 requestAnimationFrame(() => {
                   const textarea = document.querySelector<HTMLTextAreaElement>(

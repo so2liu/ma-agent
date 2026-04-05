@@ -37,6 +37,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@sentry/electron": "^7.10.0",
     "@sinclair/typebox": "0.34.49",
     "@tanstack/react-virtual": "^3.13.22",
     "adm-zip": "^0.5.16",
