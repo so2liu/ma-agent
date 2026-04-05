@@ -350,6 +350,15 @@ contextBridge.exposeInMainWorld('electron', {
     setSettings: (settings: Partial<AnalyticsSettings>) =>
       ipcRenderer.invoke('analytics:set-settings', settings) as Promise<AnalyticsSettings>
   },
+  sentry: {
+    getDsn: () => ipcRenderer.sendSync('sentry:get-dsn') as string,
+    getEnabled: () => ipcRenderer.sendSync('sentry:get-enabled') as boolean,
+    onEnabledChange: (callback: (enabled: boolean) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, enabled: boolean) => callback(enabled);
+      ipcRenderer.on('sentry:enabled-changed', listener);
+      return () => ipcRenderer.removeListener('sentry:enabled-changed', listener);
+    }
+  },
   canvas: {
     loadFile: (filePath: string) => ipcRenderer.invoke('canvas:load-file', filePath),
     saveFile: (filePath: string, content: string) =>

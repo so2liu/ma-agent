@@ -15,7 +15,7 @@ const iconMap: Record<SkillCard['icon'], ComponentType<SVGProps<SVGSVGElement>>>
 };
 
 interface SkillCardGridProps {
-  onSelectSkill: (slashCommand: string) => void;
+  onSelectSkill: (slashCommand: string, selectedCard: SkillCard) => void;
   onMoreClick?: () => void;
   currentInput?: string;
 }
@@ -68,7 +68,7 @@ export default function SkillCardGrid({
       return;
     }
 
-    onSelectSkill(`/${selectedCard.id} `);
+    onSelectSkill(`/${selectedCard.id} `, selectedCard);
     setSelectedId(null);
     setConfirmedInput(null);
   }, [selectedCard, currentInput, isConfirmed, onSelectSkill]);

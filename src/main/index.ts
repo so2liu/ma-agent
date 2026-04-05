@@ -1,3 +1,7 @@
+import { flushSentry, initSentry } from './lib/sentry';
+
+initSentry();
+
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { app, BrowserWindow, Menu } from 'electron';
@@ -182,6 +186,9 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   trackEvent({ type: 'app_closed', timestamp: Date.now() });
   feishuBot.stop();
+  flushSentry().catch((error) => {
+    console.error('Error flushing Sentry:', error);
+  });
   shutdownAnalytics().catch((error) => {
     console.error('Error shutting down analytics:', error);
   });

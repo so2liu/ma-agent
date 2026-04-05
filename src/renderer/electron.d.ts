@@ -652,6 +652,11 @@ export interface ElectronAPI {
     getSettings: () => Promise<AnalyticsSettings>;
     setSettings: (settings: Partial<AnalyticsSettings>) => Promise<AnalyticsSettings>;
   };
+  sentry: {
+    getDsn: () => string;
+    getEnabled: () => boolean;
+    onEnabledChange: (callback: (enabled: boolean) => void) => () => void;
+  };
   canvas: {
     loadFile: (filePath: string) => Promise<{
       success: boolean;
