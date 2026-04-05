@@ -518,7 +518,7 @@ const Message = forwardRef<HTMLDivElement, MessageProps>(function Message(
     <div ref={ref}>
       <AIMessage from="assistant" className="max-w-full">
         <MessageContent className="w-full px-3 py-2 text-base leading-relaxed">
-          <div className="space-y-3">
+          <div className="space-y-3 overflow-hidden">
             {groupedBlocks.map((item, index) => {
               // Single text block
               if (!Array.isArray(item)) {

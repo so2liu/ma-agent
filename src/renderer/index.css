@@ -224,6 +224,7 @@ pre code {
   min-width: 0;
   flex-direction: column;
   gap: 0.75rem;
+  overflow: hidden;
 }
 
 .expanded-block-section .collapsible-tool-expanded {
