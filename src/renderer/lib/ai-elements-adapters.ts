@@ -290,7 +290,8 @@ export function parseGlobToTree(result: string): FileTreeNode[] {
   return finalizeTree([...root.values()]);
 }
 
-export function detectLanguage(filePath: string): BundledLanguage {
+export function detectLanguage(filePath: string | undefined): BundledLanguage {
+  if (!filePath) return 'markdown';
   const normalizedPath = normalizePath(filePath);
   const basename = normalizedPath.split('/').pop()?.toLowerCase() ?? '';
   const extension = basename.includes('.') ? basename.split('.').pop() ?? '' : basename;
