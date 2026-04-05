@@ -13,7 +13,7 @@ export default defineConfig({
       __HMAC_SECRET__: JSON.stringify(
         process.env.HMAC_SECRET || 'kfy7-1oO-1oo-OcQ-XxG-t9W-odp-LSm'
       ),
-      __SENTRY_DSN__: JSON.stringify(process.env.SENTRY_DSN ?? '')
+      __SENTRY_DSN__: JSON.stringify(process.env.SENTRY_DSN ?? 'https://6aff2eef33fba18fbddd7f825c861028@o4506850555002880.ingest.us.sentry.io/4511167785992192')
     },
     build: {
       outDir: 'out/main',
